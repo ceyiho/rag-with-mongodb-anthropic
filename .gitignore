@@ -3,3 +3,6 @@
 
 # Dependencies - reinstalled with `npm install`
 node_modules/
+
+# Personal Claude preferences - kept local
+CLAUDE.md
