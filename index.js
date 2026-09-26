@@ -1,26 +1,17 @@
-const { MongoClient } = require('mongodb');
-
-const { MONGODB_URI, DB_NAME, COLLECTION_NAME } = process.env;
-
-if (!MONGODB_URI || MONGODB_URI.startsWith('paste-')) {
-  console.error('Missing MONGODB_URI - add your Atlas connection string to .env');
-  process.exit(1);
-}
+const { connect } = require('./db');
+const config = require('./config');
 
 async function main() {
-  const client = new MongoClient(MONGODB_URI);
+  const { client, db } = await connect();
 
   try {
-    await client.connect();
-    await client.db('admin').command({ ping: 1 });
+    await db.admin().command({ ping: 1 });
     console.log('Connected to MongoDB Atlas!');
 
-    const collection = client.db(DB_NAME).collection(COLLECTION_NAME);
-    const count = await collection.countDocuments();
-    console.log(`${DB_NAME}.${COLLECTION_NAME} has ${count} document(s)`);
-
-    const sample = await collection.findOne();
-    console.log('Sample document:', sample);
+    for (const name of Object.values(config.collections)) {
+      const count = await db.collection(name).countDocuments();
+      console.log(`${db.databaseName}.${name} has ${count} MDB doc(s)`);
+    }
   } finally {
     await client.close();
   }
