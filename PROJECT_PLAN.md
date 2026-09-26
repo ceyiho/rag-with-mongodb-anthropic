@@ -33,7 +33,8 @@ so no logins or usage limits are needed.
 - Database: MongoDB Atlas (free M0 cluster) via the official MongoDB Node.js driver
 - Frontend: plain HTML + JavaScript (no framework for now)
 - Language: plain JavaScript (no TypeScript for now)
-- Embeddings: Auto-Embedding with Voyage AI on MongoDB Atlas. Uses a one-time free
+- Embeddings: Auto-Embedding with Voyage AI on MongoDB Atlas, model `voyage-4`.
+  Switching models later means re-embedding everything. Uses a one-time free
   allocation of 200 million tokens per model (not monthly), so avoid unnecessary
   re-embedding.
 - Chunking: custom splitter (Markdown headings → paragraphs → sentences), sized in
@@ -114,8 +115,6 @@ so no logins or usage limits are needed.
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
-- Voyage embedding model (Atlas lists several). Decide before milestone 3; switching
-  later means re-embedding everything.
 - Schema: collections and field names (including the upload status field). Decide
   before creating any test documents in milestone 2, because the vector index
   definition is built on these field names.
