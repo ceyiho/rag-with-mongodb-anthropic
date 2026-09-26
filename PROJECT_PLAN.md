@@ -50,7 +50,7 @@ so no logins or usage limits are needed.
 ## How it works
 1. Ingest: user uploads a file; the app extracts text and splits it into overlapping chunks.
 2. Store: each chunk is saved in Atlas with its text and metadata
-   (uploadId, source file, section, upload date). The app does not create vectors.
+   (uploadId, file name, section). The app does not create vectors.
 3. Embed: Atlas Auto-Embedding converts each chunk's text to a vector with Voyage AI,
    through the vector search index.
 4. Retrieve: the question is sent to Atlas as text; Atlas embeds it with the same model,
@@ -76,6 +76,8 @@ so no logins or usage limits are needed.
    shared splitter chunks them, so PDF support later only adds an extractor.
    All-or-nothing: an upload has a status (processing → complete); only complete
    uploads count as duplicates, so a failed ingest can be retried.
+   Create `config.js` with the collection names and chunk sizes, and create the
+   regular indexes (see Decisions).
    Inspect the chunks in Atlas (no embedding tokens are spent yet).
 3. Create the vector search index with Auto-Embedding, with uploadId as a filter field.
    Wait until it reports ready. Note that embedding runs in the background: measure how
@@ -114,12 +116,17 @@ so no logins or usage limits are needed.
 11. Analytics: log each question, top score, and cited chunks in a `questions`
     collection, then build an analytics view with aggregation pipelines.
 
-## Open decisions
-- Schema: collections and field names (including the upload status field). Decide
-  before creating any test documents in milestone 2, because the vector index
-  definition is built on these field names.
-- Chunk size and overlap (decide before embedding lots of data; changing later means
-  re-embedding everything)
+## Decisions
+- Database: `knowledge_base` (`DB_NAME` in `.env`).
+- Schema: two collections, names in `config.js`.
+  - `uploads`: `_id` (the uploadId), `fileName`, `fileType`, `status`
+    (processing → complete), `uploadedAt`, `chunkCount`.
+  - `chunks`: `uploadId` (ObjectId), `fileName` (copied for citations), `section`,
+    `chunkIndex`, `text` (heading path + body; the auto-embedded field).
+  - Indexes: `uploads` partial unique on `fileName` where status is complete;
+    `chunks` on `uploadId`. The vector index filters on `uploadId` only.
+- Chunk size: 1,600 characters, max 2,000, overlap 200, headings as hard boundaries.
+  Values in `config.js`; confirm in milestone 4 before bulk uploads.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as
