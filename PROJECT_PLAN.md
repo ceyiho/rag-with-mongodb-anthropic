@@ -93,13 +93,13 @@ so no logins or usage limits are needed.
 6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
    PDFs with a clear message. Comes before the API and web page so they are built once
    for all file types.
+
+### Phase 2
 7. Express API: one shared database client; routes to upload, list documents, and ask.
    Test with curl before building any UI.
 8. Web page: upload form, document picker (including "All documents"), question box,
    answers with citations. Show a "processing… ready" state after upload, since new
    chunks are not searchable until their embeddings exist.
-
-### Phase 2
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
    Combined scores use a different scale, so re-tune the "not found" threshold (record
    it under Findings), and
