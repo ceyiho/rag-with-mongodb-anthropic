@@ -52,18 +52,39 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
 - Atlas Vector Search with Auto-Embedding, pre-filtered by document (uploadId)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
 - Flexible document model: text, vector, and metadata in one document
-- Aggregation pipeline: analytics (most-asked questions, most-cited documents,
-  questions with no good match)
+- Optional: aggregation pipeline analytics (most-asked questions, most-cited documents,
+  questions with no good match). Parked; see the last milestone.
 
 ## Milestones
-1. Connect to Atlas, insert one test note, read it back. (No AI yet.)
-2. Store a few test chunks and create a vector search index with Auto-Embedding.
-3. Run a similarity search from a text question, with and without the uploadId filter.
-4. Generate answers with an LLM, including citations.
-5. Simple web page: upload, ask, see answers.
-6. Phase 2: PDF support, metadata filters, hybrid search.
-7. Phase 3: analytics view, README with architecture diagram,
-   demo video.
+
+### Phase 1: core
+1. Connect to Atlas and verify the connection. (No AI yet.)
+2. Ingest from the command line: read a .txt or .md file, find sections (Markdown
+   headings; plain text is one section), split into overlapping chunks, and save the
+   upload and its chunks. Reject duplicate file names and unsupported types.
+   Inspect the chunks in Atlas (no embedding tokens are spent yet).
+3. Create the vector search index with Auto-Embedding, with uploadId as a filter field.
+   Wait until it reports ready.
+4. Search from the command line: a text question returns the top chunks with scores,
+   with and without the uploadId filter. Run a few test questions (answerable and not)
+   and choose the "not found" score threshold.
+5. Answer: apply the threshold check, then the LLM answers with citations
+   (document + section).
+6. Express API: one shared database client; routes to upload, list documents, and ask.
+   Test with curl before building any UI.
+7. Web page: upload form, document picker (including "All documents"), question box,
+   answers with citations.
+
+### Phase 2
+8. PDF support: text-based PDFs only; reject scanned PDFs with a clear message.
+9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
+
+### Phase 3
+10. README with architecture diagram, and a demo video.
+
+### Optional (parked)
+11. Analytics: log each question, top score, and cited chunks in a `questions`
+    collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
 - Schema: collections and field names. Decide before creating any test documents in
