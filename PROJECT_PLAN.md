@@ -33,7 +33,14 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
 - Embeddings: Auto-Embedding with Voyage AI on MongoDB Atlas. Uses a one-time free
   allocation of 200 million tokens per model (not monthly), so avoid unnecessary
   re-embedding.
-- Answer generation: Anthropic API
+- Chunking: custom splitter (Markdown headings → paragraphs → sentences), sized in
+  characters (≈4 characters per token). No library.
+- PDF extraction: a pdf.js-based library (choose in milestone 8), giving text per page.
+  Pages act as sections for citations. Pages with almost no text mean a scanned PDF,
+  which is rejected.
+- Answer generation: Anthropic API with built-in citations; one call per question,
+  skipped when retrieval scores are below the threshold. Model: Claude Sonnet 5
+  (`claude-sonnet-5`). Compare with other models on test questions in milestone 5.
 - Secrets: stored in a `.env` file, never committed to git
 
 ## How it works
@@ -62,6 +69,8 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
 2. Ingest from the command line: read a .txt or .md file, find sections (Markdown
    headings; plain text is one section), split into overlapping chunks, and save the
    upload and its chunks. Reject duplicate file names and unsupported types.
+   Structure: one extractor per file type returns sections ({ section, text }); one
+   shared splitter chunks them, so PDF support later only adds an extractor.
    Inspect the chunks in Atlas (no embedding tokens are spent yet).
 3. Create the vector search index with Auto-Embedding, with uploadId as a filter field.
    Wait until it reports ready.
