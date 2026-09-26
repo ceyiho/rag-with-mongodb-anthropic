@@ -27,6 +27,12 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
 Deployment: runs on localhost or a private VM for demos. It is not exposed publicly,
 so no logins or usage limits are needed.
 
+## Terminology
+- **MDB doc:** a document in MongoDB's document model (a record in a collection).
+- **Upload:** a file the user uploads (a document in the everyday sense).
+- **Chunk:** a piece of an upload, stored as one MDB doc in the `chunks` collection.
+- Avoid the bare word "document"; use one of the terms above.
+
 ## Tech stack
 - Runtime: Node.js (LTS)
 - Backend: Express
