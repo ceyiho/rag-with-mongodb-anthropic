@@ -38,7 +38,7 @@ so no logins or usage limits are needed.
   re-embedding.
 - Chunking: custom splitter (Markdown headings → paragraphs → sentences), sized in
   characters (≈4 characters per token). No library.
-- PDF extraction: a pdf.js-based library (choose in milestone 8), giving text per page.
+- PDF extraction: a pdf.js-based library (choose in milestone 6), giving text per page.
   Pages act as sections for citations. Pages with almost no text mean a scanned PDF,
   which is rejected.
 - Answer generation: Anthropic API with built-in citations; one call per question,
@@ -78,7 +78,7 @@ so no logins or usage limits are needed.
    Inspect the chunks in Atlas (no embedding tokens are spent yet).
 3. Create the vector search index with Auto-Embedding, with uploadId as a filter field.
    Wait until it reports ready. Note that embedding runs in the background: measure how
-   long new chunks take to become searchable, and record it under Findings (milestone 7
+   long new chunks take to become searchable, and record it under Findings (milestone 8
    uses it for the "processing… ready" state).
 4. Search from the command line: a text question returns the top chunks with scores,
    with and without the uploadId filter. Save test questions (answerable and not, each
@@ -89,16 +89,19 @@ so no logins or usage limits are needed.
    (document + section). The system prompt treats document text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
    committed, not `.env`), one per search mode, with a comment pointing to Findings.
-6. Express API: one shared database client; routes to upload, list documents, and ask.
+6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
+   PDFs with a clear message. Comes before the API and web page so they are built once
+   for all file types.
+7. Express API: one shared database client; routes to upload, list documents, and ask.
    Test with curl before building any UI.
-7. Web page: upload form, document picker (including "All documents"), question box,
+8. Web page: upload form, document picker (including "All documents"), question box,
    answers with citations. Show a "processing… ready" state after upload, since new
    chunks are not searchable until their embeddings exist.
 
 ### Phase 2
-8. PDF support: text-based PDFs only; reject scanned PDFs with a clear message.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
-   Combined scores use a different scale, so re-tune the "not found" threshold, and
+   Combined scores use a different scale, so re-tune the "not found" threshold (record
+   it under Findings), and
    compare against vector-only results using `test-questions.json`.
    Optional, for the demo: a search mode switch on the page (Vector · Keyword · Hybrid)
    to show how results differ, e.g. for exact codes or typos.
@@ -124,6 +127,7 @@ Measured results and the values chosen from them, with a short reason. Filled in
 milestones run.
 - Embedding delay (milestone 3): not measured yet
 - "Not found" score threshold (milestone 4): not chosen yet
+- Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
