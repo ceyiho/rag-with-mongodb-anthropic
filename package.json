@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --env-file=.env index.js",
     "setup": "node --env-file=.env setup-db.js",
-    "chunk": "node chunk-file.js"
+    "chunk": "node chunk-file.js",
+    "ingest": "node --env-file=.env ingest-file.js"
   },
   "keywords": [],
   "author": "",
