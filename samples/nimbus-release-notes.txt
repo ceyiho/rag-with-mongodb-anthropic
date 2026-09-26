@@ -1,0 +1,11 @@
+Nimbus CLI 3.2 release notes
+
+Version 3.2 focuses on reliability for large folders. Syncs are now split into batches of 500 files, and an interrupted sync resumes from the last finished batch instead of starting over. On a folder with 40,000 files, a resumed sync now takes about two minutes instead of fifteen.
+
+Conflict handling has changed. When a file changes on both sides, Nimbus 3.2 keeps both copies and saves the workspace version with ".remote" added before the extension. Earlier versions kept only the newer file, which could silently discard edits. The conflict is logged as NMB-4012 so it can be found later.
+
+The minimum poll interval is now 10 seconds. Configurations with a lower value are rejected at startup with error NMB-2201, because very short intervals caused rate limiting on the server for everyone sharing a workspace. If you relied on a shorter interval, consider running "nimbus sync" manually when you need changes immediately.
+
+Windows users no longer need administrator rights to install Nimbus. The installer now installs per user by default. Existing system-wide installations keep working, but they will not receive automatic updates, so we recommend uninstalling them and installing again.
+
+Known issue: on Windows, Nimbus ignores the system proxy configuration. Set the HTTPS_PROXY environment variable as a workaround. A fix is planned for version 3.3.
