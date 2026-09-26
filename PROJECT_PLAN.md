@@ -24,6 +24,9 @@ calling the LLM.
 Uploads are one-way: no delete or edit in the app. Uploading a file whose name already
 exists is rejected with a message. Test data is cleaned up manually in Atlas.
 
+Deployment: runs on localhost or a private VM for demos. It is not exposed publicly,
+so no logins or usage limits are needed.
+
 ## Tech stack
 - Runtime: Node.js (LTS)
 - Backend: Express
@@ -40,7 +43,7 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
   which is rejected.
 - Answer generation: Anthropic API with built-in citations; one call per question,
   skipped when retrieval scores are below the threshold. Model: Claude Sonnet 5
-  (`claude-sonnet-5`). Compare with other models on test questions in milestone 5.
+  (`claude-sonnet-5`).
 - Secrets: stored in a `.env` file, never committed to git
 
 ## How it works
@@ -58,7 +61,6 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
 ## MongoDB features to showcase
 - Atlas Vector Search with Auto-Embedding, pre-filtered by document (uploadId)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
-- Flexible document model: text, vector, and metadata in one document
 - Optional: aggregation pipeline analytics (most-asked questions, most-cited documents,
   questions with no good match). Parked; see the last milestone.
 
@@ -71,22 +73,35 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
    upload and its chunks. Reject duplicate file names and unsupported types.
    Structure: one extractor per file type returns sections ({ section, text }); one
    shared splitter chunks them, so PDF support later only adds an extractor.
+   All-or-nothing: an upload has a status (processing → complete); only complete
+   uploads count as duplicates, so a failed ingest can be retried.
    Inspect the chunks in Atlas (no embedding tokens are spent yet).
 3. Create the vector search index with Auto-Embedding, with uploadId as a filter field.
-   Wait until it reports ready.
+   Wait until it reports ready. Note that embedding runs in the background: measure how
+   long new chunks take to become searchable, and record it under Findings (milestone 7
+   uses it for the "processing… ready" state).
 4. Search from the command line: a text question returns the top chunks with scores,
-   with and without the uploadId filter. Run a few test questions (answerable and not)
-   and choose the "not found" score threshold.
+   with and without the uploadId filter. Save test questions (answerable and not, each
+   with the document it should find) in `test-questions.json`, run them, and choose the
+   "not found" score threshold (record it under Findings). Milestone 9 reuses this file
+   to compare hybrid search with vector-only search.
 5. Answer: apply the threshold check, then the LLM answers with citations
-   (document + section).
+   (document + section). The system prompt treats document text as material to answer
+   from, never as instructions. Store thresholds in `config.js` (application code,
+   committed, not `.env`), one per search mode, with a comment pointing to Findings.
 6. Express API: one shared database client; routes to upload, list documents, and ask.
    Test with curl before building any UI.
 7. Web page: upload form, document picker (including "All documents"), question box,
-   answers with citations.
+   answers with citations. Show a "processing… ready" state after upload, since new
+   chunks are not searchable until their embeddings exist.
 
 ### Phase 2
 8. PDF support: text-based PDFs only; reject scanned PDFs with a clear message.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
+   Combined scores use a different scale, so re-tune the "not found" threshold, and
+   compare against vector-only results using `test-questions.json`.
+   Optional, for the demo: a search mode switch on the page (Vector · Keyword · Hybrid)
+   to show how results differ, e.g. for exact codes or typos.
 
 ### Phase 3
 10. README with architecture diagram, and a demo video.
@@ -96,10 +111,19 @@ exists is rejected with a message. Test data is cleaned up manually in Atlas.
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
-- Schema: collections and field names. Decide before creating any test documents in
-  milestone 2, because the vector index definition is built on these field names.
+- Voyage embedding model (Atlas lists several). Decide before milestone 3; switching
+  later means re-embedding everything.
+- Schema: collections and field names (including the upload status field). Decide
+  before creating any test documents in milestone 2, because the vector index
+  definition is built on these field names.
 - Chunk size and overlap (decide before embedding lots of data; changing later means
   re-embedding everything)
+
+## Findings
+Measured results and the values chosen from them, with a short reason. Filled in as
+milestones run.
+- Embedding delay (milestone 3): not measured yet
+- "Not found" score threshold (milestone 4): not chosen yet
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
