@@ -4,7 +4,7 @@
 
 const path = require('path');
 const config = require('./config');
-const { getExtractor } = require('./extractors');
+const { getExtractor, extract } = require('./extractors');
 const { splitSections } = require('./splitter');
 
 // A "processing" upload older than this is a leftover from a crashed ingest.
@@ -14,7 +14,7 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 const DUPLICATE_KEY = 11000;
 
 async function ingest(db, fileName, buffer) {
-  const extractor = getExtractor(fileName);   // rejects unsupported types
+  getExtractor(fileName);   // rejects unsupported types before touching the database
   const uploads = db.collection(config.collections.uploads);
   const chunks = db.collection(config.collections.chunks);
 
@@ -23,12 +23,13 @@ async function ingest(db, fileName, buffer) {
   }
   await removeLeftovers(uploads, chunks, fileName);
 
-  const sections = await extractor.extract(buffer, fileName);
+  const { title, sections } = await extract(fileName, buffer);
   const pieces = splitSections(sections);
   if (!pieces.length) throw new Error(`"${fileName}" contains no text.`);
 
   const { insertedId: uploadId } = await uploads.insertOne({
     fileName,
+    title,
     fileType: path.extname(fileName).slice(1).toLowerCase(),
     status: 'processing',
     uploadedAt: new Date(),

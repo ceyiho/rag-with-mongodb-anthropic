@@ -3,7 +3,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
-const { getExtractor } = require('./extractors');
+const { extract } = require('./extractors');
 const { splitSections } = require('./splitter');
 
 async function main() {
@@ -16,9 +16,9 @@ async function main() {
   }
 
   const fileName = path.basename(filePath);
-  const extractor = getExtractor(fileName);
-  const sections = await extractor.extract(await fs.readFile(filePath), fileName);
+  const { title, sections } = await extract(fileName, await fs.readFile(filePath));
   const chunks = splitSections(sections);
+  console.log(`Title: ${title}`);
 
   if (!chunks.length) {
     console.log('No text found.');

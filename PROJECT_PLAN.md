@@ -28,9 +28,9 @@ Deployment: runs on localhost or a private VM for demos. It is not exposed publi
 so no logins or usage limits are needed.
 
 ## Terminology
-- **MDB doc:** a document in MongoDB's document model (a record in a collection).
-- **Upload:** a file the user uploads (a document in the everyday sense).
-- **Chunk:** a piece of an upload, stored as one MDB doc in the `chunks` collection.
+- MDB doc: a document in MongoDB's document model (a record in a collection).
+- Upload: a file the user uploads (a document in the everyday sense).
+- Chunk: a piece of an upload, stored as one MDB doc in the `chunks` collection.
 - Avoid the bare word "document"; use one of the terms above.
 
 ## Tech stack
@@ -122,11 +122,17 @@ so no logins or usage limits are needed.
 11. Analytics: log each question, top score, and cited chunks in a `questions`
     collection, then build an analytics view with aggregation pipelines.
 
+## Open decisions
+- Milestone 8: let the picker select several uploads, not just one or "All documents"?
+  The vector search filter would be `uploadId: { $in: [...] }`; the vector index stays
+  the same, so no re-embedding.
+
 ## Decisions
 - Database: `knowledge_base` (`DB_NAME` in `.env`).
 - Schema: two collections, names in `config.js`.
-  - `uploads`: `_id` (the uploadId), `fileName`, `fileType`, `status`
-    (processing → complete), `uploadedAt`, `chunkCount`.
+  - `uploads`: `_id` (the uploadId), `fileName`, `title`, `fileType`, `status`
+    (processing → complete), `uploadedAt`, `chunkCount`. `title` comes from the file
+    (first `#` heading in Markdown; PDF metadata later), else from the file name.
   - `chunks`: `uploadId` (ObjectId), `fileName` (copied for citations), `section`,
     `chunkIndex`, `text` (heading path + body; the auto-embedded field).
   - Indexes: `uploads` partial unique on `fileName` where status is complete;

@@ -1,6 +1,7 @@
 // Markdown: each heading starts a new section, named by its heading path
 // (e.g. "Installation > Windows"). Text before the first heading is named after the file.
 // Lines inside fenced code blocks are never treated as headings.
+// The title is the first "#" (level 1) heading, or null if there is none.
 // Not supported: "setext" headings (a line underlined with === or ---).
 
 const { decode } = require('./text');
@@ -11,6 +12,7 @@ const FENCE = /^ {0,3}(```|~~~)/;
 async function extract(buffer, fileName) {
   const sections = [];
   const path = [];         // heading titles by level: path[0] is the "#" heading
+  let title = null;
   let section = fileName;
   let lines = [];
   let inCode = false;
@@ -28,6 +30,7 @@ async function extract(buffer, fileName) {
     if (heading) {
       flush();
       const level = heading[1].length;
+      if (level === 1 && !title) title = heading[2];
       path.length = level - 1;          // forget headings at this level and deeper
       path[level - 1] = heading[2];
       section = path.filter(Boolean).join(' > ');   // filter skips levels that were jumped over
@@ -37,7 +40,7 @@ async function extract(buffer, fileName) {
   }
   flush();
 
-  return sections;
+  return { title, sections };
 }
 
 module.exports = { extract };
