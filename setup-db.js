@@ -6,7 +6,9 @@ const { connect } = require('./db');
 const config = require('./config');
 
 // Vector search index with Auto-Embedding: Atlas embeds each chunk's text with Voyage AI.
-// Settings are the Atlas recommended default (scalar, 1024 dimensions, dotProduct).
+// Scalar quantization, 1024 dimensions, cosine similarity. Cosine, not dotProduct:
+// scalar vectors aren't unit length, and dotProduct squeezed every score to about 0.50
+// (see Findings in PROJECT_PLAN.md).
 // An autoEmbed field can't be edited, and changing the model, path, dimensions or
 // quantization re-embeds everything. To change it, create a new index under a new name.
 const vectorIndex = {
@@ -21,7 +23,7 @@ const vectorIndex = {
         model: 'voyage-4',
         numDimensions: 1024,
         quantization: 'scalar',
-        similarity: 'dotProduct',
+        similarity: 'cosine',
       },
       { type: 'filter', path: 'uploadId' },
     ],

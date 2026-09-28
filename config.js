@@ -8,8 +8,9 @@ module.exports = {
   },
 
   // Atlas Search indexes on the chunks collection. The definitions are in setup-db.js.
+  // Search indexes can't be edited, so a changed definition gets a new name.
   searchIndexes: {
-    vector: 'chunks_vector',
+    vector: 'chunks_vector_cosine',
   },
 
   // Sizes in characters (≈4 characters per token). Provisional: confirm with

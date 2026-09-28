@@ -7,6 +7,7 @@
     "start": "node --env-file=.env index.js",
     "setup": "node --env-file=.env setup-db.js",
     "index-status": "node --env-file=.env index-status.js",
+    "probe": "node --env-file=.env probe.js",
     "chunk": "node chunk-file.js",
     "ingest": "node --env-file=.env ingest-file.js",
     "cleanup": "node --env-file=.env cleanup.js"
