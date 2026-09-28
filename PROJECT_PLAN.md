@@ -1,7 +1,7 @@
 # Project Plan: RAG Knowledge Base on MongoDB Atlas
 
 ## What we're building aka functional specifications
-A personal knowledge base. Users upload documents (text, markdown, later PDFs) and ask
+A personal knowledge base. Users upload files (text, markdown, later PDFs) and ask
 questions in plain language. The app answers using only their content and cites which
 upload and section each answer came from.
 
@@ -14,7 +14,7 @@ with a clear message.
 Upload-scoped questions: all uploads are shared and visible to everyone (no logins).
 The user selects one upload or "All uploads" before asking. With one upload
 selected, the search pre-filters by its uploadId, so answers come only from that upload.
-With "All uploads", no filter is applied and answers can come from any upload.
+With "All uploads", answers can come from any complete upload.
 Grounding rules below apply either way.
 
 Grounding: answers must come only from retrieved chunks, with citations.
