@@ -111,7 +111,9 @@ so no logins or usage limits are needed.
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
-   Test with curl before building any UI.
+   Test with curl before building any UI. Name the entry file `server.js` (not
+   `index.js`) and point `npm start` at it; `package.json` needs no `main` field,
+   since the app is run, never imported.
 8. Web page: upload form, upload picker (including "All uploads"), question box,
    answers with citations. Show a "processing… ready" state after upload, since new
    chunks are not searchable until their embeddings exist.
@@ -153,13 +155,36 @@ so no logins or usage limits are needed.
     `chunkIndex`, `text` (heading path + body; the auto-embedded field).
   - Indexes: `uploads` partial unique on `fileName` where status is complete;
     `chunks` on `uploadId`. The vector index filters on `uploadId` only.
+- Vector index `chunks_vector_cosine` on `chunks` (created by `npm run setup`):
+  autoEmbed on `text`, model `voyage-4`, 1024 dimensions, scalar quantization, cosine
+  similarity; filter on `uploadId` (queries must pass ObjectIds, not strings).
+  Search indexes can't be edited: a changed definition gets a new index under a new
+  name (use the spare slot), then the old one is dropped. Setup skips an index that
+  already exists and never updates one.
 - Chunk size: 1,600 characters, max 2,000, overlap 200, headings as hard boundaries.
   Values in `config.js`; confirm in milestone 4 before bulk uploads.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as
 milestones run.
-- Embedding delay (milestone 3): not measured yet
+- Embedding delay (milestone 3): about 5–11 s from upload to fully searchable
+  (1-chunk upload: 7–11 s; 6-chunk upload: ≤5 s, all chunks at once). It did not
+  grow with chunk count at this size. Measured with `npm run probe` ("N of N found").
+  Building the vector index over 17 existing chunks took about 80 s.
+- Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
+  to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
+  (about 0.67–0.72 vs 0.55–0.58), with the same ranking. Chose cosine.
+- Re-embedding triggers (milestone 3, Atlas docs): inserting a chunk or changing its
+  `text` embeds that chunk; changing other fields or deleting does not. Changing the
+  model, embedded path, dimensions or quantization rebuilds and re-embeds everything.
+  An autoEmbed field can't be edited. Adding filter fields later isn't documented.
+  Dropping an index also removes its stored embeddings.
+- M0 limits (milestone 3): 3 search indexes (we plan 2, one spare for replacing an
+  index side by side). Auto-Embedding needs no extra setup on M0.
+- Storage (milestone 3): about 2.2–2.5 KB per chunk (text ≈1.0 KB, embedding ≈1.2 KB
+  at 1 byte per dimension), plus index overhead. 512 MB fits well over 100,000
+  chunks, so storage, not the 200M-token allowance (~500,000 chunks), is the tighter
+  limit. Whole cluster at 24 chunks: ≈424 KB.
 - "Not found" score threshold (milestone 4): not chosen yet
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
