@@ -19,7 +19,7 @@
 //   so it is left alone.
 // - Orphan chunk: a chunk whose upload no longer exists, e.g. after deleting an
 //   upload by hand in Atlas.
-// Both would otherwise show up in "All documents" searches.
+// Both would otherwise show up in "All uploads" searches.
 
 const { connect } = require('../src/db');
 const config = require('../src/config');
