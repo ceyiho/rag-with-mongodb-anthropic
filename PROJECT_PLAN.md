@@ -101,6 +101,9 @@ so no logins or usage limits are needed.
    Search only complete uploads: "All uploads" filters on
    `uploadId: { $in: [complete upload ids] }` instead of no filter, so orphan chunks
    and crash leftovers never reach an answer.
+   One upload selected: use exact search (`exact: true`), which is complete and cheap
+   within one upload. "All uploads": use approximate search with `numCandidates`
+   (see Findings: exact vs approximate search).
 5. Answer: apply the threshold check, then the LLM answers with citations
    (upload + section). The system prompt treats uploaded text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
@@ -108,6 +111,9 @@ so no logins or usage limits are needed.
 6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
    PDFs with a clear message. Comes before the API and web page so they are built once
    for all file types.
+   With a large real PDF: record its chunk count (vs the estimate in Findings), and run
+   `npm run probe` on it to confirm exact search with a large `limit` and to measure
+   the delay for a large upload (see the caveats in tools/probe.js).
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
@@ -137,15 +143,29 @@ so no logins or usage limits are needed.
 - Milestone 8: let the picker select several uploads, not just one or "All uploads"?
   The vector search filter would be `uploadId: { $in: [...] }`; the vector index stays
   the same, so no re-embedding.
-- Milestone 3/8: how to record that an upload's chunks are searchable (embeddings done).
-  Kept out of `status`, which is the ingest state only and drives the duplicate index.
-  Options on `uploads`:
-  - `searchableAt` (Date): unset until searchable. "Ready" = the field exists. It also
-    records when, so `searchableAt − uploadedAt` gives the embedding delay per upload.
-  - `searchable` (boolean): false → true. Simpler to read, but doesn't record when.
+- Milestone 8: how to tell that an upload's chunks are searchable, for the
+  "processing… ready" state. Researched in milestone 3; Atlas has no per-upload
+  progress report (index status covers the whole index; the Atlas metrics charts cover
+  the whole cluster). Options:
+  - A. Search and count: exact `$vectorSearch` filtered by `uploadId`, `limit` =
+    chunkCount, then `$count` (as in tools/probe.js). Checks "searchable", the real end
+    result, using public features only. Each check embeds a short query (a few tokens,
+    counts toward the rate limit), and costs more for larger uploads.
+  - B. Count embeddings: the generated embeddings collection in `__mdb_internal_search`
+    (documented, read-only) holds one MDB doc per embedded chunk with a copy of
+    `uploadId`, so `countDocuments({ uploadId })` vs chunkCount shows progress
+    ("4 of 6 embedded"). Cheap at any size, no tokens. But it checks "embedded", one
+    step before "searchable", and the collection is found by its generated name
+    (prefix = index id), whose format has changed before (June 2026 release).
+  - C. Fixed wait: assume ready after ~15 s (measured 5–11 s). Simplest, no guarantee,
+    especially for large uploads.
+  - Possible mix: B for progress, then one A check to confirm.
 
-  It may not need storing at all if the UI uses the delay measured in milestone 3.
-  Decide once we know how Atlas reports embedding progress.
+  Storing the result: keep it out of `status`, which is the ingest state only and
+  drives the duplicate index. Prefer `searchableAt` (Date) on `uploads`: set the first
+  time the check passes, so the upload is never checked again; `searchableAt −
+  uploadedAt` gives the delay per upload. (Alternative: `searchable` boolean, which
+  doesn't record when.)
 
 ## Decisions
 - Database: `knowledge_base` (`DB_NAME` in `.env`).
@@ -171,8 +191,21 @@ Measured results and the values chosen from them, with a short reason. Filled in
 milestones run.
 - Embedding delay (milestone 3): about 5–11 s from upload to fully searchable
   (1-chunk upload: 7–11 s; 6-chunk upload: ≤5 s, all chunks at once). It did not
-  grow with chunk count at this size. Measured with `npm run probe` ("N of N found").
-  Building the vector index over 17 existing chunks took about 80 s.
+  grow with chunk count at this size. Measured with `npm run probe` ("N of N").
+  Building the vector index over 17 existing chunks took about 80 s. For large uploads
+  the probe's seconds include ingest time, and embedding beyond the rate limit is
+  queued, so expect longer (to measure in milestone 6).
+- Exact vs approximate search (milestone 3, Atlas docs + test): approximate search
+  (default, HNSW) can miss results (the docs call 90–95% overlap with exact search
+  typical good recall), so it can't be trusted to count chunks. Exact search
+  (`exact: true`) checks every vector that passes the filter; the docs recommend it
+  below 10,000 MDB docs and for selective pre-filters. On our index it works with
+  scalar quantization and gives the same scores (within ~0.0004 run-to-run jitter).
+  `numCandidates` (approximate only) is capped at 10,000.
+- Upload size estimate (milestone 3, not measured): a 500-page textbook is about
+  1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
+  That's ~1M tokens and ~4.5–9 MB (see Storage). Confirm with a real PDF in
+  milestone 6.
 - Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
   to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
   (about 0.67–0.72 vs 0.55–0.58), with the same ranking. Chose cosine.
@@ -187,13 +220,31 @@ milestones run.
   at 1 byte per dimension), plus index overhead. 512 MB fits well over 100,000
   chunks, so storage, not the 200M-token allowance (~500,000 chunks), is the tighter
   limit. Whole cluster at 24 chunks: ≈424 KB.
+  In 500-page textbooks (estimate; see Upload size): at ~3–3.5 KB per chunk all-in,
+  one is about 4.5 MB (typical, ~1,500 chunks) to 9 MB (dense, ~2,500 chunks), so
+  512 MB holds roughly 50–100 of them (about 110 typical, 55 dense). The token
+  allowance would cover ~200 (at ~1M tokens each), so storage runs out first.
+  Uncertain: the vector index itself (Lucene, on the search side) isn't in these
+  numbers, and it's unclear whether M0 counts it toward 512 MB. Re-measure with
+  real PDFs in milestone 6.
 - "Not found" score threshold (milestone 4): not chosen yet
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
 - Milestone 2 is completed: `npm run ingest -- <file>` saves .txt and .md uploads and
-  their chunks. Two samples are in Atlas (nimbus-guide.md: 11 chunks,
-  nimbus-admin-handbook.txt: 6 chunks). Next: milestone 3 (vector index).
-- Commands: `npm run setup` (indexes), `npm run chunk -- <file>` (preview, no database),
-  `npm run ingest -- <file>`, `npm run cleanup` (see tools/cleanup.js), `npm run check-db` (connection check).
+  their chunks.
+- Milestone 3 is completed: the vector index `chunks_vector_cosine` is ready (see
+  Decisions), and delay, storage and search behaviour are under Findings. Three samples
+  are in Atlas (nimbus-guide.md: 11 chunks, nimbus-admin-handbook.txt: 6,
+  nimbus-release-notes.txt: 1). Next: milestone 4 (search from the command line).
+- Layout: `src/` app code; `scripts/` commands that make the app work; `tools/`
+  maintenance and testing helpers. Scripts and tools import from `src/`, never the
+  reverse.
+- Commands:
+  - scripts: `npm run setup` (collections, indexes, vector index; skips existing ones),
+    `npm run ingest -- <file>`.
+  - tools: `npm run check-db` (connection check and counts), `npm run index-status`
+    (search index build status), `npm run probe -- <fileName>` (how many of an
+    upload's chunks are searchable), `npm run chunk -- <file>` (preview, no database),
+    `npm run cleanup` (see tools/cleanup.js).
