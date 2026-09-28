@@ -193,16 +193,10 @@ so no logins or usage limits are needed.
 - Chunk size: 1,600 characters, max 2,000, overlap 200, headings as hard boundaries.
   Values in `config.js`; confirm in milestone 4 before bulk uploads.
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
-  - `src/`: app code, used by the app at runtime (database connection, config, ingest,
-    splitter, extractors, search; later the server, routes and the web page).
-  - `scripts/`: what's needed to make the app work: setup (collections and indexes the
-    app relies on) and the user-facing command-line commands, ingest and (milestone 5)
-    ask, which are how a user uploads and asks until the web page (milestone 8).
-  - `tools/`: maintenance and testing, not needed for the app to work. Includes
-    everything that shows the app's internals: connection checks, index status, the
-    probe, chunking preview, cleanup, the command-line search (raw chunks and scores)
-    and the `test-questions.json` runner.
-  - `samples/`: test files to upload.
+  `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
+  user-facing commands ingest and ask until the web page); `tools/` is maintenance and
+  testing, including everything that shows the app's internals (e.g. the command-line
+  search). ARCHITECTURE.md maps each folder and file.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as
@@ -256,11 +250,4 @@ milestones run.
   Decisions), and delay, storage and search behaviour are under Findings. Three samples
   are in Atlas (nimbus-guide.md: 11 chunks, nimbus-admin-handbook.txt: 6,
   nimbus-release-notes.txt: 1). Next: milestone 4 (search from the command line).
-- Layout: `src/`, `scripts/`, `tools/`, `samples/` (roles under Decisions).
-- Commands:
-  - scripts: `npm run setup` (collections, indexes, vector index; skips existing ones),
-    `npm run ingest -- <file>`.
-  - tools: `npm run check-db` (connection check and counts), `npm run index-status`
-    (search index build status), `npm run probe -- <fileName>` (how many of an
-    upload's chunks are searchable), `npm run chunk -- <file>` (preview, no database),
-    `npm run cleanup` (see tools/cleanup.js).
+- Files and commands: see ARCHITECTURE.md.
