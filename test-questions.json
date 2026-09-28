@@ -210,8 +210,8 @@
     "upload": "claude-code-first-steps.txt",
     "alsoIn": ["nimbus-guide.md"],
     "wrongUpload": "mongodb-document-model.md",
-    "kind": "direct",
-    "note": "Ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
+    "kind": "mixed-chunk",
+    "note": "The answer is a small part of a chunk about slash commands and settings (0.6724 in step 4). Also ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
   },
   {
     "id": "claude-pro-price",
