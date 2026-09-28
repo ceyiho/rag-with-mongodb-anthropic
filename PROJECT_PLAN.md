@@ -89,6 +89,10 @@ so no logins or usage limits are needed.
    Wait until it reports ready. Note that embedding runs in the background: measure how
    long new chunks take to become searchable, and record it under Findings (milestone 8
    uses it for the "processing… ready" state).
+   Before creating the index: check the Atlas docs for which changes trigger
+   re-embedding (show the user the source), and check the M0 limit on search indexes
+   (this project plans a vector and a keyword index). After embedding, measure M0
+   storage use (512 MB limit).
 4. Search from the command line: a text question returns the top chunks with scores,
    with and without the uploadId filter. Save test questions (answerable and not, each
    with the upload it should find) in `test-questions.json`, run them, and choose the
@@ -164,3 +168,5 @@ milestones run.
 - Milestone 2 is completed: `npm run ingest -- <file>` saves .txt and .md uploads and
   their chunks. Two samples are in Atlas (nimbus-guide.md: 11 chunks,
   nimbus-admin-handbook.txt: 6 chunks). Next: milestone 3 (vector index).
+- Commands: `npm run setup` (indexes), `npm run chunk -- <file>` (preview, no database),
+  `npm run ingest -- <file>`, `npm run cleanup` (see cleanup.js), `npm start` (connection check).
