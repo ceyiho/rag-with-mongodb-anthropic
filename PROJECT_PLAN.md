@@ -111,6 +111,10 @@ so no logins or usage limits are needed.
    (upload + section). The system prompt treats uploaded text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
    committed, not `.env`), one per search mode, with a comment pointing to Findings.
+   Where the code goes: the answer function in `src/`, since milestone 7 reuses it; the
+   command-line ask command in `scripts/`, since it's how a user asks until the web page
+   (milestone 8), like `ingest-file.js` for uploads. `tools/search.js` stays in `tools/`:
+   it shows raw chunks and scores, for testing and tuning.
 6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
    PDFs with a clear message. Comes before the API and web page so they are built once
    for all file types.
@@ -188,6 +192,17 @@ so no logins or usage limits are needed.
   already exists and never updates one.
 - Chunk size: 1,600 characters, max 2,000, overlap 200, headings as hard boundaries.
   Values in `config.js`; confirm in milestone 4 before bulk uploads.
+- Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
+  - `src/`: app code, used by the app at runtime (database connection, config, ingest,
+    splitter, extractors, search; later the server, routes and the web page).
+  - `scripts/`: what's needed to make the app work: setup (collections and indexes the
+    app relies on) and the user-facing command-line commands, ingest and (milestone 5)
+    ask, which are how a user uploads and asks until the web page (milestone 8).
+  - `tools/`: maintenance and testing, not needed for the app to work. Includes
+    everything that shows the app's internals: connection checks, index status, the
+    probe, chunking preview, cleanup, the command-line search (raw chunks and scores)
+    and the `test-questions.json` runner.
+  - `samples/`: test files to upload.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as
@@ -241,9 +256,7 @@ milestones run.
   Decisions), and delay, storage and search behaviour are under Findings. Three samples
   are in Atlas (nimbus-guide.md: 11 chunks, nimbus-admin-handbook.txt: 6,
   nimbus-release-notes.txt: 1). Next: milestone 4 (search from the command line).
-- Layout: `src/` app code; `scripts/` commands that make the app work; `tools/`
-  maintenance and testing helpers. Scripts and tools import from `src/`, never the
-  reverse.
+- Layout: `src/`, `scripts/`, `tools/`, `samples/` (roles under Decisions).
 - Commands:
   - scripts: `npm run setup` (collections, indexes, vector index; skips existing ones),
     `npm run ingest -- <file>`.
