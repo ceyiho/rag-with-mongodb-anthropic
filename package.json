@@ -2,9 +2,8 @@
   "name": "mongodb-solo-proj",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "start": "node --env-file=.env index.js",
+    "check-db": "node --env-file=.env check-db.js",
     "setup": "node --env-file=.env setup-db.js",
     "index-status": "node --env-file=.env index-status.js",
     "probe": "node --env-file=.env probe.js",

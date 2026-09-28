@@ -194,4 +194,4 @@ milestones run.
   their chunks. Two samples are in Atlas (nimbus-guide.md: 11 chunks,
   nimbus-admin-handbook.txt: 6 chunks). Next: milestone 3 (vector index).
 - Commands: `npm run setup` (indexes), `npm run chunk -- <file>` (preview, no database),
-  `npm run ingest -- <file>`, `npm run cleanup` (see cleanup.js), `npm start` (connection check).
+  `npm run ingest -- <file>`, `npm run cleanup` (see cleanup.js), `npm run check-db` (connection check).

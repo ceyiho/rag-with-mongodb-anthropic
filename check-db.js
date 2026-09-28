@@ -1,3 +1,6 @@
+// Checks the Atlas connection and prints how many MDB docs each collection holds.
+// Usage: npm run check-db
+
 const { connect } = require('./db');
 const config = require('./config');
 
