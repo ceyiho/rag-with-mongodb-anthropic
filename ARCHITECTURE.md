@@ -76,7 +76,7 @@ distractors. Written as test data, not as reference material.
 | File | Purpose |
 |---|---|
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
-| `CLAUDE.md` | Working preferences for Claude Code. |
+| `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |
