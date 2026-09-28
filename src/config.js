@@ -13,6 +13,14 @@ module.exports = {
     vector: 'chunks_vector_cosine',
   },
 
+  // Vector search (src/search.js). numCandidates applies to "All uploads" (approximate
+  // search) only: how many nearest chunks Atlas considers before keeping the top `limit`.
+  // The Atlas docs suggest 10–20× the limit; Atlas caps it at 10,000.
+  search: {
+    limit: 5,
+    candidatesPerResult: 20,
+  },
+
   // Sizes in characters (≈4 characters per token). Provisional: confirm with
   // test-questions.json in milestone 4, before bulk uploads. Changing them after
   // that means re-embedding everything.

@@ -7,6 +7,7 @@
     "setup": "node --env-file=.env scripts/setup-db.js",
     "index-status": "node --env-file=.env tools/index-status.js",
     "probe": "node --env-file=.env tools/probe.js",
+    "search": "node --env-file=.env tools/search.js",
     "chunk": "node tools/chunk-file.js",
     "ingest": "node --env-file=.env scripts/ingest-file.js",
     "cleanup": "node --env-file=.env tools/cleanup.js"
