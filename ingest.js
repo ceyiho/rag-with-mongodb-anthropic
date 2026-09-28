@@ -74,4 +74,4 @@ function alreadyUploaded(fileName) {
   return new Error(`"${fileName}" has already been uploaded.`);
 }
 
-module.exports = { ingest };
+module.exports = { ingest, removeUploads, STALE_AFTER_MS };

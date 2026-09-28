@@ -94,6 +94,9 @@ so no logins or usage limits are needed.
    with the document it should find) in `test-questions.json`, run them, and choose the
    "not found" score threshold (record it under Findings). Milestone 9 reuses this file
    to compare hybrid search with vector-only search.
+   Search only complete uploads: "All documents" filters on
+   `uploadId: { $in: [complete upload ids] }` instead of no filter, so orphan chunks
+   and crash leftovers never reach an answer.
 5. Answer: apply the threshold check, then the LLM answers with citations
    (document + section). The system prompt treats document text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
