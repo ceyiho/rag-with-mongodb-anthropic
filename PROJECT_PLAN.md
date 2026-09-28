@@ -104,6 +104,9 @@ so no logins or usage limits are needed.
    One upload selected: use exact search (`exact: true`), which is complete and cheap
    within one upload. "All uploads": use approximate search with `numCandidates`
    (see Findings: exact vs approximate search).
+   Where the code goes: the search function in `src/` (e.g. `src/search.js`), since
+   milestones 5 and 7 reuse it; the command-line search and the `test-questions.json`
+   runner in `tools/`.
 5. Answer: apply the threshold check, then the LLM answers with citations
    (upload + section). The system prompt treats uploaded text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
