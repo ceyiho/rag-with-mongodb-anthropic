@@ -1,0 +1,278 @@
+[
+  {
+    "id": "guide-proxy",
+    "question": "How do I set up a proxy for Nimbus?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "alsoIn": ["nimbus-release-notes.txt"],
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "direct",
+    "note": "HTTPS_PROXY environment variable."
+  },
+  {
+    "id": "guide-battery",
+    "question": "My laptop battery drains fast because Nimbus checks for changes too often. What can I change?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "paraphrase",
+    "note": "poll_interval in nimbus.toml; never says 'poll'."
+  },
+  {
+    "id": "guide-error-1001",
+    "question": "What does error NMB-1001 mean?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "alsoIn": ["nimbus-admin-handbook.txt"],
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "direct",
+    "note": "Exact code; also useful for keyword search in milestone 9."
+  },
+  {
+    "id": "guide-rename-history",
+    "question": "If I rename a file, do I lose its history?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "paraphrase",
+    "note": "Yes: a rename is a delete plus an upload. Buried in the long Sync behaviour section."
+  },
+  {
+    "id": "guide-uninstall-mac",
+    "question": "How do I uninstall Nimbus on macOS?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "near-miss",
+    "note": "Only installing on macOS is covered; the release notes mention uninstalling on Windows without saying how."
+  },
+  {
+    "id": "guide-error-6001",
+    "question": "What does error NMB-6001 mean?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "near-miss",
+    "note": "No such code; the error code list is a close match in wording."
+  },
+  {
+    "id": "handbook-invite-valid",
+    "question": "How long does an invitation to join a workspace stay valid?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "direct",
+    "note": "14 days."
+  },
+  {
+    "id": "handbook-changes-not-seen",
+    "question": "A colleague edits files but nobody else sees the changes. Why?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "paraphrase",
+    "note": "Most common support request: viewer permission, exclude pattern, or conflict."
+  },
+  {
+    "id": "handbook-storage-full",
+    "question": "What happens when the workspace runs out of storage?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "direct",
+    "note": "Uploads stop with NMB-3007; downloads and deletes keep working."
+  },
+  {
+    "id": "handbook-subfolder-access",
+    "question": "Why did people lose access to a subfolder after I added editors to it?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "paraphrase",
+    "note": "Subfolder settings replace inherited ones completely."
+  },
+  {
+    "id": "handbook-price",
+    "question": "How much does a Nimbus workspace cost per month?",
+    "answerable": false,
+    "upload": "nimbus-admin-handbook.txt",
+    "kind": "near-miss",
+    "note": "Billing plans are mentioned, prices are not."
+  },
+  {
+    "id": "handbook-sso-setup",
+    "question": "How do I set up single sign-on for my workspace?",
+    "answerable": false,
+    "upload": "nimbus-admin-handbook.txt",
+    "kind": "near-miss",
+    "note": "Single sign-on is mentioned only for password resets, not setup."
+  },
+  {
+    "id": "notes-both-sides",
+    "question": "What happens when a file changes on both sides?",
+    "answerable": true,
+    "upload": "nimbus-release-notes.txt",
+    "alsoIn": ["nimbus-guide.md", "nimbus-admin-handbook.txt"],
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "mixed-chunk",
+    "note": "Step 2: the release notes' single chunk covers five topics and scored 0.6647, missing the All-uploads top 3."
+  },
+  {
+    "id": "notes-admin-rights",
+    "question": "Do I need administrator rights to install Nimbus on Windows?",
+    "answerable": true,
+    "upload": "nimbus-release-notes.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "mixed-chunk",
+    "note": "No, per-user install since 3.2. The guide's Windows install section is a close distractor that doesn't answer it."
+  },
+  {
+    "id": "mongodb-doc-size",
+    "question": "What is the maximum size of a MongoDB document?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "nimbus-release-notes.txt",
+    "kind": "direct",
+    "note": "16 MB."
+  },
+  {
+    "id": "mongodb-order-lines",
+    "question": "Should order line items go in the same record as the order, or in a separate table?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "paraphrase",
+    "note": "Embed; relational wording ('record', 'table')."
+  },
+  {
+    "id": "mongodb-advantages",
+    "question": "What are the advantages of the document model over relational databases?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "direct",
+    "note": "The answer spans five small chunks, one per advantage."
+  },
+  {
+    "id": "mongodb-explain",
+    "question": "How can I tell whether a query is using an index?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "paraphrase",
+    "note": "explain(\"executionStats\"): IXSCAN vs COLLSCAN."
+  },
+  {
+    "id": "mongodb-atlas-cluster",
+    "question": "How do I create a MongoDB Atlas cluster?",
+    "answerable": false,
+    "upload": "mongodb-document-model.md",
+    "kind": "near-miss",
+    "note": "Atlas isn't covered."
+  },
+  {
+    "id": "mongodb-sql",
+    "question": "Can I query MongoDB with SQL?",
+    "answerable": false,
+    "upload": "mongodb-document-model.md",
+    "kind": "near-miss",
+    "note": "SQL is mentioned only as relational tooling."
+  },
+  {
+    "id": "claude-install-windows",
+    "question": "How do I install Claude Code on Windows?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "direct",
+    "note": "Distractor: Nimbus's Windows install section."
+  },
+  {
+    "id": "claude-plan-first",
+    "question": "How can I stop Claude from changing files until I approve a plan?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "nimbus-release-notes.txt",
+    "kind": "mixed-chunk",
+    "note": "Plan mode; shares a chunk with the first session and Esc."
+  },
+  {
+    "id": "claude-remember-instructions",
+    "question": "Where do I put project instructions so Claude remembers them every session?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "paraphrase",
+    "note": "CLAUDE.md; never says 'CLAUDE.md' or 'memory'."
+  },
+  {
+    "id": "claude-settings-files",
+    "question": "Where are the settings files stored?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "alsoIn": ["nimbus-guide.md"],
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "direct",
+    "note": "Ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
+  },
+  {
+    "id": "claude-pro-price",
+    "question": "How much does a Claude Pro subscription cost?",
+    "answerable": false,
+    "upload": "claude-code-first-steps.txt",
+    "kind": "near-miss",
+    "note": "Pro plan mentioned, no price."
+  },
+  {
+    "id": "typo-proxy",
+    "question": "How do I set up a proxxy for Nimbus?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "alsoIn": ["nimbus-release-notes.txt"],
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "typo",
+    "note": "Typo of guide-proxy; compare the two scores."
+  },
+  {
+    "id": "typo-error-code",
+    "question": "what does NMB1001 mean",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "alsoIn": ["nimbus-admin-handbook.txt"],
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "typo",
+    "note": "Code without its hyphen, no capital or question mark; compare with guide-error-1001."
+  },
+  {
+    "id": "typo-doc-size",
+    "question": "whats the max size of a mongdb documnet?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "typo",
+    "note": "Two misspellings plus abbreviations; compare with mongodb-doc-size."
+  },
+  {
+    "id": "typo-install-windows",
+    "question": "how to instal claude code on windoes",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "typo",
+    "note": "Compare with claude-install-windows; the Nimbus Windows install section is a distractor."
+  },
+  {
+    "id": "offtopic-france",
+    "question": "What is the capital of France?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "off-topic",
+    "note": "Step 2 baseline: top score 0.5990 in All uploads."
+  },
+  {
+    "id": "offtopic-banana-bread",
+    "question": "What's a good recipe for banana bread?",
+    "answerable": false,
+    "upload": "claude-code-first-steps.txt",
+    "kind": "off-topic",
+    "note": ""
+  }
+]
