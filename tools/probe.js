@@ -4,8 +4,8 @@
 // Usage: npm run probe -- <fileName> [question] [--index <name>]
 // --index searches another vector index instead of the one in config.js (to compare indexes).
 
-const { connect } = require('./db');
-const config = require('./config');
+const { connect } = require('../src/db');
+const config = require('../src/config');
 
 async function main() {
   const args = process.argv.slice(2);

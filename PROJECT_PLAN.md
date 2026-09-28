@@ -113,7 +113,9 @@ so no logins or usage limits are needed.
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
    Test with curl before building any UI. Name the entry file `server.js` (not
    `index.js`) and point `npm start` at it; `package.json` needs no `main` field,
-   since the app is run, never imported.
+   since the app is run, never imported. Move the index definitions from
+   `scripts/setup-db.js` into `src/indexes.js`, so the server can check at startup
+   that the vector index exists.
 8. Web page: upload form, upload picker (including "All uploads"), question box,
    answers with citations. Show a "processing… ready" state after upload, since new
    chunks are not searchable until their embeddings exist.
@@ -194,4 +196,4 @@ milestones run.
   their chunks. Two samples are in Atlas (nimbus-guide.md: 11 chunks,
   nimbus-admin-handbook.txt: 6 chunks). Next: milestone 3 (vector index).
 - Commands: `npm run setup` (indexes), `npm run chunk -- <file>` (preview, no database),
-  `npm run ingest -- <file>`, `npm run cleanup` (see cleanup.js), `npm run check-db` (connection check).
+  `npm run ingest -- <file>`, `npm run cleanup` (see tools/cleanup.js), `npm run check-db` (connection check).

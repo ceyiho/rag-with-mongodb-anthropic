@@ -21,9 +21,9 @@
 //   upload by hand in Atlas.
 // Both would otherwise show up in "All documents" searches.
 
-const { connect } = require('./db');
-const config = require('./config');
-const { removeUploads, STALE_AFTER_MS } = require('./ingest');
+const { connect } = require('../src/db');
+const config = require('../src/config');
+const { removeUploads, STALE_AFTER_MS } = require('../src/ingest');
 
 async function main() {
   // process.argv holds the command line: [node, script, ...arguments].

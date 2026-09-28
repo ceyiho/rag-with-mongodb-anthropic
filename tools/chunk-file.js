@@ -3,8 +3,8 @@
 
 const fs = require('fs/promises');
 const path = require('path');
-const { extract } = require('./extractors');
-const { splitSections } = require('./splitter');
+const { extract } = require('../src/extractors');
+const { splitSections } = require('../src/splitter');
 
 async function main() {
   const args = process.argv.slice(2);

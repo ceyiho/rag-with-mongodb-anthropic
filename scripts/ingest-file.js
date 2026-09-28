@@ -3,8 +3,8 @@
 
 const fs = require('fs/promises');
 const path = require('path');
-const { connect } = require('./db');
-const { ingest } = require('./ingest');
+const { connect } = require('../src/db');
+const { ingest } = require('../src/ingest');
 
 async function main() {
   const filePath = process.argv[2];

@@ -1,8 +1,8 @@
 // Lists the search indexes on the chunks collection and their status.
 // Atlas builds search indexes in the background; an index can be used once it is queryable.
 
-const { connect } = require('./db');
-const config = require('./config');
+const { connect } = require('../src/db');
+const config = require('../src/config');
 
 async function main() {
   const { client, db } = await connect();

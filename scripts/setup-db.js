@@ -2,8 +2,8 @@
 // createIndex does nothing if an identical index already exists, and search indexes
 // that already exist are skipped.
 
-const { connect } = require('./db');
-const config = require('./config');
+const { connect } = require('../src/db');
+const config = require('../src/config');
 
 // Vector search index with Auto-Embedding: Atlas embeds each chunk's text with Voyage AI.
 // Scalar quantization, 1024 dimensions, cosine similarity. Cosine, not dotProduct:

@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "check-db": "node --env-file=.env check-db.js",
-    "setup": "node --env-file=.env setup-db.js",
-    "index-status": "node --env-file=.env index-status.js",
-    "probe": "node --env-file=.env probe.js",
-    "chunk": "node chunk-file.js",
-    "ingest": "node --env-file=.env ingest-file.js",
-    "cleanup": "node --env-file=.env cleanup.js"
+    "check-db": "node --env-file=.env tools/check-db.js",
+    "setup": "node --env-file=.env scripts/setup-db.js",
+    "index-status": "node --env-file=.env tools/index-status.js",
+    "probe": "node --env-file=.env tools/probe.js",
+    "chunk": "node tools/chunk-file.js",
+    "ingest": "node --env-file=.env scripts/ingest-file.js",
+    "cleanup": "node --env-file=.env tools/cleanup.js"
   },
   "keywords": [],
   "author": "",
