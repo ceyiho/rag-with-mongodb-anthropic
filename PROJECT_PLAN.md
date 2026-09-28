@@ -3,7 +3,7 @@
 ## What we're building aka functional specifications
 A personal knowledge base. Users upload documents (text, markdown, later PDFs) and ask
 questions in plain language. The app answers using only their content and cites which
-document and section each answer came from.
+upload and section each answer came from.
 
 Purpose: a solo portfolio project that showcases MongoDB Atlas capabilities,
 especially Vector Search.
@@ -11,14 +11,14 @@ especially Vector Search.
 Supported uploads: .txt, .md, and text-based PDFs. Reject scanned PDFs and images
 with a clear message.
 
-Document-scoped questions: all uploads are shared and visible to everyone (no logins).
-The user selects one document or "All documents" before asking. With one document
-selected, the search pre-filters by its uploadId, so answers come only from that document.
-With "All documents", no filter is applied and answers can come from any upload.
+Upload-scoped questions: all uploads are shared and visible to everyone (no logins).
+The user selects one upload or "All uploads" before asking. With one upload
+selected, the search pre-filters by its uploadId, so answers come only from that upload.
+With "All uploads", no filter is applied and answers can come from any upload.
 Grounding rules below apply either way.
 
 Grounding: answers must come only from retrieved chunks, with citations.
-If retrieval scores are below a threshold, reply "not found in your documents" without
+If retrieval scores are below a threshold, reply "not found in your uploads" without
 calling the LLM.
 
 Uploads are one-way: no delete or edit in the app. Uploading a file whose name already
@@ -60,15 +60,15 @@ so no logins or usage limits are needed.
 3. Embed: Atlas Auto-Embedding converts each chunk's text to a vector with Voyage AI,
    through the vector search index.
 4. Retrieve: the question is sent to Atlas as text; Atlas embeds it with the same model,
-   and Vector Search finds the closest chunks (pre-filtered by uploadId when one document
+   and Vector Search finds the closest chunks (pre-filtered by uploadId when one upload
    is selected).
 5. Answer: if the best match scores below the threshold, reply "not found in your
-   documents". Otherwise the chunks and question go to the LLM, which answers with citations.
+   uploads". Otherwise the chunks and question go to the LLM, which answers with citations.
 
 ## MongoDB features to showcase
-- Atlas Vector Search with Auto-Embedding, pre-filtered by document (uploadId)
+- Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
-- Optional: aggregation pipeline analytics (most-asked questions, most-cited documents,
+- Optional: aggregation pipeline analytics (most-asked questions, most-cited uploads,
   questions with no good match). Parked; see the last milestone.
 
 ## Milestones
@@ -91,14 +91,14 @@ so no logins or usage limits are needed.
    uses it for the "processing… ready" state).
 4. Search from the command line: a text question returns the top chunks with scores,
    with and without the uploadId filter. Save test questions (answerable and not, each
-   with the document it should find) in `test-questions.json`, run them, and choose the
+   with the upload it should find) in `test-questions.json`, run them, and choose the
    "not found" score threshold (record it under Findings). Milestone 9 reuses this file
    to compare hybrid search with vector-only search.
-   Search only complete uploads: "All documents" filters on
+   Search only complete uploads: "All uploads" filters on
    `uploadId: { $in: [complete upload ids] }` instead of no filter, so orphan chunks
    and crash leftovers never reach an answer.
 5. Answer: apply the threshold check, then the LLM answers with citations
-   (document + section). The system prompt treats document text as material to answer
+   (upload + section). The system prompt treats uploaded text as material to answer
    from, never as instructions. Store thresholds in `config.js` (application code,
    committed, not `.env`), one per search mode, with a comment pointing to Findings.
 6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
@@ -106,9 +106,9 @@ so no logins or usage limits are needed.
    for all file types.
 
 ### Phase 2
-7. Express API: one shared database client; routes to upload, list documents, and ask.
+7. Express API: one shared database client; routes to upload, list uploads, and ask.
    Test with curl before building any UI.
-8. Web page: upload form, document picker (including "All documents"), question box,
+8. Web page: upload form, upload picker (including "All uploads"), question box,
    answers with citations. Show a "processing… ready" state after upload, since new
    chunks are not searchable until their embeddings exist.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
@@ -126,7 +126,7 @@ so no logins or usage limits are needed.
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
-- Milestone 8: let the picker select several uploads, not just one or "All documents"?
+- Milestone 8: let the picker select several uploads, not just one or "All uploads"?
   The vector search filter would be `uploadId: { $in: [...] }`; the vector index stays
   the same, so no re-embedding.
 - Milestone 3/8: how to record that an upload's chunks are searchable (embeddings done).
