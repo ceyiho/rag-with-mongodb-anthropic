@@ -7,6 +7,11 @@ module.exports = {
     chunks: 'chunks',
   },
 
+  // Atlas Search indexes on the chunks collection. The definitions are in setup-db.js.
+  searchIndexes: {
+    vector: 'chunks_vector',
+  },
+
   // Sizes in characters (≈4 characters per token). Provisional: confirm with
   // test-questions.json in milestone 4, before bulk uploads. Changing them after
   // that means re-embedding everything.
