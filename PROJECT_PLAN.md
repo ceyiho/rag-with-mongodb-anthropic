@@ -126,6 +126,15 @@ so no logins or usage limits are needed.
 - Milestone 8: let the picker select several uploads, not just one or "All documents"?
   The vector search filter would be `uploadId: { $in: [...] }`; the vector index stays
   the same, so no re-embedding.
+- Milestone 3/8: how to record that an upload's chunks are searchable (embeddings done).
+  Kept out of `status`, which is the ingest state only and drives the duplicate index.
+  Options on `uploads`:
+  - `searchableAt` (Date): unset until searchable. "Ready" = the field exists. It also
+    records when, so `searchableAt − uploadedAt` gives the embedding delay per upload.
+  - `searchable` (boolean): false → true. Simpler to read, but doesn't record when.
+
+  It may not need storing at all if the UI uses the delay measured in milestone 3.
+  Decide once we know how Atlas reports embedding progress.
 
 ## Decisions
 - Database: `knowledge_base` (`DB_NAME` in `.env`).
@@ -149,3 +158,6 @@ milestones run.
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
+- Milestone 2 is completed: `npm run ingest -- <file>` saves .txt and .md uploads and
+  their chunks. Two samples are in Atlas (nimbus-guide.md: 11 chunks,
+  nimbus-admin-handbook.txt: 6 chunks). Next: milestone 3 (vector index).
