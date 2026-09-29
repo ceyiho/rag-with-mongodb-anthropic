@@ -15,13 +15,16 @@
 // Pass rules:
 // - Answerable (all, one): answered, and a cited chunk contains one of the `expect`
 //   phrases. The LLM may paraphrase, so the fact is checked in the cited chunks, not in
-//   the answer text.
+//   the answer text. Broad questions have no `expect`: a cited chunk from an expected
+//   upload (`upload`, or `alsoIn` in all) is enough, and coverage is judged by reading.
+//   For partial questions, whether the answer names the missing part is also judged by
+//   reading (see the question's note).
 // - Everything else (not answerable, wrong upload): "not found".
 // A Fail is diagnosed as in HANDOFF.md: threshold (answerable question below it),
-// retrieval (the expect phrase wasn't in the chunks sent), or prompt/LLM (it was, or
-// the question had no answer to give).
+// retrieval (the expected fact or upload wasn't in the chunks sent), or prompt/LLM (it
+// was, or the question had no answer to give).
 //
-// Cost: every mode above the threshold calls the LLM, about 60-70 calls for a full run
+// Cost: every mode above the threshold calls the LLM, about 70-80 calls for a full run
 // (a few thousand input tokens each). The token totals are printed at the end.
 
 const fs = require('fs');
@@ -132,11 +135,19 @@ const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ');
 
 // --- Judging one reply ---
 
-function judge({ q, expectAnswer, result: r }) {
+// Whether the chunks hold what the question needs: one of its `expect` phrases or, for a
+// broad question (no phrases), any chunk from an expected upload.
+function holdsAnswer(q, mode, chunks) {
+  if (q.expect) return hasPhrase(chunks, q.expect);
+  const uploads = mode === 'all' ? [q.upload, ...(q.alsoIn || [])] : [q.upload];
+  return chunks.some((chunk) => uploads.includes(chunk.fileName));
+}
+
+function judge({ q, mode, expectAnswer, result: r }) {
   const cited = r.citations.map((c) => r.chunks.find((chunk) =>
     String(chunk.uploadId) === String(c.uploadId) && chunk.chunkIndex === c.chunkIndex));
-  const factSent = expectAnswer && hasPhrase(r.chunks, q.expect);
-  const factCited = expectAnswer && hasPhrase(cited, q.expect);
+  const factSent = expectAnswer && holdsAnswer(q, mode, r.chunks);
+  const factCited = expectAnswer && holdsAnswer(q, mode, cited);
   const pass = expectAnswer ? r.found && factCited : !r.found;
 
   let diagnosis = '';
@@ -153,7 +164,10 @@ function judge({ q, expectAnswer, result: r }) {
   if (r.reason === 'noCitations' && normalize(r.rawText) !== normalize(config.answer.notFoundReply)) {
     notes.push('uncited reply, not the exact "not found" wording');
   }
-  if (expectAnswer && r.found && !factCited) notes.push('answered, but no cited chunk has the expected fact');
+  if (expectAnswer && r.found && !factCited) {
+    notes.push(q.expect ? 'answered, but no cited chunk has the expected fact'
+      : 'answered, but cites no chunk from the expected upload');
+  }
 
   return { pass, diagnosis, notes };
 }
@@ -259,7 +273,9 @@ function report({ label, only, rows, summary: s, uploads }) {
   add('- **Modes**: all = All uploads; one = the question\'s `upload`; wrong = the question\'s');
   add('  `wrongUpload` (should be "not found").');
   add('- **Pass**: an answerable question is answered and a cited chunk contains one of its');
-  add('  `expect` phrases; everything else comes back "not found".');
+  add('  `expect` phrases (broad: cites a chunk from the expected upload); everything else comes');
+  add('  back "not found". Not checked automatically, so read the answers: coverage for broad');
+  add('  questions, and for partial ones whether the missing part is named.');
   add('- **Top score**: the best chunk\'s score from the search. Below the threshold, the reply');
   add('  is "not found" without calling the LLM; at or above it, the LLM decides.');
   add('- **Diagnosis** of a Fail: threshold (answerable, but below it), retrieval (the expected');

@@ -286,6 +286,63 @@
     "note": "Compare with claude-install-windows; the Nimbus Windows install section is a distractor."
   },
   {
+    "id": "partial-invite-price",
+    "question": "How long does an invitation to join a workspace stay valid, and how much does each extra member cost?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "partial",
+    "expect": ["valid for 14 days"],
+    "note": "14 days; should say the uploads don't give a price per member (no upload does)."
+  },
+  {
+    "id": "partial-doc-size-atlas",
+    "question": "What is the maximum size of a MongoDB document, and how do I create an Atlas cluster to store it?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "partial",
+    "expect": ["at most 16 MB"],
+    "note": "16 MB; should say the uploads don't cover creating an Atlas cluster."
+  },
+  {
+    "id": "partial-claude-mac-uninstall",
+    "question": "How do I install Claude Code on macOS, and how do I uninstall it later?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "partial",
+    "expect": ["curl -fsSL https://claude.ai/install.sh | bash"],
+    "note": "The curl installer; should say the uploads don't cover uninstalling (the Nimbus release notes mention uninstalling Nimbus, not Claude Code)."
+  },
+  {
+    "id": "broad-handbook-summary",
+    "question": "Summarize the Nimbus workspace administration handbook.",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "broad",
+    "note": "Spans all 6 chunks: owners, invitations, permissions, storage, audit log, support requests. Judge coverage by reading the answer."
+  },
+  {
+    "id": "broad-mongodb-schema-design",
+    "question": "What should I consider when designing a MongoDB schema?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "broad",
+    "note": "Spread over several sections: embed or reference, design patterns, anti-patterns, indexes, transactions."
+  },
+  {
+    "id": "broad-claude-getting-started",
+    "question": "Give me an overview of how to get started with Claude Code.",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "broad",
+    "note": "Spread over the whole file: prerequisites, installing, signing in, first session, permissions, CLAUDE.md."
+  },
+  {
     "id": "offtopic-france",
     "question": "What is the capital of France?",
     "answerable": false,

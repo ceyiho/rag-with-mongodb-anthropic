@@ -25,7 +25,8 @@
 // - alsoIn: other uploads that also answer it (optional). A hit in any of them counts.
 // - wrongUpload: an upload on another topic, for the wrong-upload search (answerable only).
 // - expect: phrases copied from the sample that hold the answer; any one counts
-//   (answerable only). Specific enough that only the right passage contains them.
+//   (answerable only, except broad). Specific enough that only the right passage
+//   contains them.
 // - compareWith: the id of the clean version of a typo question (typo only).
 // - kind, note: the kind (below) and a free-text note.
 // Kinds:
@@ -33,9 +34,13 @@
 // - paraphrase:  same meaning, different words.
 // - mixed-chunk: the answer sits in a chunk that covers several topics.
 // - typo:        a misspelled version of a clean question.
+// - partial:     two parts; `upload` answers one, no upload answers the other. The
+//                answer should cover the first and say the uploads don't cover the second.
+// - broad:       asks for a summary or overview spanning many chunks, not one fact. Has no
+//                `expect`; the answer's coverage is judged by reading it.
 // - near-miss:   on topic, same vocabulary, but the answer isn't in the uploads.
 // - off-topic:   not about any upload, either general or technical sharing our wording.
-// The first four are answerable, the last two are not.
+// The first six are answerable, the last two are not.
 
 const fs = require('fs');
 const path = require('path');
