@@ -19,6 +19,13 @@ module.exports = {
   search: {
     limit: 5,
     candidatesPerResult: 20,
+    // "Not found" thresholds on the top score, one per search mode: below it, the app
+    // replies "not found in your uploads" without calling the LLM. Provisional; see
+    // Findings in PROJECT_PLAN.md ("Not found" score threshold).
+    notFoundThreshold: {
+      oneUpload: 0.62,
+      allUploads: 0.62,
+    },
   },
 
   // Sizes in characters (≈4 characters per token). Provisional: confirm with
