@@ -52,8 +52,8 @@ so no logins or usage limits are needed.
   Pages act as sections for citations. Pages with almost no text mean a scanned PDF,
   which is rejected.
 - Answer generation: Anthropic API with built-in citations; one call per question,
-  skipped when retrieval scores are below the threshold. Model: Claude Sonnet 5
-  (`claude-sonnet-5`).
+  skipped when retrieval scores are below the threshold. Model: Claude Sonnet 5.5
+  (`claude-sonnet-5-5`).
 - Secrets: stored in a `.env` file, never committed to git
 
 ## How it works
