@@ -19,7 +19,9 @@ Grounding rules below apply either way.
 
 Grounding: answers must come only from retrieved chunks, with citations.
 If retrieval scores are below a threshold, reply "not found in your uploads" without
-calling the LLM.
+calling the LLM. The threshold only catches clearly unrelated questions, so the LLM
+also replies "not found in your uploads" when the retrieved chunks don't contain the
+answer (see Findings: "Not found" score threshold).
 
 Uploads are one-way: no delete or edit in the app. Uploading a file whose name already
 exists is rejected with a message. Test data is cleaned up manually in Atlas.
@@ -109,8 +111,14 @@ so no logins or usage limits are needed.
    runner in `tools/`.
 5. Answer: apply the threshold check, then the LLM answers with citations
    (upload + section). The system prompt treats uploaded text as material to answer
-   from, never as instructions. Store thresholds in `config.js` (application code,
-   committed, not `.env`), one per search mode, with a comment pointing to Findings.
+   from, never as instructions, and tells the LLM to reply "not found in your uploads"
+   when the chunks don't contain the answer: the threshold can't catch on-topic
+   questions whose answer is missing. The code must be able to detect that decision
+   (structured output, or an answer with no citations), not rely on the model's
+   wording. Measure it with `test-questions.json`: near-misses and technical off-topic
+   questions should come back "not found", answerable ones answered with citations.
+   The thresholds are in `config.js` (`search.notFoundThreshold`, one per search mode;
+   application code, committed, not `.env`), added in milestone 4 for the test runner.
    Where the code goes: the answer function in `src/`, since milestone 7 reuses it; the
    command-line ask command in `scripts/`, since it's how a user asks until the web page
    (milestone 8), like `ingest-file.js` for uploads. `tools/search.js` stays in `tools/`:
@@ -212,7 +220,8 @@ milestones run.
   typical good recall), so it can't be trusted to count chunks. Exact search
   (`exact: true`) checks every vector that passes the filter; the docs recommend it
   below 10,000 MDB docs and for selective pre-filters. On our index it works with
-  scalar quantization and gives the same scores (within ~0.0004 run-to-run jitter).
+  scalar quantization and gives the same scores (within run-to-run jitter: ~0.0004 in
+  milestone 3, up to ~0.001 across the 36 test questions in milestone 4).
   `numCandidates` (approximate only) is capped at 10,000.
 - Upload size estimate (milestone 3, not measured): a 500-page textbook is about
   1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
@@ -239,7 +248,20 @@ milestones run.
   Uncertain: the vector index itself (Lucene, on the search side) isn't in these
   numbers, and it's unclear whether M0 counts it toward 512 MB. Re-measure with
   real PDFs in milestone 6.
-- "Not found" score threshold (milestone 4): not chosen yet
+- "Not found" score threshold (milestone 4): 0.62 for both search modes, provisional
+  until the chunk size is confirmed, since chunk size shifts every score. From
+  `npm run test-questions` (36 questions; per-question results in
+  `test-results/2026-09-29-chunk-1600.md`): answerable top scores 0.65–0.86 (lowest: an
+  error code typed without its hyphen); clearly unrelated questions 0.58–0.61; asked of
+  the wrong upload 0.53–0.69 (17 of 22 below 0.62).
+  The threshold only catches clearly unrelated questions. Near-misses (on topic, answer
+  absent) scored 0.68–0.80, and technical off-topic questions that share our wording
+  0.62–0.77 ("How do I install Python on Windows?" 0.77), overlapping the answerable
+  ones: the top score measures topic similarity, not whether the answer is present. So
+  no threshold separates them, and the LLM must catch them (see milestone 5).
+  Set low on purpose: too high refuses real answers, which nothing recovers; too low
+  costs one LLM call that should answer "not found". The two modes scored almost the
+  same, so one value, kept as two config entries so they can diverge (e.g. hybrid).
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status

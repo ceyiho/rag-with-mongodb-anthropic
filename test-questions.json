@@ -229,6 +229,7 @@
     "alsoIn": ["nimbus-release-notes.txt"],
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
+    "compareWith": "guide-proxy",
     "note": "Typo of guide-proxy; compare the two scores."
   },
   {
@@ -239,6 +240,7 @@
     "alsoIn": ["nimbus-admin-handbook.txt"],
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
+    "compareWith": "guide-error-1001",
     "note": "Code without its hyphen, no capital or question mark; compare with guide-error-1001."
   },
   {
@@ -248,6 +250,7 @@
     "upload": "mongodb-document-model.md",
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
+    "compareWith": "mongodb-doc-size",
     "note": "Two misspellings plus abbreviations; compare with mongodb-doc-size."
   },
   {
@@ -257,6 +260,7 @@
     "upload": "claude-code-first-steps.txt",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "typo",
+    "compareWith": "claude-install-windows",
     "note": "Compare with claude-install-windows; the Nimbus Windows install section is a distractor."
   },
   {
@@ -274,5 +278,45 @@
     "upload": "claude-code-first-steps.txt",
     "kind": "off-topic",
     "note": ""
+  },
+  {
+    "id": "offtopic-css-center",
+    "question": "How do I center a div in CSS?",
+    "answerable": false,
+    "upload": "claude-code-first-steps.txt",
+    "kind": "off-topic",
+    "note": "General coding question; the Claude Code sample is about coding."
+  },
+  {
+    "id": "offtopic-git-undo",
+    "question": "How do I undo my last git commit?",
+    "answerable": false,
+    "upload": "claude-code-first-steps.txt",
+    "kind": "off-topic",
+    "note": "The Claude Code sample mentions git and committing, but not undoing a commit."
+  },
+  {
+    "id": "offtopic-tcp-udp",
+    "question": "What is the difference between TCP and UDP?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "off-topic",
+    "note": "Networking; closest are Nimbus's proxy and sync sections."
+  },
+  {
+    "id": "offtopic-postgres-key",
+    "question": "How do I create a table with a primary key in PostgreSQL?",
+    "answerable": false,
+    "upload": "mongodb-document-model.md",
+    "kind": "off-topic",
+    "note": "Relational databases; the MongoDB sample compares itself with them."
+  },
+  {
+    "id": "offtopic-python-windows",
+    "question": "How do I install Python on Windows?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "off-topic",
+    "note": "Same wording as the Windows install sections in Nimbus and Claude Code."
   }
 ]
