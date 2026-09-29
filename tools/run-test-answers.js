@@ -1,6 +1,7 @@
 // Runs the questions in test-questions.json through the answer function (search,
 // threshold check, LLM) and checks each reply: Pass or Fail, and for a Fail, where the
 // problem is. tools/run-test-questions.js tests search only; this tests the answers.
+// The question fields and kinds are described in tools/run-test-questions.js.
 // Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>]
 // --save writes a report to test-results/<date>-answers-<label>.md, with every answer
 // text, the settings and the system prompt.

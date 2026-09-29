@@ -16,6 +16,26 @@
 // one of the question's `expect` phrases (copied from the samples), in all and one. It
 // shows whether the passage with the answer was retrieved, whole, not just the right upload.
 // About 90 searches, each embedding a short question (a few tokens each).
+//
+// test-questions.json (also read by tools/run-test-answers.js). Fields:
+// - id, question, answerable: a short name, the question text, and whether the uploads
+//   hold the answer.
+// - upload: the upload that answers it; for a not-answerable question, the one it sounds
+//   closest to. Used for the one-upload search.
+// - alsoIn: other uploads that also answer it (optional). A hit in any of them counts.
+// - wrongUpload: an upload on another topic, for the wrong-upload search (answerable only).
+// - expect: phrases copied from the sample that hold the answer; any one counts
+//   (answerable only). Specific enough that only the right passage contains them.
+// - compareWith: the id of the clean version of a typo question (typo only).
+// - kind, note: the kind (below) and a free-text note.
+// Kinds:
+// - direct:      uses the sample's own words.
+// - paraphrase:  same meaning, different words.
+// - mixed-chunk: the answer sits in a chunk that covers several topics.
+// - typo:        a misspelled version of a clean question.
+// - near-miss:   on topic, same vocabulary, but the answer isn't in the uploads.
+// - off-topic:   not about any upload, either general or technical sharing our wording.
+// The first four are answerable, the last two are not.
 
 const fs = require('fs');
 const path = require('path');
