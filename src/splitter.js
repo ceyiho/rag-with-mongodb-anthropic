@@ -1,5 +1,6 @@
-// Splits sections into overlapping chunks. Headings are already hard boundaries
-// (one section never shares a chunk with another). Inside a section, split points are
+// Splits sections into overlapping chunks. Sections are hard boundaries (one section
+// never shares a chunk with another); the extractor decides what a section is, e.g.
+// each Markdown heading starts one, and a plain-text file is a single section. Inside a section, split points are
 // tried in order: paragraphs, then sentences, then lines, then words.
 //
 // Each chunk's text starts with its section name, so the embedding knows the context.

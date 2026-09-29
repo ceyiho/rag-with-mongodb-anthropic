@@ -45,8 +45,9 @@ so no logins or usage limits are needed.
   Switching models later means re-embedding everything. Uses a one-time free
   allocation of 200 million tokens per model (not monthly), so avoid unnecessary
   re-embedding.
-- Chunking: custom splitter (Markdown headings → paragraphs → sentences), sized in
-  characters (≈4 characters per token). No library.
+- Chunking: custom splitter (sections → paragraphs → sentences), sized in characters
+  (≈4 characters per token). No library. Sections come from the extractor: Markdown
+  headings, one per plain-text file, pages for PDFs.
 - PDF extraction: a pdf.js-based library (choose in milestone 6), giving text per page.
   Pages act as sections for citations. Pages with almost no text mean a scanned PDF,
   which is rejected.
@@ -119,6 +120,12 @@ so no logins or usage limits are needed.
    questions should come back "not found", answerable ones answered with citations.
    The thresholds are in `config.js` (`search.notFoundThreshold`, one per search mode;
    application code, committed, not `.env`), added in milestone 4 for the test runner.
+   Context: the LLM sees the top chunks only: up to ≈8,000 characters (5 × 1,600; our
+   `config.search.limit`, not an Atlas or LLM limit), less when chunks are shorter than
+   the target, as short Markdown sections are. If answers lack
+   context, try neighbour expansion (send each hit with the chunks at `chunkIndex` ± 1
+   from the same upload) before changing the chunk size. Re-check the chunk size here
+   with broad questions (e.g. summaries), which milestone 4 didn't test.
    Where the code goes: the answer function in `src/`, since milestone 7 reuses it; the
    command-line ask command in `scripts/`, since it's how a user asks until the web page
    (milestone 8), like `ingest-file.js` for uploads. `tools/search.js` stays in `tools/`:
@@ -129,6 +136,10 @@ so no logins or usage limits are needed.
    With a large real PDF: record its chunk count (vs the estimate in Findings), and run
    `npm run probe` on it to confirm exact search with a large `limit` and to measure
    the delay for a large upload (see the caveats in tools/probe.js).
+   Also with that PDF: re-check the "not found" threshold, which will likely drift up
+   (an off-topic question's top score is the best of many more chunks); decide how page
+   breaks are handled (pages as hard boundaries cut sentences at every break); and
+   re-check the chunk size, since PDF chunks have no heading path for context.
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
@@ -198,8 +209,11 @@ so no logins or usage limits are needed.
   Search indexes can't be edited: a changed definition gets a new index under a new
   name (use the spare slot), then the old one is dropped. Setup skips an index that
   already exists and never updates one.
-- Chunk size: 1,600 characters, max 2,000, overlap 200, headings as hard boundaries.
-  Values in `config.js`; confirm in milestone 4 before bulk uploads.
+- Chunk size: 1,600 characters (≈400 tokens), max 2,000, overlap 200. Sections are
+  hard boundaries (a chunk never spans two): each Markdown heading starts a section, a
+  plain-text file is one section, and PDFs will use pages (how page breaks are handled
+  is decided in milestone 6). Values in `config.js`. Confirmed in milestone 4 against 1,000 (see
+  Findings: Chunk size); re-check with answers (milestone 5) and a real PDF (milestone 6).
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
   user-facing commands ingest and ask until the web page); `tools/` is maintenance and
@@ -248,8 +262,9 @@ milestones run.
   Uncertain: the vector index itself (Lucene, on the search side) isn't in these
   numbers, and it's unclear whether M0 counts it toward 512 MB. Re-measure with
   real PDFs in milestone 6.
-- "Not found" score threshold (milestone 4): 0.62 for both search modes, provisional
-  until the chunk size is confirmed, since chunk size shifts every score. From
+- "Not found" score threshold (milestone 4): 0.62 for both search modes, confirmed at
+  the chosen chunk size (1,600; the rerun gave the same results). Re-check it with a
+  real PDF in milestone 6, since more chunks will likely push off-topic scores up. From
   `npm run test-questions` (36 questions; per-question results in
   `test-results/2026-09-29-chunk-1600.md`): answerable top scores 0.65–0.86 (lowest: an
   error code typed without its hyphen); clearly unrelated questions 0.58–0.61; asked of
@@ -262,6 +277,21 @@ milestones run.
   Set low on purpose: too high refuses real answers, which nothing recovers; too low
   costs one LLM call that should answer "not found". The two modes scored almost the
   same, so one value, kept as two config entries so they can diverge (e.g. hybrid).
+- Chunk size (milestone 4): kept 1,600 after comparing it with 1,000 (scaled max
+  1,250, overlap 125) on the same 36 questions (`test-results/2026-09-29-chunk-1600.md`
+  and `…-chunk-1000.md`). Retrieving the answer tied: each question's answer text
+  (its `expect` phrases) was in the top 5 for 22 of 22 at both sizes, and at #1 about
+  equally often (All/One: 19/21 at 1,600, 20/20 at 1,000). 1,000 raised scores and
+  put the expected upload first more often (22 vs 20 of 22), most for answers that are
+  a small part of a mixed-topic chunk (+0.035 to +0.064), but those answers were already
+  retrieved at 1,600. With retrieval tied, 1,600 wins on the rest: more context for the
+  LLM (top 5: up to ≈8,000 vs 5,000 characters), safer for PDF chunks, which have no heading
+  path, about 30% less storage (fewer chunks, each with a fixed ≈1.2 KB embedding), and
+  slightly better threshold behaviour (17 vs 16 of 22 wrong-upload questions rejected).
+  Limits: `expect` phrases are short facts, so broad questions (where context matters
+  most) aren't tested, and the samples are small. Extrapolated to PDFs (≈3,000–3,500
+  characters per page): 1,000 would give about 1.6× the chunks of 1,600; the embedding
+  tokens are the same either way.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status

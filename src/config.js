@@ -20,17 +20,17 @@ module.exports = {
     limit: 5,
     candidatesPerResult: 20,
     // "Not found" thresholds on the top score, one per search mode: below it, the app
-    // replies "not found in your uploads" without calling the LLM. Provisional; see
-    // Findings in PROJECT_PLAN.md ("Not found" score threshold).
+    // replies "not found in your uploads" without calling the LLM. See Findings in
+    // PROJECT_PLAN.md ("Not found" score threshold); re-check with a real PDF.
     notFoundThreshold: {
       oneUpload: 0.62,
       allUploads: 0.62,
     },
   },
 
-  // Sizes in characters (≈4 characters per token). Provisional: confirm with
-  // test-questions.json in milestone 4, before bulk uploads. Changing them after
-  // that means re-embedding everything.
+  // Sizes in characters (≈4 characters per token). Confirmed in milestone 4 against
+  // 1,000 (see Findings in PROJECT_PLAN.md: Chunk size). Changing them means
+  // re-ingesting, and so re-embedding, every upload.
   chunking: {
     targetSize: 1600,
     maxSize: 2000,
