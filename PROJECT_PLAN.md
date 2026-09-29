@@ -140,6 +140,8 @@ so no logins or usage limits are needed.
    (an off-topic question's top score is the best of many more chunks); decide how page
    breaks are handled (pages as hard boundaries cut sentences at every break); and
    re-check the chunk size, since PDF chunks have no heading path for context.
+   Ask it broad questions (summaries, overviews) and revisit `search.limit`: the top 5
+   chunks cover little of a large upload (see Findings: Broad questions).
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
@@ -303,9 +305,21 @@ milestones run.
   path, about 30% less storage (fewer chunks, each with a fixed ≈1.2 KB embedding), and
   slightly better threshold behaviour (17 vs 16 of 22 wrong-upload questions rejected).
   Limits: `expect` phrases are short facts, so broad questions (where context matters
-  most) aren't tested, and the samples are small. Extrapolated to PDFs (≈3,000–3,500
+  most) aren't tested, and the samples are small. (Broad questions were tested in
+  milestone 5 and support keeping 1,600; see Broad questions.) Extrapolated to PDFs (≈3,000–3,500
   characters per page): 1,000 would give about 1.6× the chunks of 1,600; the embedding
   tokens are the same either way.
+- Broad questions (milestone 5): answers are limited by the top 5 chunks (≈8,000
+  characters), not by chunk size. A summary of the 6-chunk Claude Code upload cited 5
+  of its chunks and was complete; for the 13-chunk MongoDB upload, a schema design
+  question missed "embed or reference", indexes and transactions, and the handbook
+  summary missed the support requests section
+  (`test-results/2026-09-29-answers-new-kinds.md`). The answers stay honest about it
+  ("the excerpts I have cover…"). This is a limit of top-k retrieval: smaller chunks
+  would make it worse (less text in the top 5), and neighbour expansion adds depth
+  around a hit, not breadth. The lever is `search.limit`, which costs input tokens on
+  every question, so it stays at 5 for now; revisit it with a large real PDF in
+  milestone 6, where summarizing a whole upload can't work this way.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
