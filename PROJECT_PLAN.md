@@ -71,6 +71,7 @@ so no logins or usage limits are needed.
 ## MongoDB features to showcase
 - Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
+- To consider: reranking with `$rerank` (Voyage AI), see milestone 9
 - Optional: aggregation pipeline analytics (most-asked questions, most-cited uploads,
   questions with no good match). Parked; see the last milestone.
 
@@ -159,6 +160,15 @@ so no logins or usage limits are needed.
    compare against vector-only results using `test-questions.json`.
    Optional, for the demo: a search mode switch on the page (Vector · Keyword · Hybrid)
    to show how results differ, e.g. for exact codes or typos.
+   To consider: reranking with the `$rerank` stage (Voyage AI `rerank-2.5`), after
+   `$rankFusion` or `$vectorSearch`: fetch more candidates (e.g. 20–50), rerank, keep the
+   top 5. A reranker reads the question and chunk together, so its score may separate
+   near-misses from answers, which cosine can't (see Findings: "Not found" score
+   threshold); measure that first, since it could save LLM calls. It would also give
+   hybrid search one relevance scale. Blockers as of milestone 5: needs MongoDB 8.3+
+   (our M0 runs 8.0.32, and M0 versions can't be chosen), is in Preview, and needs
+   Native Reranking enabled in Project Settings; check cost and latency. Docs:
+   https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/
 
 ### Phase 3
 10. README with architecture diagram, and a demo video.
