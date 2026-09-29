@@ -122,4 +122,4 @@ function readReply(content, chunks) {
   return { text: text.trim(), citations, rawText: rawText.trim() };
 }
 
-module.exports = { answer };
+module.exports = { answer, SYSTEM_PROMPT };

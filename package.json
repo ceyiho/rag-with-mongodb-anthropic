@@ -9,6 +9,7 @@
     "probe": "node --env-file=.env tools/probe.js",
     "search": "node --env-file=.env tools/search.js",
     "test-questions": "node --env-file=.env tools/run-test-questions.js",
+    "test-answers": "node --env-file=.env tools/run-test-answers.js",
     "chunk": "node tools/chunk-file.js",
     "ingest": "node --env-file=.env scripts/ingest-file.js",
     "ask": "node --env-file=.env scripts/ask.js",
