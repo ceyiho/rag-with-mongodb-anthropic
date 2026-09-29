@@ -214,6 +214,20 @@ so no logins or usage limits are needed.
   plain-text file is one section, and PDFs will use pages (how page breaks are handled
   is decided in milestone 6). Values in `config.js`. Confirmed in milestone 4 against 1,000 (see
   Findings: Chunk size); re-check with answers (milestone 5) and a real PDF (milestone 6).
+- Answers (milestone 5, from the Anthropic docs on search results and citations):
+  - Chunks go to the LLM as `search_result` blocks in the user message, one per chunk
+    with one text block each: `title` is "fileName: section", `source` identifies the
+    chunk. A citation's `search_result_index` is the chunk's position in the list sent,
+    so it maps back to upload and section. Claude cites whole blocks, so a citation
+    quotes the whole chunk; split chunks into paragraph blocks later if the web page
+    needs shorter quotes (no data change).
+  - "Not found" is detected by citations: a reply with at least one citation is an
+    answer; a reply with none is "not found in your uploads", whatever its wording.
+    Built-in citations can't be combined with structured output (the API returns a
+    400), so that option would mean giving up built-in citations. If citations prove
+    unreliable, the fallback is a "not found" tool the LLM calls.
+  - Partial answers: the LLM answers the part the chunks cover, with citations, and
+    says plainly what the uploads don't cover. It counts as an answer.
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
   user-facing commands ingest and ask until the web page); `tools/` is maintenance and
