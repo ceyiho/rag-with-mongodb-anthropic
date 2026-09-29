@@ -27,7 +27,7 @@ Scripts and tools import from `src/`, never the reverse.
 
 | File | Purpose |
 |---|---|
-| `config.js` | Application settings: collection and index names, search limits, chunk sizes. Secrets go in `.env` instead. |
+| `config.js` | Application settings: collection and index names, search limits, "not found" thresholds, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section. Also decodes file bytes to text. |
@@ -61,9 +61,14 @@ Everything that shows the app's internals.
 | `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. |
 | `chunk-file.js` | `npm run chunk -- <file>` | Chunking preview, no database. |
 | `search.js` | `npm run search -- "<question>"` | Raw search results with scores, for testing and tuning. |
+| `run-test-questions.js` | `npm run test-questions` | Runs `test-questions.json`: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test-results/`. |
 | `cleanup.js` | `npm run cleanup` | Removes orphan chunks, stale ingests, or one named upload. Lists first; `--yes` removes. |
 
-Later: the `test-questions.json` runner (milestone 4).
+### `test-results/`: saved test runs
+
+One Markdown report per `npm run test-questions -- --save <label>`, named
+`<date>-<label>.md`, with the settings that affect scores. Findings in PROJECT_PLAN.md
+link to the runs they rely on.
 
 ### `samples/`: test files to upload
 
@@ -78,5 +83,6 @@ distractors. Written as test data, not as reference material.
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
+| `test-questions.json` | Test questions against the samples: which upload should answer each, the answer phrases, and a wrong upload for each answerable one. |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |

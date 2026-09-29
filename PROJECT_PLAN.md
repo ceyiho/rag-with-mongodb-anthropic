@@ -299,7 +299,12 @@ milestones run.
 - Milestone 2 is completed: `npm run ingest -- <file>` saves .txt and .md uploads and
   their chunks.
 - Milestone 3 is completed: the vector index `chunks_vector_cosine` is ready (see
-  Decisions), and delay, storage and search behaviour are under Findings. Three samples
-  are in Atlas (nimbus-guide.md: 11 chunks, nimbus-admin-handbook.txt: 6,
-  nimbus-release-notes.txt: 1). Next: milestone 4 (search from the command line).
+  Decisions), and delay, storage and search behaviour are under Findings.
+- Milestone 4 is completed: `src/search.js` searches one upload (exact) or all complete
+  uploads (approximate); `npm run search` shows raw results; `npm run test-questions`
+  runs the 36 questions in `test-questions.json` and saves reports in `test-results/`.
+  The "not found" threshold (0.62) and the chunk size (1,600) are under Findings.
+  Five samples are in Atlas at 1,600 (37 chunks): nimbus-guide.md 11,
+  nimbus-admin-handbook.txt 6, nimbus-release-notes.txt 1, mongodb-document-model.md 13,
+  claude-code-first-steps.txt 6. Next: milestone 5 (answers with citations).
 - Files and commands: see ARCHITECTURE.md.
