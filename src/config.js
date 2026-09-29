@@ -28,6 +28,15 @@ module.exports = {
     },
   },
 
+  // Answers (src/answer.js). The API key is in .env (ANTHROPIC_API_KEY).
+  answer: {
+    model: 'claude-sonnet-5-5',
+    // Output cap per answer, including the model's thinking. Answers are short; this
+    // only stops a runaway reply.
+    maxTokens: 16000,
+    notFoundReply: 'not found in your uploads',
+  },
+
   // Sizes in characters (≈4 characters per token). Confirmed in milestone 4 against
   // 1,000 (see Findings in PROJECT_PLAN.md: Chunk size). Changing them means
   // re-ingesting, and so re-embedding, every upload.
