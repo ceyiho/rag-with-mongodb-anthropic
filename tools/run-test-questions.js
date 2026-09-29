@@ -12,6 +12,9 @@
 //          like a user who picked the wrong upload.
 // The threshold check uses the top score, so that's what is compared. A question that
 // fails is reported and the run carries on.
+// Answer text: for answerable questions, the position of the first chunk that contains
+// one of the question's `expect` phrases (copied from the samples), in all and one. It
+// shows whether the passage with the answer was retrieved, whole, not just the right upload.
 // About 90 searches, each embedding a short question (a few tokens each).
 
 const fs = require('fs');
@@ -66,7 +69,10 @@ async function main() {
         const expected = [q.upload, ...(q.alsoIn || [])];
         const rank = all.findIndex((chunk) => expected.includes(chunk.fileName));
         result.rank = rank === -1 ? null : rank + 1;
-        result.one = topScore(await search(db, q.question, scoped(q.upload)));
+        result.allText = phraseRank(all, q.expect);
+        const one = await search(db, q.question, scoped(q.upload));
+        result.one = topScore(one);
+        result.oneText = phraseRank(one, q.expect);
         if (q.wrongUpload) {
           result.wrong = topScore(await search(db, q.question, scoped(q.wrongUpload)));
         }
@@ -110,16 +116,30 @@ function topScore(chunks) {
 
 const fmt = (score) => (score == null ? '-' : score.toFixed(4));
 
+// Position (1-based) of the first chunk containing one of the phrases, or null if none
+// does. Ignores case and spacing. Undefined when the question has no phrases.
+function phraseRank(chunks, phrases) {
+  if (!phrases) return undefined;
+  const wanted = phrases.map(normalize);
+  const at = chunks.findIndex((chunk) => wanted.some((p) => normalize(chunk.text).includes(p)));
+  return at === -1 ? null : at + 1;
+}
+
+const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ');
+
+const position = (rank) => (rank ? `#${rank}` : '-');
+
 // --- Console output ---
 
-function printRow({ q, all, rank, one, wrong, error }) {
+function printRow({ q, all, rank, one, wrong, allText, oneText, error }) {
   const label = `${q.answerable ? 'Y' : 'N'} ${q.id.padEnd(30)} ${q.kind.padEnd(11)}`;
   if (error) {
     console.log(`${label} ERROR: ${error}`);
     return;
   }
   const hit = q.answerable ? (rank ? `#${rank}` : 'miss') : '';
-  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}`);
+  const text = allText === undefined ? '' : `  answer ${position(allText)}/${position(oneText)}`;
+  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}`);
 }
 
 function printSummary(results, thresholds) {
@@ -130,6 +150,14 @@ function printSummary(results, thresholds) {
 
   console.log(`\n${ok.length} of ${results.length} questions ran${failed ? `, ${failed} failed` : ''}.`);
   console.log('Y = answerable, N = not answerable. Scores are the top score (cosine, higher is closer).');
+  console.log('answer #a/#b = position of the first chunk with the answer text, in all/one ("-" = not in the results).');
+
+  const text = answerText(answerable);
+  if (text.checked) {
+    console.log(`\nAnswer text in the top ${config.search.limit} (${text.checked} questions with phrases)`);
+    console.log(`  All: ${text.all.found} (at #1: ${text.all.first}), One: ${text.one.found} (at #1: ${text.one.first})`);
+    if (text.missing.length) console.log(`  missing: ${text.missing.join(', ')}`);
+  }
 
   const { top1, inTop } = ranking(answerable);
   console.log(`\nAll uploads (approximate)`);
@@ -185,6 +213,23 @@ function ranking(answerable) {
     top1: answerable.filter((r) => r.rank === 1).length,
     inTop: answerable.filter((r) => r.rank).length,
   };
+}
+
+// How often the answer text was retrieved, per mode, and which questions missed it
+// in either mode (with the mode, e.g. "handbook-invite-valid (all)").
+function answerText(answerable) {
+  const rows = answerable.filter((r) => r.allText !== undefined);
+  const count = (key) => ({
+    found: rows.filter((r) => r[key]).length,
+    first: rows.filter((r) => r[key] === 1).length,
+  });
+  const missing = rows
+    .filter((r) => !r.allText || !r.oneText)
+    .map((r) => {
+      const modes = [!r.allText && 'all', !r.oneText && 'one'].filter(Boolean);
+      return `${r.q.id} (${modes.join(', ')})`;
+    });
+  return { checked: rows.length, all: count('allText'), one: count('oneText'), missing };
 }
 
 // How each group fares at the thresholds: answerable questions should pass (kept),
@@ -271,6 +316,9 @@ function report({ label, results, thresholds, uploads, index }) {
   add('- **All**: All uploads. The rank is the position of the first chunk from an expected');
   add(`  upload (\`upload\` or \`alsoIn\`) in the top ${searchConfig.limit}.`);
   add('- **One**: scoped to the question\'s `upload`.');
+  add('- **Answer** (after All and after One): position of the first chunk in the results that');
+  add('  contains one of the question\'s `expect` phrases (copied from the sample), or **missing**.');
+  add('  It checks that the passage with the answer came back whole, not just the right upload.');
   add('- **Wrong**: scoped to the question\'s `wrongUpload` (answerable questions only). The');
   add('  right result is "not found".');
   add(`- **At ${thresholdText}**: what the threshold does. For answerable questions: whether All and One`);
@@ -278,14 +326,16 @@ function report({ label, results, thresholds, uploads, index }) {
   add('  others: rejected, or passed on to the LLM.', '');
 
   add(`## Answerable questions (${answerable.length})`, '');
-  add(`| id | Kind | Question | All | Rank | One | Wrong | At ${thresholdText} |`);
-  add('|---|---|---|---|---|---|---|---|');
+  add(`| id | Kind | Question | All | Rank | Answer | One | Answer | Wrong | At ${thresholdText} |`);
+  add('|---|---|---|---|---|---|---|---|---|---|');
+  const answerCell = (rank) => (rank === undefined ? '' : rank ? `#${rank}` : '**missing**');
   for (const r of answerable) {
     const refused = [r.all < tAll && 'All', r.one < tOne && 'One'].filter(Boolean);
     const kept = refused.length ? `**refused (${refused.join(', ')})**` : 'kept';
     const wrong = r.wrong == null ? '' : (r.wrong < tOne ? '; wrong rejected' : '; **wrong passes**');
     add(`| ${r.q.id} | ${r.q.kind} | ${cell(r.q.question)} | ${fmt(r.all)} | `
-      + `${r.rank ? `#${r.rank}` : '**miss**'} | ${fmt(r.one)} | ${fmt(r.wrong)} | ${kept}${wrong} |`);
+      + `${r.rank ? `#${r.rank}` : '**miss**'} | ${answerCell(r.allText)} | ${fmt(r.one)} | `
+      + `${answerCell(r.oneText)} | ${fmt(r.wrong)} | ${kept}${wrong} |`);
   }
   add('');
 
@@ -302,6 +352,13 @@ function report({ label, results, thresholds, uploads, index }) {
   const { top1, inTop } = ranking(answerable);
   add(`**Ranking (All uploads):** the expected upload ranked #1 for ${top1} of ${answerable.length} `
     + `answerable questions, and was in the top ${searchConfig.limit} for ${inTop}.`, '');
+
+  const text = answerText(answerable);
+  if (text.checked) {
+    add(`**Answer text in the top ${searchConfig.limit}** (${text.checked} questions with \`expect\` phrases): `
+      + `All ${text.all.found} (at #1: ${text.all.first}), One ${text.one.found} (at #1: ${text.one.first}).`
+      + (text.missing.length ? ` Missing: ${text.missing.join(', ')}.` : ' None missing.'), '');
+  }
 
   const range = (rows, key) => {
     const low = extreme(rows, key, Math.min);

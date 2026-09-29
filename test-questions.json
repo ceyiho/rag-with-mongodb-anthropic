@@ -7,6 +7,7 @@
     "alsoIn": ["nimbus-release-notes.txt"],
     "wrongUpload": "mongodb-document-model.md",
     "kind": "direct",
+    "expect": ["set the HTTPS_PROXY environment variable"],
     "note": "HTTPS_PROXY environment variable."
   },
   {
@@ -16,6 +17,7 @@
     "upload": "nimbus-guide.md",
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "paraphrase",
+    "expect": ["controls how often Nimbus asks the server for remote changes"],
     "note": "poll_interval in nimbus.toml; never says 'poll'."
   },
   {
@@ -26,6 +28,7 @@
     "alsoIn": ["nimbus-admin-handbook.txt"],
     "wrongUpload": "mongodb-document-model.md",
     "kind": "direct",
+    "expect": ["NMB-1001: the workspace name","reports error NMB-1001"],
     "note": "Exact code; also useful for keyword search in milestone 9."
   },
   {
@@ -35,6 +38,7 @@
     "upload": "nimbus-guide.md",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "paraphrase",
+    "expect": ["a renamed file loses its version history"],
     "note": "Yes: a rename is a delete plus an upload. Buried in the long Sync behaviour section."
   },
   {
@@ -60,6 +64,7 @@
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "direct",
+    "expect": ["valid for 14 days"],
     "note": "14 days."
   },
   {
@@ -69,6 +74,7 @@
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "paraphrase",
+    "expect": ["quietly keeping their edits local"],
     "note": "Most common support request: viewer permission, exclude pattern, or conflict."
   },
   {
@@ -78,6 +84,7 @@
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "direct",
+    "expect": ["uploads stop and the CLI reports error NMB-3007"],
     "note": "Uploads stop with NMB-3007; downloads and deletes keep working."
   },
   {
@@ -87,6 +94,7 @@
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "paraphrase",
+    "expect": ["replace the inherited ones completely"],
     "note": "Subfolder settings replace inherited ones completely."
   },
   {
@@ -113,6 +121,7 @@
     "alsoIn": ["nimbus-guide.md", "nimbus-admin-handbook.txt"],
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "mixed-chunk",
+    "expect": ["keeps both copies","so it keeps both"],
     "note": "Step 2: the release notes' single chunk covers five topics and scored 0.6647, missing the All-uploads top 3."
   },
   {
@@ -122,6 +131,7 @@
     "upload": "nimbus-release-notes.txt",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "mixed-chunk",
+    "expect": ["no longer need administrator rights"],
     "note": "No, per-user install since 3.2. The guide's Windows install section is a close distractor that doesn't answer it."
   },
   {
@@ -131,6 +141,7 @@
     "upload": "mongodb-document-model.md",
     "wrongUpload": "nimbus-release-notes.txt",
     "kind": "direct",
+    "expect": ["at most 16 MB"],
     "note": "16 MB."
   },
   {
@@ -140,6 +151,7 @@
     "upload": "mongodb-document-model.md",
     "wrongUpload": "nimbus-admin-handbook.txt",
     "kind": "paraphrase",
+    "expect": ["an order's line items"],
     "note": "Embed; relational wording ('record', 'table')."
   },
   {
@@ -149,6 +161,7 @@
     "upload": "mongodb-document-model.md",
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "direct",
+    "expect": ["Advantages over relational databases"],
     "note": "The answer spans five small chunks, one per advantage."
   },
   {
@@ -158,6 +171,7 @@
     "upload": "mongodb-document-model.md",
     "wrongUpload": "nimbus-guide.md",
     "kind": "paraphrase",
+    "expect": ["explain(\"executionStats\")"],
     "note": "explain(\"executionStats\"): IXSCAN vs COLLSCAN."
   },
   {
@@ -183,6 +197,7 @@
     "upload": "claude-code-first-steps.txt",
     "wrongUpload": "mongodb-document-model.md",
     "kind": "direct",
+    "expect": ["irm https://claude.ai/install.ps1 | iex"],
     "note": "Distractor: Nimbus's Windows install section."
   },
   {
@@ -192,6 +207,7 @@
     "upload": "claude-code-first-steps.txt",
     "wrongUpload": "nimbus-release-notes.txt",
     "kind": "mixed-chunk",
+    "expect": ["plan mode lets Claude read and propose a plan"],
     "note": "Plan mode; shares a chunk with the first session and Esc."
   },
   {
@@ -201,6 +217,7 @@
     "upload": "claude-code-first-steps.txt",
     "wrongUpload": "nimbus-guide.md",
     "kind": "paraphrase",
+    "expect": ["Claude Code reads this file at the start of every session"],
     "note": "CLAUDE.md; never says 'CLAUDE.md' or 'memory'."
   },
   {
@@ -211,6 +228,7 @@
     "alsoIn": ["nimbus-guide.md"],
     "wrongUpload": "mongodb-document-model.md",
     "kind": "mixed-chunk",
+    "expect": [".claude/settings.json","reads its settings from a file named"],
     "note": "The answer is a small part of a chunk about slash commands and settings (0.6724 in step 4). Also ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
   },
   {
@@ -230,6 +248,7 @@
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
     "compareWith": "guide-proxy",
+    "expect": ["set the HTTPS_PROXY environment variable"],
     "note": "Typo of guide-proxy; compare the two scores."
   },
   {
@@ -241,6 +260,7 @@
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
     "compareWith": "guide-error-1001",
+    "expect": ["NMB-1001: the workspace name","reports error NMB-1001"],
     "note": "Code without its hyphen, no capital or question mark; compare with guide-error-1001."
   },
   {
@@ -251,6 +271,7 @@
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "typo",
     "compareWith": "mongodb-doc-size",
+    "expect": ["at most 16 MB"],
     "note": "Two misspellings plus abbreviations; compare with mongodb-doc-size."
   },
   {
@@ -261,6 +282,7 @@
     "wrongUpload": "mongodb-document-model.md",
     "kind": "typo",
     "compareWith": "claude-install-windows",
+    "expect": ["irm https://claude.ai/install.ps1 | iex"],
     "note": "Compare with claude-install-windows; the Nimbus Windows install section is a distractor."
   },
   {
