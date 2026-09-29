@@ -160,14 +160,9 @@ so no logins or usage limits are needed.
    compare against vector-only results using `test-questions.json`.
    Optional, for the demo: a search mode switch on the page (Vector · Keyword · Hybrid)
    to show how results differ, e.g. for exact codes or typos.
-   To consider: reranking with the `$rerank` stage (Voyage AI `rerank-2.5`), after
-   `$rankFusion` or `$vectorSearch`: fetch more candidates (e.g. 20–50), rerank, keep the
-   top 5. A reranker reads the question and chunk together, so its score may separate
-   near-misses from answers, which cosine can't (see Findings: "Not found" score
-   threshold); measure that first, since it could save LLM calls. It would also give
-   hybrid search one relevance scale. Blockers as of milestone 5: needs MongoDB 8.3+
-   (our M0 runs 8.0.32, and M0 versions can't be chosen), is in Preview, and needs
-   Native Reranking enabled in Project Settings; check cost and latency. Docs:
+   To consider: the `$rerank` stage (Voyage AI) to rerank 20–50 candidates into the top
+   5. Its score may separate near-misses from answers, which cosine can't; measure that
+   first. Blocked: needs MongoDB 8.3+ (our M0 runs 8.0.32) and is in Preview. Docs:
    https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/
 
 ### Phase 3
@@ -319,17 +314,23 @@ milestones run.
   milestone 5 and support keeping 1,600; see Broad questions.) Extrapolated to PDFs (≈3,000–3,500
   characters per page): 1,000 would give about 1.6× the chunks of 1,600; the embedding
   tokens are the same either way.
-- Broad questions (milestone 5): answers are limited by the top 5 chunks (≈8,000
-  characters), not by chunk size. A summary of the 6-chunk Claude Code upload cited 5
-  of its chunks and was complete; for the 13-chunk MongoDB upload, a schema design
-  question missed "embed or reference", indexes and transactions, and the handbook
-  summary missed the support requests section
-  (`test-results/2026-09-29-answers-new-kinds.md`). The answers stay honest about it
-  ("the excerpts I have cover…"). This is a limit of top-k retrieval: smaller chunks
-  would make it worse (less text in the top 5), and neighbour expansion adds depth
-  around a hit, not breadth. The lever is `search.limit`, which costs input tokens on
-  every question, so it stays at 5 for now; revisit it with a large real PDF in
-  milestone 6, where summarizing a whole upload can't work this way.
+- Answers (milestone 5): all 112 question/mode pairs passed
+  (`test-results/2026-09-29-answers-prompt-v2.md`). The LLM replied "not found" to
+  every near-miss and off-topic question the threshold let through (up to 0.80), so
+  threshold plus LLM work as planned. Detecting "not found" by citations held, and
+  partial answers named their missing part.
+- Answer prompt (milestone 5): tuned against unasked gap notes, an invented example
+  value and long answers (baseline and two attempt reports in `test-results/`). The
+  kept rules are in `src/answer.js`. Accepted: proxy answers note that no exact syntax
+  is given. Replies vary between runs, so judge prompt changes on a full run.
+- LLM cost (milestone 5): billing implies ~$2 / $10 per million input / output tokens.
+  Input dominates (~3,000 tokens per question, mostly the chunks); a full
+  `npm run test-answers` run is ~85 calls, ~$0.70.
+- Broad questions (milestone 5): limited by the top 5 chunks, not chunk size: complete
+  for a 6-chunk upload, whole sections missed in the 13-chunk one
+  (`test-results/2026-09-29-answers-new-kinds.md`). Smaller chunks or neighbour
+  expansion wouldn't help; `search.limit` would, at an input-token cost on every
+  question. Stays at 5; revisit with a large PDF in milestone 6.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
@@ -344,5 +345,8 @@ milestones run.
   The "not found" threshold (0.62) and the chunk size (1,600) are under Findings.
   Five samples are in Atlas at 1,600 (37 chunks): nimbus-guide.md 11,
   nimbus-admin-handbook.txt 6, nimbus-release-notes.txt 1, mongodb-document-model.md 13,
-  claude-code-first-steps.txt 6. Next: milestone 5 (answers with citations).
+  claude-code-first-steps.txt 6.
+- Milestone 5 is completed: `src/answer.js` answers with citations; `npm run ask`;
+  `npm run test-answers` checks answers against `test-questions.json` (42 questions,
+  new kinds partial and broad). Results under Findings. Next: milestone 6 (PDF).
 - Files and commands: see ARCHITECTURE.md.
