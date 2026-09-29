@@ -162,6 +162,8 @@ function expected(row) {
   return row.expectAnswer ? 'answer' : 'not found';
 }
 
+const fmt = (score) => (score == null ? '-' : score.toFixed(4));
+
 function got({ result: r, error }) {
   if (error) return 'ERROR';
   if (r.found) return `answered (${r.citations.length} cited)`;
@@ -178,7 +180,7 @@ function printRow(row) {
   }
   const verdict = row.pass ? 'PASS' : `FAIL (${row.diagnosis})`;
   const notes = row.notes.length ? `  note: ${row.notes.join('; ')}` : '';
-  console.log(`${start} got ${got(row).padEnd(22)} ${verdict}${notes}`);
+  console.log(`${start} top ${fmt(row.result.topScore)} got ${got(row).padEnd(22)} ${verdict}${notes}`);
 }
 
 function groupOf(row) {
@@ -258,6 +260,8 @@ function report({ label, only, rows, summary: s, uploads }) {
   add('  `wrongUpload` (should be "not found").');
   add('- **Pass**: an answerable question is answered and a cited chunk contains one of its');
   add('  `expect` phrases; everything else comes back "not found".');
+  add('- **Top score**: the best chunk\'s score from the search. Below the threshold, the reply');
+  add('  is "not found" without calling the LLM; at or above it, the LLM decides.');
   add('- **Diagnosis** of a Fail: threshold (answerable, but below it), retrieval (the expected');
   add('  fact wasn\'t in the chunks sent), prompt/LLM (it was, or there was no answer to give).');
   add('- **Notes** flag replies worth a look even when they pass.', '');
@@ -267,19 +271,20 @@ function report({ label, only, rows, summary: s, uploads }) {
   for (const g of s.groups) add(`| ${g.name} | ${g.expect} | ${g.passed} of ${g.total} |`);
   add('');
 
-  add('## Results', '', '| id | Kind | Mode | Question | Expected | Got | Pass/Fail | Notes |');
-  add('|---|---|---|---|---|---|---|---|');
+  add('## Results', '', '| id | Kind | Mode | Question | Top score | Expected | Got | Pass/Fail | Notes |');
+  add('|---|---|---|---|---|---|---|---|---|');
   for (const row of rows.filter((r) => !r.error)) {
     const verdict = row.pass ? 'Pass' : `**Fail** (${row.diagnosis})`;
-    add(`| ${row.q.id} | ${row.q.kind} | ${row.mode} | ${cell(row.q.question)} | ${expected(row)} | `
-      + `${got(row)} | ${verdict} | ${cell(row.notes.join('; '))} |`);
+    add(`| ${row.q.id} | ${row.q.kind} | ${row.mode} | ${cell(row.q.question)} | ${fmt(row.result.topScore)} | `
+      + `${expected(row)} | ${got(row)} | ${verdict} | ${cell(row.notes.join('; '))} |`);
   }
   add('');
 
   add('## Answers', '', 'Every reply from the LLM (runs stopped by the threshold are left out).', '');
   for (const row of rows.filter((r) => !r.error && r.result.usage)) {
     const r = row.result;
-    add(`### ${row.q.id} (${row.mode}): ${row.pass ? 'Pass' : `Fail (${row.diagnosis})`}`, '');
+    add(`### ${row.q.id} (${row.mode}): ${row.pass ? 'Pass' : `Fail (${row.diagnosis})`}, `
+      + `top score ${fmt(r.topScore)}`, '');
     add(`**Q:** ${row.q.question}`, '');
     if (row.q.note) add(`*Note in test-questions.json:* ${row.q.note}`, '');
     add(...quote(r.found ? r.text : r.rawText), '');
