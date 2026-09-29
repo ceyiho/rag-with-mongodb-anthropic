@@ -83,6 +83,7 @@ distractors. Written as test data, not as reference material.
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
+| `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
 | `test-questions.json` | Test questions against the samples: which upload should answer each, the answer phrases, and a wrong upload for each answerable one. |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |

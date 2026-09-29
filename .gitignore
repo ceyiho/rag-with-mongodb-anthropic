@@ -4,5 +4,6 @@
 # Dependencies - reinstalled with `npm install`
 node_modules/
 
-# Personal Claude preferences - kept local
+# Personal Claude preferences and session handoff notes - kept local
 CLAUDE.md
+HANDOFF.md
