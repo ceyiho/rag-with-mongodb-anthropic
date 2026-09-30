@@ -122,7 +122,7 @@
     "wrongUpload": "claude-code-first-steps.txt",
     "kind": "mixed-chunk",
     "expect": ["keeps both copies","so it keeps both"],
-    "note": "Step 2: the release notes' single chunk covers five topics and scored 0.6647, missing the All-uploads top 3."
+    "note": "The release notes are a single chunk covering five topics, so the answer is a small part of it."
   },
   {
     "id": "notes-admin-rights",
@@ -229,7 +229,7 @@
     "wrongUpload": "mongodb-document-model.md",
     "kind": "mixed-chunk",
     "expect": [".claude/settings.json","reads its settings from a file named"],
-    "note": "The answer is a small part of a chunk about slash commands and settings (0.6724 in step 4). Also ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
+    "note": "The answer is a small part of a chunk about slash commands and settings. Also ambiguous on purpose: Nimbus's nimbus.toml also answers it, so a Nimbus hit counts in All uploads."
   },
   {
     "id": "claude-pro-price",
@@ -348,7 +348,7 @@
     "answerable": false,
     "upload": "nimbus-guide.md",
     "kind": "off-topic",
-    "note": "Step 2 baseline: top score 0.5990 in All uploads."
+    "note": "Clearly unrelated: no sample is about geography."
   },
   {
     "id": "offtopic-banana-bread",
