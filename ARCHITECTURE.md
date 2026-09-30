@@ -37,13 +37,15 @@ npm run test-questions → tools/run-test-questions.js → src/search.js
 npm run test-answers   → tools/run-test-answers.js → src/answer.js → src/search.js
 npm run chunk          → tools/chunk-file.js → src/extractors/ + src/splitter.js  (no database)
 npm run cleanup        → tools/cleanup.js → src/ingest.js (removeUploads)
-npm run check-db, index-status, probe → tools/<name>.js
+npm run check-db       → tools/check-db.js
+npm run index-status   → tools/index-status.js
+npm run probe          → tools/probe.js
 ```
 
 `src/extractors/index.js` picks `text.js` or `markdown.js`; `markdown.js` reuses the
 decoder in `text.js`. Each starting file opens the connection with `src/db.js` and
 passes it down; `src/` modules never open their own. `src/config.js` is read
-almost everywhere.
+almost everywhere. So the chains leave out these two.
 
 ## Folders
 
