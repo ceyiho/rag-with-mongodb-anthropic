@@ -133,14 +133,14 @@ so no logins or usage limits are needed.
    it shows raw chunks and scores, for testing and tuning.
 6. PDF support (command line): add a PDF extractor for text-based PDFs; reject scanned
    PDFs with a clear message. Comes before the API and web page so they are built once
-   for all file types.
+   for all file types. Decide how page breaks are handled (pages as hard boundaries cut
+   sentences at every break); and re-check the chunk size, since PDF chunks have no
+   heading path for context.
    With a large real PDF: record its chunk count (vs the estimate in Findings), and run
    `npm run probe` on it to confirm exact search with a large `limit` and to measure
    the delay for a large upload (see the caveats in tools/probe.js).
-   Also with that PDF: re-check the "not found" threshold, which will likely drift up
-   (an off-topic question's top score is the best of many more chunks); decide how page
-   breaks are handled (pages as hard boundaries cut sentences at every break); and
-   re-check the chunk size, since PDF chunks have no heading path for context.
+   "Not found" threshold: With the same PDF, re-check the "not found" threshold, which will
+   likely drift up (an off-topic question's top score is the best of many more chunks).
    Ask it broad questions (summaries, overviews) and revisit `search.limit`: the top 5
    chunks cover little of a large upload (see Findings: Broad questions).
 
