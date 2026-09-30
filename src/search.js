@@ -53,6 +53,9 @@ async function search(db, question, { uploadId, limit = config.search.limit } = 
   ]).toArray();
 }
 
+// Ids of the complete uploads, for the "All uploads" filter. Chunks have no status
+// (it's on the upload), and $vectorSearch can only filter on fields in the vector
+// index (uploadId), so the status check happens here first, on the uploads collection.
 async function completeUploadIds(db) {
   const uploads = await db.collection(config.collections.uploads)
     .find({ status: 'complete' }, { projection: { _id: 1 } })
