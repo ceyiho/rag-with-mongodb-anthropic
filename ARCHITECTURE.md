@@ -24,6 +24,27 @@ The LLM (Claude, through the Anthropic API) gets the top chunks as search result
 cites the ones it uses; each citation maps back to an upload and section. A reply with
 no citations counts as "not found in your uploads".
 
+## Call chains
+
+Where each part of the app starts, and which `src/` files it calls, in order.
+
+```
+npm run ask            → scripts/ask.js → src/answer.js → src/search.js
+npm run ingest         → scripts/ingest-file.js → src/ingest.js → src/extractors/ + src/splitter.js
+npm run setup          → scripts/setup-db.js
+npm run search         → tools/search.js → src/search.js
+npm run test-questions → tools/run-test-questions.js → src/search.js
+npm run test-answers   → tools/run-test-answers.js → src/answer.js → src/search.js
+npm run chunk          → tools/chunk-file.js → src/extractors/ + src/splitter.js  (no database)
+npm run cleanup        → tools/cleanup.js → src/ingest.js (removeUploads)
+npm run check-db, index-status, probe → tools/<name>.js
+```
+
+`src/extractors/index.js` picks `text.js` or `markdown.js`; `markdown.js` reuses the
+decoder in `text.js`. Each starting file opens the connection with `src/db.js` and
+passes it down; `src/` modules never open their own. `src/config.js` is read
+almost everywhere.
+
 ## Folders
 
 Scripts and tools import from `src/`, never the reverse.
