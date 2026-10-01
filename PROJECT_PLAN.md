@@ -124,7 +124,7 @@ so no logins or usage limits are needed.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
    Combined scores use a different scale, so re-tune the "not found" threshold (record
    it under Findings), and
-   compare against vector-only results using `test-questions.json`.
+   compare against vector-only results using `test/questions.json`.
    Optional, for the demo: a search mode switch on the page (Vector · Keyword · Hybrid)
    to show how results differ, e.g. for exact codes or typos.
    To consider: the `$rerank` stage (Voyage AI) to rerank 20–50 candidates into the top
@@ -319,10 +319,10 @@ milestones run.
   Decisions), and delay, storage and search behaviour are under Findings.
 - Milestone 4 is completed: `src/search.js` searches one upload (exact) or all complete
   uploads (approximate); `npm run search` shows raw results; `npm run test-questions`
-  runs the 36 questions in `test-questions.json` and saves reports in `test-results/`.
+  runs the 36 questions in `test/questions.json` and saves reports in `test/results/`.
   The "not found" threshold (0.62) and the chunk size (1,600) are under Findings.
 - Milestone 5 is completed: `src/answer.js` answers with citations; `npm run ask`;
-  `npm run test-answers` checks answers against `test-questions.json` (42 questions,
+  `npm run test-answers` checks answers against `test/questions.json` (42 questions,
   new kinds partial and broad). Results under Findings.
 - Milestone 6 is completed: PDF ingestion with running headers and footers dropped and
   chapter names in the prefix (see Decisions: PDF pages, and PDF headers, footers and

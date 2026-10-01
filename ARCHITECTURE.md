@@ -95,13 +95,17 @@ Everything that shows the app's internals.
 | `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. |
 | `chunk-file.js` | `npm run chunk -- <file> [--full]` | Chunking preview, no database: each chunk's start and end on one line, with the PDF prefix; `--full` prints whole chunks. |
 | `search.js` | `npm run search -- "<question>"` | Raw search results with scores, for testing and tuning. |
-| `run-test-questions.js` | `npm run test-questions` | Runs `test-questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test-results/`. Its header describes the question fields and kinds. |
-| `run-test-answers.js` | `npm run test-answers` | Runs `test-questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
+| `run-test-questions.js` | `npm run test-questions` | Runs `test/questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test/results/`. Its header describes the question fields and kinds. |
+| `run-test-answers.js` | `npm run test-answers` | Runs `test/questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
 | `cleanup.js` | `npm run cleanup` | Removes orphan chunks, stale ingests, or one named upload. Lists first; `--yes` removes. |
 
-### `test-results/`: saved test runs
+### `test/`: test questions and saved test runs
 
-One Markdown report per saved run: `npm run test-questions -- --save <label>` writes
+`questions.json` holds the test questions against the samples: which upload should
+answer each, the answer phrases, and a wrong upload for each answerable one. Fields and
+kinds are described in `tools/run-test-questions.js`.
+
+`results/` holds one Markdown report per saved run: `npm run test-questions -- --save <label>` writes
 `<date>-<label>.md` (search scores), and `npm run test-answers -- --save <label>` writes
 `<date>-answers-<label>.md` (answers, with the system prompt used). Each report lists
 the settings that affect its results. Findings in PROJECT_PLAN.md name the date of the
@@ -131,6 +135,5 @@ result.
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
 | `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
-| `test-questions.json` | Test questions against the samples: which upload should answer each, the answer phrases, and a wrong upload for each answerable one. Fields and kinds are described in `tools/run-test-questions.js`. |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |
