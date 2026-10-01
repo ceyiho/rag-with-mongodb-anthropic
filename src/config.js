@@ -21,7 +21,7 @@ module.exports = {
     candidatesPerResult: 20,
     // "Not found" thresholds on the top score, one per search mode: below it, the app
     // replies "not found in your uploads" without calling the LLM. See Findings in
-    // PROJECT_PLAN.md ("Not found" score threshold); re-check with a real PDF.
+    // PROJECT_PLAN.md ("Not found" score threshold), re-checked with the PDFs.
     notFoundThreshold: {
       oneUpload: 0.62,
       allUploads: 0.62,
