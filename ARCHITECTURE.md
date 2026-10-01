@@ -65,7 +65,7 @@ Scripts and tools import from `src/`, never the reverse.
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section. Also decodes file bytes to text. |
 | `extractors/markdown.js` | Markdown: each heading starts a section, named by its heading path; the first `#` heading is the title. |
-| `extractors/pdf.js` | PDF (text-based, via `unpdf`): each page is a section ("page 12"); drops page numbers, repairs sentences cut by a page break, rejects scanned PDFs. |
+| `extractors/pdf.js` | PDF (text-based, via `unpdf`): each page is a section ("page 12"), read in visual order (code blocks back in place, columns kept apart); drops page numbers, repairs sentences cut by a page break, rejects scanned PDFs. |
 | `extractors/title.js` | Makes a title from a file name, for files without one. |
 | `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name, or the section's prefix if the extractor gives one (PDFs: the title). |
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
@@ -96,7 +96,7 @@ Everything that shows the app's internals.
 | `chunk-file.js` | `npm run chunk -- <file>` | Chunking preview, no database. |
 | `search.js` | `npm run search -- "<question>"` | Raw search results with scores, for testing and tuning. |
 | `run-test-questions.js` | `npm run test-questions` | Runs `test-questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test-results/`. Its header describes the question fields and kinds. |
-| `run-test-answers.js` | `npm run test-answers` | Runs `test-questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions. |
+| `run-test-answers.js` | `npm run test-answers` | Runs `test-questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
 | `cleanup.js` | `npm run cleanup` | Removes orphan chunks, stale ingests, or one named upload. Lists first; `--yes` removes. |
 
 ### `test-results/`: saved test runs
