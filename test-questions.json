@@ -176,12 +176,12 @@
     "note": "explain(\"executionStats\"): IXSCAN vs COLLSCAN. The book's Using Explain Plans chapter also answers it, for aggregations."
   },
   {
-    "id": "mongodb-atlas-cluster",
-    "question": "How do I create a MongoDB Atlas cluster?",
+    "id": "mongodb-backup",
+    "question": "How do I back up a MongoDB database?",
     "answerable": false,
     "upload": "mongodb-document-model.md",
     "kind": "near-miss",
-    "note": "Atlas isn't covered."
+    "note": "No upload covers backups; Nimbus mentions restoring files from a backup. Replaces 'How do I create a MongoDB Atlas cluster?', which the book partly answers (Free Tier, Access List)."
   },
   {
     "id": "mongodb-sql",
@@ -477,10 +477,12 @@
   {
     "id": "book-mapreduce-removed",
     "question": "In which MongoDB version was Map-Reduce removed?",
-    "answerable": false,
+    "answerable": true,
     "upload": "Practical MongoDB Aggregations.pdf",
-    "kind": "near-miss",
-    "note": "The book says 5.0 deprecated it and it is 'likely to be removed in a future version'. A tempting wrong answer: 5.0."
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "direct",
+    "expect": ["version 5.0 deprecated Map-"],
+    "note": "False premise: the book says 5.0 deprecated it and it is 'likely to be removed in a future version'. The answer should correct the premise, not say 'removed in 5.0'. Was a near-miss, but the book does answer it."
   },
   {
     "id": "book-vector-search",
