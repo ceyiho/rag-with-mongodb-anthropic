@@ -210,8 +210,8 @@ so no logins or usage limits are needed.
     (processing → complete), `uploadedAt`, `chunkCount`. `title` comes from the file
     (first `#` heading in Markdown, metadata title in a PDF), else from the file name.
   - `chunks`: `uploadId` (ObjectId), `fileName` (copied for citations), `section`,
-    `chunkIndex`, `text` (heading path + body, or for PDFs title, chapter if any,
-    + body; the auto-embedded field).
+    `chunkIndex`, `text` (Markdown: heading path + body; plain text: title + body;
+    PDFs: title, chapter if any, + body; the auto-embedded field).
   - Indexes: `uploads` partial unique on `fileName` where status is complete;
     `chunks` on `uploadId`. The vector index filters on `uploadId` only.
 - Vector index `chunks_vector_cosine` on `chunks` (created by `npm run setup`):
@@ -229,8 +229,7 @@ so no logins or usage limits are needed.
   page is a section, cited by its PDF page number, and page breaks stay hard
   boundaries. Pages are read in visual order (some PDFs store code blocks after the
   prose). A sentence cut by a page break moves to the next page, unless either side of
-  the break is code. Images are skipped and there's no OCR: little is lost in the
-  book, more in the pouch, whose steps refer to photos.
+  the break is code. Images are skipped and there's no OCR.
 - PDF headers, footers and chapters (milestone 6): running headers and footers are
   dropped: margin lines that repeat on a run of nearby pages. A run, not a share of
   all pages, so chapter names go in long books too, while body sentences a book
@@ -334,7 +333,7 @@ milestones run.
   same, so one value, kept as two config entries so they can diverge (e.g. hybrid).
   Milestone 6, with the PDFs (run of 2026-10-01): kept at 0.62,
   all answerable kept (lowest 0.654). In All uploads it no longer rejects off-topic
-  questions (0 of 9; low-content chunks like the pouch's title page lift them to
+  questions (0 of 9; low-content chunks lift them to
   0.62–0.67), but still most wrong-upload ones (38 of 49). The LLM is the real "not
   found" gate.
 - Chunk size (milestone 4): kept 1,600 after comparing it with 1,000 (scaled max
@@ -381,6 +380,11 @@ milestones run.
   including one with a small text footer as phone scanner apps add. A text PDF with a
   few image-only pages (a cover, a diagram) is accepted; those pages give no section.
   Rejection happens before anything is saved.
+- Plain-text chunk prefix (milestone 6): changed from the file name
+  ("nimbus-admin-handbook.txt") to the title made from it ("Nimbus Admin Handbook"),
+  to match PDFs. No measurable effect (runs of 2026-10-01): ranks, answers and the
+  threshold unchanged; scores of the plain-text uploads' own questions moved by
+  -0.006 to +0.006, mostly slightly down. Kept for consistency.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
@@ -402,8 +406,8 @@ milestones run.
 - Milestone 6 is completed: PDF ingestion with running headers and footers dropped and
   chapter names in the prefix (see Decisions: PDF pages, and PDF headers, footers and
   chapters), and the tuning (threshold kept at 0.62, `search.limit` 10, chunk size
-  kept; under Findings). In Atlas, 360 chunks: the five samples plus two real PDFs,
-  kept out of git: the book (313) and the pouch instructions (10). Neither has running
-  headers, so neither needed re-ingesting. The test set has 71 questions.
+  kept; under Findings). In Atlas, 360 chunks: the five samples plus two real PDFs.
+  Neither has running headers, so neither needed re-ingesting.
+  The test set has 71 questions.
 - Next: milestone 7 (Express API).
 - Files and commands: see ARCHITECTURE.md.
