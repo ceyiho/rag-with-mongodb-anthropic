@@ -169,10 +169,11 @@
     "question": "How can I tell whether a query is using an index?",
     "answerable": true,
     "upload": "mongodb-document-model.md",
+    "alsoIn": ["Practical MongoDB Aggregations.pdf"],
     "wrongUpload": "nimbus-guide.md",
     "kind": "paraphrase",
     "expect": ["explain(\"executionStats\")"],
-    "note": "explain(\"executionStats\"): IXSCAN vs COLLSCAN."
+    "note": "explain(\"executionStats\"): IXSCAN vs COLLSCAN. The book's Using Explain Plans chapter also answers it, for aggregations."
   },
   {
     "id": "mongodb-atlas-cluster",
@@ -343,6 +344,261 @@
     "note": "Spread over the whole file: prerequisites, installing, signing in, first session, permissions, CLAUDE.md."
   },
   {
+    "id": "book-blocking-stages",
+    "question": "Which aggregation stages are blocking stages?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "direct",
+    "expect": ["the two types of stages that block are"],
+    "note": "$sort and $group (plus $bucket, $bucketAuto, $count, $sortByCount, $facet). Page 38."
+  },
+  {
+    "id": "book-memory-limit",
+    "question": "What is the RAM limit for a blocking stage in an aggregation pipeline?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "direct",
+    "expect": ["limited to 100 MB of consumed", "100 MB RAM limit for blocking stages"],
+    "note": "100 MB, unless allowDiskUse:true. Pages 40 and 41."
+  },
+  {
+    "id": "book-sort-spill",
+    "question": "My pipeline fails because sorting runs out of memory. How can I let it use the disk instead?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "paraphrase",
+    "expect": ["allowDiskUse:true option"],
+    "note": "allowDiskUse:true, at the cost of much higher latency; never says 'spill' in the question. Page 40."
+  },
+  {
+    "id": "book-set-vs-project",
+    "question": "I want to add one field and keep all the others. Should I use $project?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "paraphrase",
+    "expect": ["you need to retain most of the fields in the", "always look to use $set (or $addFields ) and $unset"],
+    "note": "No: use $set / $unset; $project only when the output shape is very different. Pages 26-31."
+  },
+  {
+    "id": "book-mapreduce-deprecated",
+    "question": "Which MongoDB version deprecated Map-Reduce?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "direct",
+    "expect": ["version 5.0 deprecated Map-"],
+    "note": "5.0. The same chunk lists the key releases, so the answer is a small part of it. Page 13."
+  },
+  {
+    "id": "book-framework-introduced",
+    "question": "When was the Aggregation Framework introduced?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-release-notes.txt",
+    "kind": "direct",
+    "expect": ["introduced in the 2.2 version of MongoDB", "MongoDB 2.2 (August 2012): Initial Release"],
+    "note": "August 2012, MongoDB 2.2. Page 13."
+  },
+  {
+    "id": "book-expr-compare-fields",
+    "question": "How can I keep only records where one field is greater than another field in the same record?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "paraphrase",
+    "expect": ["compare two fields from the same record"],
+    "note": "$expr inside $match. The explanation starts at the end of one chunk (page 52) and the example is on the next page."
+  },
+  {
+    "id": "book-filter-array",
+    "question": "How do I remove some elements from an array in each document without using $unwind and $group?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "mixed-chunk",
+    "expect": ["using the $filter array operator"],
+    "note": "$filter inside $set. The chunk is mostly code (the suboptimal and optimal pipelines). Page 44."
+  },
+  {
+    "id": "book-lookup-sharded",
+    "question": "Can $lookup join to a sharded collection?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "direct",
+    "expect": ["the other referenced collection to join with"],
+    "note": "Yes from 5.1; before that it must be unsharded. Page 56."
+  },
+  {
+    "id": "book-integral",
+    "question": "How does the $integral operator work out the energy used from power readings?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "direct",
+    "expect": ["trapezoidal rule determines the area"],
+    "note": "Trapezoidal rule over a 1-hour window. The previous page is the same heading plus JSON output only. Page 187."
+  },
+  {
+    "id": "book-atlas-search-index",
+    "question": "How do I create the Atlas Search index for the full-text search examples?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "direct",
+    "expect": ["click the Search tab and then click"],
+    "note": "Atlas console steps in the appendix, spread over three short pages (276-278)."
+  },
+  {
+    "id": "typo-memory-limit",
+    "question": "whats the ram limmit for a bloking stage",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "typo",
+    "compareWith": "book-memory-limit",
+    "expect": ["limited to 100 MB of consumed", "100 MB RAM limit for blocking stages"],
+    "note": "Two misspellings, no capital or question mark; compare with book-memory-limit."
+  },
+  {
+    "id": "partial-memory-limit-price",
+    "question": "What is the memory limit for a blocking stage, and how much does a dedicated Atlas cluster cost per month?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "partial",
+    "expect": ["limited to 100 MB of consumed", "100 MB RAM limit for blocking stages"],
+    "note": "100 MB; should say the uploads don't give Atlas prices (the book mentions only the free tier)."
+  },
+  {
+    "id": "book-mapreduce-removed",
+    "question": "In which MongoDB version was Map-Reduce removed?",
+    "answerable": false,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "kind": "near-miss",
+    "note": "The book says 5.0 deprecated it and it is 'likely to be removed in a future version'. A tempting wrong answer: 5.0."
+  },
+  {
+    "id": "book-vector-search",
+    "question": "How do I use the $vectorSearch stage in an aggregation pipeline?",
+    "answerable": false,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "kind": "near-miss",
+    "note": "The book covers $search and $searchMeta (Atlas Search), not $vectorSearch."
+  },
+  {
+    "id": "book-change-streams",
+    "question": "How do I use change streams to react to new documents in a collection?",
+    "answerable": false,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "kind": "near-miss",
+    "note": "Not covered; Incremental Analytics re-runs a pipeline on a schedule, which is close but different."
+  },
+  {
+    "id": "book-max-stages",
+    "question": "What is the maximum number of stages allowed in one aggregation pipeline?",
+    "answerable": false,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "kind": "near-miss",
+    "note": "Not in the book; it gives other limits (100 MB per blocking stage, 16MB documents, 'over thirty stages' exist)."
+  },
+  {
+    "id": "broad-book-performance",
+    "question": "What are the main tips for making aggregation pipelines run faster?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "broad",
+    "note": "Pipeline Performance Considerations, pages 38-48 (~16 chunks): streaming vs blocking stages, $sort and $group memory, avoid $unwind/$group for arrays, match early. Also explain plans (32-37) and sharding tips (64)."
+  },
+  {
+    "id": "broad-book-examples",
+    "question": "What kinds of example pipelines does the book include?",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "broad",
+    "note": "Pages 86-248, no list in one place: foundational, joining, data type conversion, trend analysis, securing data, time-series, array manipulation, full-text search. Each part's title page is a short chunk."
+  },
+  {
+    "id": "broad-book-summary",
+    "question": "Summarize the book Practical MongoDB Aggregations.",
+    "answerable": true,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "broad",
+    "note": "The worst case: 311 chunks. Useful parts: Who This Book Is For (page 6), Introduction (7-14), Guiding Tips (21), Aggregations By Example (86)."
+  },
+  {
+    "id": "pouch-seam-allowance",
+    "question": "What seam allowance does the Shanti Pouch pattern use?",
+    "answerable": true,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "direct",
+    "expect": ["(6 mm) unless otherwise noted"],
+    "note": "1/4\" (6 mm), basting and topstitching 1/8\". Page 2; some steps use 3/8\" (1cm)."
+  },
+  {
+    "id": "pouch-zipper",
+    "question": "What zipper do I need to buy for this pouch?",
+    "answerable": true,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "wrongUpload": "Practical MongoDB Aggregations.pdf",
+    "kind": "mixed-chunk",
+    "expect": ["#3 NYLON zipper"],
+    "note": "#3 nylon, at least 6\" (15cm). One line of page 2, which also holds the pattern notes and the whole supplies list."
+  },
+  {
+    "id": "pouch-turning-hole",
+    "question": "How big should the opening be for turning the pouch right side out?",
+    "answerable": true,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "paraphrase",
+    "expect": ["turning hole on the bottom of the lining"],
+    "note": "2-3\" (5-7cm) at the bottom of the lining; the question says 'opening', the PDF 'turning hole'. Page 9."
+  },
+  {
+    "id": "partial-pouch-size-fabric",
+    "question": "How big is the finished Shanti Pouch, and how many pouches can I cut from one yard of fabric?",
+    "answerable": true,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "partial",
+    "expect": ["12.7cm wide by 10.1cm tall"],
+    "note": "5\" x 4\"; should say the uploads don't cover pouches per yard (supplies are per pouch, a fat quarter)."
+  },
+  {
+    "id": "pouch-washing",
+    "question": "Can I machine wash the finished Shanti Pouch?",
+    "answerable": false,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "near-miss",
+    "note": "No care instructions; the pattern names fabrics and pressing, never washing."
+  },
+  {
+    "id": "pouch-larger",
+    "question": "How do I make a larger version of the Shanti Pouch?",
+    "answerable": false,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "near-miss",
+    "note": "Only one size; the dimensions and printing at 100% are a close match in wording."
+  },
+  {
+    "id": "broad-pouch-steps",
+    "question": "Give me an overview of the steps to sew the Shanti Pouch.",
+    "answerable": true,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "wrongUpload": "nimbus-admin-handbook.txt",
+    "kind": "broad",
+    "note": "Steps spread over pages 4-10 (7 chunks): preparation (contrast top, fleece, zipper, tab), construction (zipper, lining, topstitch, sew around, turn, close)."
+  },
+  {
     "id": "offtopic-france",
     "question": "What is the capital of France?",
     "answerable": false,
@@ -397,5 +653,21 @@
     "upload": "nimbus-guide.md",
     "kind": "off-topic",
     "note": "Same wording as the Windows install sections in Nimbus and Claude Code."
+  },
+  {
+    "id": "offtopic-mysql-group-by",
+    "question": "How do I filter groups with HAVING after a GROUP BY in MySQL?",
+    "answerable": false,
+    "upload": "Practical MongoDB Aggregations.pdf",
+    "kind": "off-topic",
+    "note": "SQL grouping; the book's $group and $match-after-$group passages share the wording."
+  },
+  {
+    "id": "offtopic-buttonhole",
+    "question": "How do I sew a buttonhole on a shirt?",
+    "answerable": false,
+    "upload": "Shanti_Pouch_Instructions.pdf",
+    "kind": "off-topic",
+    "note": "Sewing, but not the pouch; shares the pattern's stitching vocabulary."
   }
 ]
