@@ -4,9 +4,9 @@
 // tried in order: paragraphs, then sentences, then lines, then words.
 //
 // Each chunk's text starts with its section name, so the embedding knows the context,
-// or with the section's own prefix if the extractor gives one (PDFs use the title,
-// since "page 12" says nothing about the content). Sizes apply to the whole chunk
-// text, including that prefix.
+// or with the section's own prefix if the extractor gives one (PDFs and plain text use
+// the title, since "page 12" or "notes.txt" says little about the content). Sizes
+// apply to the whole chunk text, including that prefix.
 
 const config = require('./config');
 
