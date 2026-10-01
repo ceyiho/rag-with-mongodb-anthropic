@@ -262,6 +262,12 @@ milestones run.
   1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
   That's ~1M tokens and ~4.5–9 MB (see Storage). Confirm with a real PDF in
   milestone 6.
+  Measured (milestone 6, `npm run chunk`, not yet ingested): a 280-page technical book
+  (Practical MongoDB Aggregations, many code examples) gave 311 chunks from 277 pages
+  with text, about 1.1 chunks per page. Its pages are far lighter than estimated
+  (average 1,197 characters, median 1,147, max 3,325), so most pages are one chunk
+  (average 1,123 characters). At this density 500 pages would be ~550 chunks; the
+  estimate above still fits dense textbooks.
 - Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
   to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
   (about 0.67–0.72 vs 0.55–0.58), with the same ranking. Chose cosine.
