@@ -122,9 +122,9 @@ so no logins or usage limits are needed.
    questions should come back "not found", answerable ones answered with citations.
    The thresholds are in `config.js` (`search.notFoundThreshold`, one per search mode;
    application code, committed, not `.env`), added in milestone 4 for the test runner.
-   Context: the LLM sees the top chunks only: up to ≈8,000 characters (5 × 1,600; our
-   `config.search.limit`, not an Atlas or LLM limit), less when chunks are shorter than
-   the target, as short Markdown sections are. If answers lack
+   Context: the LLM sees the top chunks only: up to ≈16,000 characters (10 × 1,600; our
+   `config.search.limit`, 5 until milestone 6; not an Atlas or LLM limit), less when
+   chunks are shorter than the target, as short Markdown sections are. If answers lack
    context, try neighbour expansion (send each hit with the chunks at `chunkIndex` ± 1
    from the same upload) before changing the chunk size. Re-check the chunk size here
    with broad questions (e.g. summaries), which milestone 4 didn't test.
@@ -144,11 +144,10 @@ so no logins or usage limits are needed.
    likely drift up (an off-topic question's top score is the best of many more chunks).
    Ask it broad questions (summaries, overviews) and revisit `search.limit`: the top 5
    chunks cover little of a large upload (see Findings: Broad questions).
-   After the tuning: drop running headers and footers (repeated lines in the page
-   margins; neither test PDF has any). Test with mock PDFs made by a generator in
-   `tools/` (`pdf-lib`, a devDependency): fixed, numbered, alternating and chapter
-   headers, a title page, body headings that repeat (must be kept), and two columns
-   under a header. Leaning towards keeping chapter-name headers as context; revisit.
+   After the tuning: drop running headers and footers (lines repeated in the page
+   margins). Neither test PDF has any, so test with mock PDFs from a generator in
+   `tools/` (`pdf-lib`, a devDependency), including repeated body headings that must be
+   kept. Leaning towards keeping chapter-name headers as context; revisit.
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
@@ -190,7 +189,7 @@ so no logins or usage limits are needed.
     chunkCount, then `$count` (as in tools/probe.js). Checks "searchable", the real end
     result, using public features only. Each check embeds a short query (a few tokens,
     counts toward the rate limit), and costs more for larger uploads. Works for a
-    311-chunk upload (milestone 6).
+    313-chunk upload (milestone 6).
   - B. Count embeddings: the generated embeddings collection in `__mdb_internal_search`
     (documented, read-only) holds one MDB doc per embedded chunk with a copy of
     `uploadId`, so `countDocuments({ uploadId })` vs chunkCount shows progress
@@ -227,21 +226,16 @@ so no logins or usage limits are needed.
 - Chunk size: 1,600 characters (≈400 tokens), max 2,000, overlap 200. Sections are
   hard boundaries (a chunk never spans two): each Markdown heading starts a section, a
   plain-text file is one section, and each PDF page is one (see PDF pages). Values in
-  `config.js`. Confirmed in milestone 4 against 1,000 (see Findings: Chunk size);
-  re-check with answers (milestone 5) and a real PDF (milestone 6).
+  `config.js`. Confirmed in milestone 4 against 1,000, and re-checked with answers
+  (milestone 5) and PDFs (milestone 6); see Findings: Chunk size.
 - PDF pages (milestone 6; rules in the header of `src/extractors/pdf.js`): each page is
-  a section, cited by its PDF page number, and page breaks stay hard boundaries. A
-  sentence cut by a page break is repaired by moving it to the next page, except when
-  either side of the break is code, where it moved whole code blocks, headings or
-  pages across pages. Pages are read in visual order: some PDFs store the prose first
-  and the code blocks after it (133 of the book's 280 pages), so a page is rebuilt
-  from pdf.js's positioned text, keeping side-by-side columns in order. Rejected: text
-  flowing across pages with page-range citations (a bigger change to the splitter
-  shared with `.md`/`.txt`). Chunks start with the title, not "page N", which says
-  nothing about the content. Not handled yet: running headers or footers. Images are
-  skipped, so what they show is lost: little in the book (21 diagrams and screenshots,
-  which the prose mostly repeats), more in the pouch (40 step photos its steps refer
-  to). No OCR: scanned PDFs stay rejected, and text inside images is lost.
+  a section, cited by its PDF page number, and page breaks stay hard boundaries. Pages
+  are read in visual order (some PDFs store code blocks after the prose). A sentence
+  cut by a page break moves to the next page, unless either side of the break is code.
+  Rejected: text flowing across pages with page-range citations (a bigger change to
+  the shared splitter). Chunks start with the title, not "page N". Not handled yet:
+  running headers or footers. Images are skipped and there's no OCR: little is lost
+  in the book, more in the pouch, whose steps refer to photos.
 - Answers (milestone 5, from the Anthropic documentation on search results and
   citations):
   - Chunks go to the LLM as `search_result` blocks in the user message, one per chunk
@@ -272,9 +266,8 @@ milestones run.
   Building the vector index over 17 existing chunks took about 80 s. For large uploads
   the probe's seconds include ingest time, and embedding beyond the rate limit is
   queued, so expect longer.
-  Large upload (milestone 6): the 280-page book (311 chunks) was fully searchable
-  within 13 s of upload, ingest included; re-ingested after the reading-order fix
-  (313 chunks), within 16 s (none at 7 s).
+  Large upload (milestone 6): the 280-page book (313 chunks) was fully searchable
+  within 13–16 s of upload, ingest included.
 - Exact vs approximate search (milestone 3, Atlas documentation + test): approximate
   search (default, HNSW) can miss results (the documentation calls 90–95% overlap with
   exact search typical good recall), so it can't be trusted to count chunks. Exact
@@ -314,17 +307,14 @@ milestones run.
   allowance would cover ~200 (at ~1M tokens each), so storage runs out first.
   Uncertain: the vector index itself (Lucene, on the search side) isn't in these
   numbers, and it's unclear whether M0 counts it toward 512 MB.
-  Measured (milestone 6, 371 chunks including the 280-page book): data 2.4 KB per
-  chunk, as estimated; ~4.4 KB on disk with indexes (the generated embeddings take
-  about twice their data size); plus the vector index, ~1.1 KB. Re-measured at 360
-  chunks (after removing the extract): the same 2.4 KB data, ~4.5 KB on disk with
-  indexes (vector index not re-measured). So ~5.5 KB per chunk
+  Measured (milestone 6, ~360 chunks including the book): data 2.4 KB per chunk, as
+  estimated; ~4.5 KB on disk with indexes (the generated embeddings take about twice
+  their data size); plus the vector index, ~1.1 KB. So ~5.5 KB per chunk
   worst case: the book takes ~1.7 MB, and 512 MB holds ~90,000 chunks. Whether M0
   counts the embeddings and the vector index toward 512 MB is still unknown; storage
   isn't a concern at this project's scale either way.
 - "Not found" score threshold (milestone 4): 0.62 for both search modes, confirmed at
-  the chosen chunk size (1,600; the rerun gave the same results). Re-check it with a
-  real PDF in milestone 6, since more chunks will likely push off-topic scores up. From
+  the chosen chunk size (1,600; the rerun gave the same results). From
   `npm run test-questions` (36 questions; per-question results in
   `test-results/2026-09-29-chunk-1600.md`): answerable top scores 0.65–0.86 (lowest: an
   error code typed without its hyphen); clearly unrelated questions 0.58–0.61; asked of
@@ -337,6 +327,11 @@ milestones run.
   Set low on purpose: too high refuses real answers, which nothing recovers; too low
   costs one LLM call that should answer "not found". The two modes scored almost the
   same, so one value, kept as two config entries so they can diverge (e.g. hybrid).
+  Milestone 6, with the PDFs (`test-results/2026-10-01-pdf-book.md`): kept at 0.62,
+  all answerable kept (lowest 0.654). In All uploads it no longer rejects off-topic
+  questions (0 of 9; low-content chunks like the pouch's title page lift them to
+  0.62–0.67), but still most wrong-upload ones (38 of 49). The LLM is the real "not
+  found" gate.
 - Chunk size (milestone 4): kept 1,600 after comparing it with 1,000 (scaled max
   1,250, overlap 125) on the same 36 questions (`test-results/2026-09-29-chunk-1600.md`
   and `…-chunk-1000.md`). Retrieving the answer tied: each question's answer text
@@ -350,26 +345,34 @@ milestones run.
   slightly better threshold behaviour (17 vs 16 of 22 wrong-upload questions rejected).
   Limits: `expect` phrases are short facts, so broad questions (where context matters
   most) aren't tested, and the samples are small. (Broad questions were tested in
-  milestone 5 and support keeping 1,600; see Broad questions.) Extrapolated to PDFs (≈3,000–3,500
-  characters per page): 1,000 would give about 1.6× the chunks of 1,600; the embedding
-  tokens are the same either way.
+  milestone 5 and support keeping 1,600; see Broad questions.)
+  PDFs (milestone 6): kept 1,600. Pages are hard boundaries and only 30 of the book's
+  278 pages are longer, so the size barely matters there. Short chunks (part openers,
+  page ends) don't crowd out answers; they hold real content, so they aren't merged.
+  One weak retrieval, `book-filter-array` (answer at #10, behind symbol-only
+  cheatsheet pages): try neighbour expansion or hybrid search (milestone 9).
 - Answers (milestone 5): all 112 question/mode pairs passed
   (`test-results/2026-09-29-answers-prompt-v2.md`). The LLM replied "not found" to
   every near-miss and off-topic question the threshold let through (up to 0.80), so
   threshold plus LLM work as planned. Detecting "not found" by citations held, and
   partial answers named their missing part.
+  Milestone 6, with the PDFs at `search.limit` 10
+  (`test-results/2026-10-01-answers-pdf-limit-10.md`): 188 of 191 passed; the 3
+  failures were badly designed questions, since fixed. All other near-misses and
+  off-topic questions came back "not found".
 - Answer prompt (milestone 5): tuned against unasked gap notes, an invented example
   value and long answers (baseline and two attempt reports in `test-results/`). The
   kept rules are in `src/answer.js`. Accepted: proxy answers note that no exact syntax
   is given. Replies vary between runs, so judge prompt changes on a full run.
 - LLM cost (milestone 5): billing implies ~$2 / $10 per million input / output tokens.
-  Input dominates (~3,000 tokens per question, mostly the chunks); a full
-  `npm run test-answers` run is ~85 calls, ~$0.70.
-- Broad questions (milestone 5): limited by the top 5 chunks, not chunk size: complete
-  for a 6-chunk upload, whole sections missed in the 13-chunk one
-  (`test-results/2026-09-29-answers-new-kinds.md`). Smaller chunks or neighbour
-  expansion wouldn't help; `search.limit` would, at an input-token cost on every
-  question. Stays at 5; revisit with a large PDF in milestone 6.
+  Input dominates (~5,300 tokens per question at `search.limit` 10, mostly the
+  chunks); a full `npm run test-answers` run (71 questions) is ~150 calls, ~$2.
+- Broad questions (milestones 5–6): limited by how many chunks reach the LLM, not by
+  chunk size. `search.limit` raised from 5 to 10 in milestone 6
+  (`test-results/2026-10-01-answers-broad-limit-5.md` vs `…-limit-10.md`): uploads of
+  10–13 chunks now get complete answers; the book's stay partial. "What kinds of examples does the book include?"
+  stays incomplete at any limit (no table of contents in its text). Cost: ~$0.003
+  more per question.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
@@ -388,12 +391,10 @@ milestones run.
 - Milestone 5 is completed: `src/answer.js` answers with citations; `npm run ask`;
   `npm run test-answers` checks answers against `test-questions.json` (42 questions,
   new kinds partial and broad). Results under Findings.
-- Milestone 6 is in progress. Done: PDF ingestion (`src/extractors/pdf.js`, see
-  Decisions: PDF pages, including reading pages in visual order) and the large-PDF
-  measurements (chunk count, probe, storage; under Findings). Two PDFs are in Atlas,
-  from `samples/private-samples/` (gitignored): Practical MongoDB Aggregations.pdf 313
-  chunks and Shanti_Pouch_Instructions.pdf 10 (360 chunks with the five samples). The
-  book's 10-page extract was removed, since it duplicated the book's first pages.
-  `test-questions.json` has 71 questions, 29 of them for the PDFs. Next: tuning with
-  the PDF ("not found" threshold, broad questions and `search.limit`, chunk size).
+- Milestone 6 is in progress. Done: PDF ingestion (see Decisions: PDF pages) and the
+  tuning (threshold kept at 0.62, `search.limit` 10, chunk size kept; under Findings).
+  In Atlas, 360 chunks: the five samples plus two PDFs from `samples/private-samples/`
+  (gitignored), Practical MongoDB Aggregations.pdf (313) and
+  Shanti_Pouch_Instructions.pdf (10). `test-questions.json` has 71 questions. Next:
+  running headers and footers (see milestone 6), then close the milestone.
 - Files and commands: see ARCHITECTURE.md.
