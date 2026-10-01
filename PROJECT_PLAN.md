@@ -144,6 +144,11 @@ so no logins or usage limits are needed.
    likely drift up (an off-topic question's top score is the best of many more chunks).
    Ask it broad questions (summaries, overviews) and revisit `search.limit`: the top 5
    chunks cover little of a large upload (see Findings: Broad questions).
+   After the tuning: drop running headers and footers (repeated lines in the page
+   margins; neither test PDF has any). Test with mock PDFs made by a generator in
+   `tools/` (`pdf-lib`, a devDependency): fixed, numbered, alternating and chapter
+   headers, a title page, body headings that repeat (must be kept), and two columns
+   under a header. Leaning towards keeping chapter-name headers as context; revisit.
 
 ### Phase 2
 7. Express API: one shared database client; routes to upload, list uploads, and ask.
@@ -226,11 +231,17 @@ so no logins or usage limits are needed.
   re-check with answers (milestone 5) and a real PDF (milestone 6).
 - PDF pages (milestone 6; rules in the header of `src/extractors/pdf.js`): each page is
   a section, cited by its PDF page number, and page breaks stay hard boundaries. A
-  sentence cut by a page break is repaired by moving it to the next page, except in
-  code, where it moved whole code blocks across pages. Rejected: text flowing across
-  pages with page-range citations (a bigger change to the splitter shared with
-  `.md`/`.txt`). Chunks start with the title, not "page N", which says nothing about
-  the content. Not handled yet: running headers or footers, and images (no OCR).
+  sentence cut by a page break is repaired by moving it to the next page, except when
+  either side of the break is code, where it moved whole code blocks, headings or
+  pages across pages. Pages are read in visual order: some PDFs store the prose first
+  and the code blocks after it (133 of the book's 280 pages), so a page is rebuilt
+  from pdf.js's positioned text, keeping side-by-side columns in order. Rejected: text
+  flowing across pages with page-range citations (a bigger change to the splitter
+  shared with `.md`/`.txt`). Chunks start with the title, not "page N", which says
+  nothing about the content. Not handled yet: running headers or footers. Images are
+  skipped, so what they show is lost: little in the book (21 diagrams and screenshots,
+  which the prose mostly repeats), more in the pouch (40 step photos its steps refer
+  to). No OCR: scanned PDFs stay rejected, and text inside images is lost.
 - Answers (milestone 5, from the Anthropic documentation on search results and
   citations):
   - Chunks go to the LLM as `search_result` blocks in the user message, one per chunk
@@ -262,7 +273,8 @@ milestones run.
   the probe's seconds include ingest time, and embedding beyond the rate limit is
   queued, so expect longer.
   Large upload (milestone 6): the 280-page book (311 chunks) was fully searchable
-  within 13 s of upload, ingest included.
+  within 13 s of upload, ingest included; re-ingested after the reading-order fix
+  (313 chunks), within 16 s (none at 7 s).
 - Exact vs approximate search (milestone 3, Atlas documentation + test): approximate
   search (default, HNSW) can miss results (the documentation calls 90–95% overlap with
   exact search typical good recall), so it can't be trusted to count chunks. Exact
@@ -271,16 +283,16 @@ milestones run.
   works with scalar quantization and gives the same scores (within run-to-run jitter:
   ~0.0004 in milestone 3, up to ~0.001 across the 36 test questions in milestone 4).
   `numCandidates` (approximate only) is capped at 10,000. Exact search has no
-  documented cap on `limit`; `limit` = 311 returned all 311 chunks of the book
+  documented cap on `limit`; `limit` = 313 returned all 313 chunks of the book
   (milestone 6, `npm run probe`).
 - Upload size estimate (milestone 3, not measured): a 500-page textbook is about
   1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
   That's ~1M tokens and ~4.5–9 MB (see Storage).
   Measured (milestone 6): a 280-page technical book
-  (Practical MongoDB Aggregations, many code examples) gave 311 chunks from 277 pages
+  (Practical MongoDB Aggregations, many code examples) gave 313 chunks from 278 pages
   with text, about 1.1 chunks per page. Its pages are far lighter than estimated
-  (average 1,197 characters, median 1,147, max 3,325), so most pages are one chunk
-  (average 1,123 characters). At this density 500 pages would be ~550 chunks; the
+  (average 1,205 characters, median 1,151, max 3,355), so most pages are one chunk
+  (average 1,117 characters). At this density 500 pages would be ~550 chunks; the
   estimate above still fits dense textbooks.
 - Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
   to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
@@ -304,7 +316,9 @@ milestones run.
   numbers, and it's unclear whether M0 counts it toward 512 MB.
   Measured (milestone 6, 371 chunks including the 280-page book): data 2.4 KB per
   chunk, as estimated; ~4.4 KB on disk with indexes (the generated embeddings take
-  about twice their data size); plus the vector index, ~1.1 KB. So ~5.5 KB per chunk
+  about twice their data size); plus the vector index, ~1.1 KB. Re-measured at 360
+  chunks (after removing the extract): the same 2.4 KB data, ~4.5 KB on disk with
+  indexes (vector index not re-measured). So ~5.5 KB per chunk
   worst case: the book takes ~1.7 MB, and 512 MB holds ~90,000 chunks. Whether M0
   counts the embeddings and the vector index toward 512 MB is still unknown; storage
   isn't a concern at this project's scale either way.
@@ -375,10 +389,11 @@ milestones run.
   `npm run test-answers` checks answers against `test-questions.json` (42 questions,
   new kinds partial and broad). Results under Findings.
 - Milestone 6 is in progress. Done: PDF ingestion (`src/extractors/pdf.js`, see
-  Decisions: PDF pages) and the large-PDF measurements (chunk count, probe, storage;
-  under Findings). Three PDFs are in Atlas, from `samples/private-samples/`
-  (gitignored): Practical MongoDB Aggregations.pdf 311 chunks, its 10-page extract 13,
-  Shanti_Pouch_Instructions.pdf 10 (371 chunks with the five samples). Next: tuning
-  with the PDF (test questions, "not found" threshold, broad questions and
-  `search.limit`, chunk size).
+  Decisions: PDF pages, including reading pages in visual order) and the large-PDF
+  measurements (chunk count, probe, storage; under Findings). Two PDFs are in Atlas,
+  from `samples/private-samples/` (gitignored): Practical MongoDB Aggregations.pdf 313
+  chunks and Shanti_Pouch_Instructions.pdf 10 (360 chunks with the five samples). The
+  book's 10-page extract was removed, since it duplicated the book's first pages.
+  `test-questions.json` has 71 questions, 29 of them for the PDFs. Next: tuning with
+  the PDF ("not found" threshold, broad questions and `search.limit`, chunk size).
 - Files and commands: see ARCHITECTURE.md.
