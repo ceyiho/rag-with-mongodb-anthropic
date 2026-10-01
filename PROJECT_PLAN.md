@@ -34,6 +34,8 @@ so no logins or usage limits are needed.
 - Upload: a file the user uploads (a document in the everyday sense).
 - Chunk: a piece of an upload, stored as one MDB doc in the `chunks` collection.
 - Avoid the bare word "document"; use one of the terms above.
+- Documentation: official product documentation (e.g. "the Atlas documentation").
+  Don't shorten it to "docs", which reads like "MDB docs".
 
 ## Tech stack
 - Runtime: Node.js (LTS)
@@ -93,7 +95,7 @@ so no logins or usage limits are needed.
    Wait until it reports ready. Note that embedding runs in the background: measure how
    long new chunks take to become searchable, and record it under Findings (milestone 8
    uses it for the "processing… ready" state).
-   Before creating the index: check the Atlas docs for which changes trigger
+   Before creating the index: check the Atlas documentation for which changes trigger
    re-embedding (show the user the source), and check the M0 limit on search indexes
    (this project plans a vector and a keyword index). After embedding, measure M0
    storage use (512 MB limit).
@@ -221,7 +223,8 @@ so no logins or usage limits are needed.
   plain-text file is one section, and PDFs will use pages (how page breaks are handled
   is decided in milestone 6). Values in `config.js`. Confirmed in milestone 4 against 1,000 (see
   Findings: Chunk size); re-check with answers (milestone 5) and a real PDF (milestone 6).
-- Answers (milestone 5, from the Anthropic docs on search results and citations):
+- Answers (milestone 5, from the Anthropic documentation on search results and
+  citations):
   - Chunks go to the LLM as `search_result` blocks in the user message, one per chunk
     with one text block each: `title` is "fileName: section", `source` identifies the
     chunk. A citation's `search_result_index` is the chunk's position in the list sent,
@@ -250,13 +253,13 @@ milestones run.
   Building the vector index over 17 existing chunks took about 80 s. For large uploads
   the probe's seconds include ingest time, and embedding beyond the rate limit is
   queued, so expect longer (to measure in milestone 6).
-- Exact vs approximate search (milestone 3, Atlas docs + test): approximate search
-  (default, HNSW) can miss results (the docs call 90–95% overlap with exact search
-  typical good recall), so it can't be trusted to count chunks. Exact search
-  (`exact: true`) checks every vector that passes the filter; the docs recommend it
-  below 10,000 MDB docs and for selective pre-filters. On our index it works with
-  scalar quantization and gives the same scores (within run-to-run jitter: ~0.0004 in
-  milestone 3, up to ~0.001 across the 36 test questions in milestone 4).
+- Exact vs approximate search (milestone 3, Atlas documentation + test): approximate
+  search (default, HNSW) can miss results (the documentation calls 90–95% overlap with
+  exact search typical good recall), so it can't be trusted to count chunks. Exact
+  search (`exact: true`) checks every vector that passes the filter; the documentation
+  recommends it below 10,000 MDB docs and for selective pre-filters. On our index it
+  works with scalar quantization and gives the same scores (within run-to-run jitter:
+  ~0.0004 in milestone 3, up to ~0.001 across the 36 test questions in milestone 4).
   `numCandidates` (approximate only) is capped at 10,000.
 - Upload size estimate (milestone 3, not measured): a 500-page textbook is about
   1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
@@ -271,7 +274,7 @@ milestones run.
 - Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
   to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
   (about 0.67–0.72 vs 0.55–0.58), with the same ranking. Chose cosine.
-- Re-embedding triggers (milestone 3, Atlas docs): inserting a chunk or changing its
+- Re-embedding triggers (milestone 3, Atlas documentation): inserting a chunk or changing its
   `text` embeds that chunk; changing other fields or deleting does not. Changing the
   model, embedded path, dimensions or quantization rebuilds and re-embeds everything.
   An autoEmbed field can't be edited. Adding filter fields later isn't documented.
