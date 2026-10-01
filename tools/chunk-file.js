@@ -26,8 +26,13 @@ async function main() {
   }
 
   for (const chunk of chunks) {
-    console.log(`\n#${chunk.chunkIndex}  [${chunk.section}]  ${chunk.text.length} chars`);
-    console.log(full ? chunk.text : preview(chunk.text.slice(chunk.section.length + 2)));
+    // The chunk starts with a prefix and a blank line (see src/splitter.js): the section
+    // name, or for PDFs the title and chapter, shown here since the section doesn't say.
+    const end = chunk.text.indexOf('\n\n');
+    const prefix = chunk.text.slice(0, end);
+    console.log(`\n#${chunk.chunkIndex}  [${chunk.section}]  ${chunk.text.length} chars`
+      + (prefix === chunk.section ? '' : `  prefix: ${prefix}`));
+    console.log(full ? chunk.text : preview(chunk.text.slice(end + 2)));
   }
 
   const lengths = chunks.map((chunk) => chunk.text.length);
