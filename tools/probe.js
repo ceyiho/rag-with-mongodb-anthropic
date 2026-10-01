@@ -9,14 +9,15 @@
 // - The seconds count from uploadedAt, set when ingest starts. For large uploads they
 //   include ingest time (Atlas starts embedding while chunks are still being inserted),
 //   so they mean "upload started to fully searchable", not the pure embedding delay.
-// - limit is set to the upload's chunk count. Tested only up to 11 chunks; the docs give
-//   no cap on limit for exact search, but recommend exact search below 10,000 MDB docs.
-//   Confirm with a large PDF in milestone 6.
+// - limit is set to the upload's chunk count. Works up to 311 chunks (a 280-page PDF,
+//   milestone 6); the Atlas documentation gives no cap on limit for exact search, but
+//   recommends exact search below 10,000 MDB docs.
 // - Exact search compares against every chunk of the upload, so each run costs more for
 //   larger uploads (still small at a few thousand chunks). Each run also embeds the query
 //   text: a few tokens and one request against the Auto-Embedding rate limit.
 // - Large uploads can take longer than the measured 5–11 s: embedding beyond the rate
-//   limit is queued. The probe reports partial progress correctly ("1400 of 2000").
+//   limit is queued. 311 chunks still took ≤13 s (milestone 6); larger ones may not.
+//   The probe reports partial progress correctly ("1400 of 2000").
 // - Refuses uploads still "processing" (their chunk count isn't known yet).
 
 const { connect } = require('../src/db');
