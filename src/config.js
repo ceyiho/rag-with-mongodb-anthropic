@@ -37,6 +37,13 @@ module.exports = {
     notFoundReply: 'not found in your uploads',
   },
 
+  // PDF extraction (src/extractors/pdf.js). A PDF averaging fewer characters per page
+  // than this is rejected as scanned. Text PDFs here averaged ~800–1,200; covers and
+  // picture pages pull the average down, so keep this well below that.
+  pdf: {
+    minAverageChars: 100,
+  },
+
   // Sizes in characters (≈4 characters per token). Confirmed in milestone 4 against
   // 1,000 (see Findings in PROJECT_PLAN.md: Chunk size). Changing them means
   // re-ingesting, and so re-embedding, every upload.

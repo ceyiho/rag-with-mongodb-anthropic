@@ -3,8 +3,10 @@
 // each Markdown heading starts one, and a plain-text file is a single section. Inside a section, split points are
 // tried in order: paragraphs, then sentences, then lines, then words.
 //
-// Each chunk's text starts with its section name, so the embedding knows the context.
-// Sizes apply to the whole chunk text, including that prefix.
+// Each chunk's text starts with its section name, so the embedding knows the context,
+// or with the section's own prefix if the extractor gives one (PDFs use the title,
+// since "page 12" says nothing about the content). Sizes apply to the whole chunk
+// text, including that prefix.
 
 const config = require('./config');
 
@@ -13,8 +15,8 @@ const FENCE = /^ {0,3}(```|~~~)/;
 
 function splitSections(sections, { targetSize, maxSize, overlap } = config.chunking) {
   const chunks = [];
-  for (const { section, text } of sections) {
-    const prefix = `${section}\n\n`;
+  for (const { section, text, prefix: label = section } of sections) {
+    const prefix = `${label}\n\n`;
     const sizes = {
       targetSize: targetSize - prefix.length,
       maxSize: maxSize - prefix.length,
