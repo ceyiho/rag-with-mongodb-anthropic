@@ -12,7 +12,9 @@
 // - A sentence cut by a page break is repaired: if a page doesn't end in . ! ? and
 //   the text clearly continues (the next page starts in lowercase, or this page ends
 //   with a comma or a word like "the" or "of"), the page's unfinished end moves to
-//   the start of the next page.
+//   the start of the next page. Not when the page's last line looks like code (code
+//   has no sentence ends, so whole code blocks would move, page after page), and not
+//   when the unfinished end is longer than MAX_MOVE (then it isn't one cut sentence).
 //
 // Scanned PDFs (images of pages, no text layer) are rejected: too few characters per
 // page on average (config.pdf.minAverageChars). The average is over the whole file,
@@ -25,6 +27,8 @@ const { titleFromFileName } = require('./title');
 const PAGE_NUMBER = /^\s*(page\s+)?(\d+|[ivxlc]{1,7})(\s+of\s+\d+)?\s*$/i;
 const ENDS_SENTENCE = /[.!?]["')\]”’]*$/;
 const SENTENCE_END = /[.!?]["')\]”’]*\s+/g;
+const CODE = /[{}[\];]|":/;   // braces, brackets, semicolons, JSON keys
+const MAX_MOVE = 400;         // characters; the longest real cut sentence seen was 294
 const PLACEHOLDER_TITLE = /^(untitled|microsoft word - .*|.*\.(pdf|docx?|odt|pages|txt))$/i;
 
 // Words a sentence can't end with: a page ending in one continues on the next page.
@@ -80,15 +84,17 @@ function stripPageNumber(text) {
 }
 
 // Moves each page's unfinished last sentence to the start of the next page, when the
-// text clearly continues there. Changes pages in place.
+// text clearly continues there and the page doesn't end in code. Changes pages in place.
 function repairCutSentences(pages) {
   for (let i = 0; i < pages.length - 1; i++) {
     const page = pages[i];
     const next = pages[i + 1];
     if (!page || !next || ENDS_SENTENCE.test(page) || !continues(page, next)) continue;
+    if (CODE.test(page.slice(page.lastIndexOf('\n') + 1))) continue;   // last line
 
     let cut = 0;   // where the unfinished sentence starts: after the last sentence end
     for (const match of page.matchAll(SENTENCE_END)) cut = match.index + match[0].length;
+    if (page.length - cut > MAX_MOVE) continue;
     pages[i] = page.slice(0, cut).trim();
     pages[i + 1] = `${page.slice(cut)}\n${next}`;
   }
