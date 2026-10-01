@@ -63,11 +63,11 @@ Scripts and tools import from `src/`, never the reverse.
 | `config.js` | Application settings: collection and index names, search limits, "not found" thresholds, answer model, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
-| `extractors/text.js` | Plain text: the whole file is one section. Also decodes file bytes to text. |
+| `extractors/text.js` | Plain text: the whole file is one section; its chunks start with a title made from the file name. Also decodes file bytes to text. |
 | `extractors/markdown.js` | Markdown: each heading starts a section, named by its heading path; the first `#` heading is the title. |
-| `extractors/pdf.js` | PDF (text-based, via `unpdf`): each page is a section ("page 12"), read in visual order (code blocks back in place, columns kept apart); drops page numbers, repairs sentences cut by a page break, rejects scanned PDFs. |
+| `extractors/pdf.js` | PDF (text-based, via `unpdf`): each page is a section ("page 12"), read in visual order (code blocks back in place, columns kept apart); drops running headers, footers and page numbers, takes chapter names from the headers for the prefix ("Title > Chapter"), repairs sentences cut by a page break, rejects scanned PDFs. |
 | `extractors/title.js` | Makes a title from a file name, for files without one. |
-| `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name, or the section's prefix if the extractor gives one (PDFs: the title). |
+| `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name, or the section's prefix if the extractor gives one (plain text: the title; PDFs: the title, and the chapter if found). |
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
 | `search.js` | Vector search for a question: exact within one upload, approximate across all complete uploads. Returns chunks with scores. |
 | `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Holds the system prompt. |
@@ -93,7 +93,7 @@ Everything that shows the app's internals.
 | `check-db.js` | `npm run check-db` | Connection check and MDB doc counts per collection. |
 | `index-status.js` | `npm run index-status` | Search index build status. |
 | `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. |
-| `chunk-file.js` | `npm run chunk -- <file>` | Chunking preview, no database. |
+| `chunk-file.js` | `npm run chunk -- <file> [--full]` | Chunking preview, no database: each chunk's start and end on one line, with the PDF prefix; `--full` prints whole chunks. |
 | `search.js` | `npm run search -- "<question>"` | Raw search results with scores, for testing and tuning. |
 | `run-test-questions.js` | `npm run test-questions` | Runs `test-questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test-results/`. Its header describes the question fields and kinds. |
 | `run-test-answers.js` | `npm run test-answers` | Runs `test-questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
@@ -104,8 +104,8 @@ Everything that shows the app's internals.
 One Markdown report per saved run: `npm run test-questions -- --save <label>` writes
 `<date>-<label>.md` (search scores), and `npm run test-answers -- --save <label>` writes
 `<date>-answers-<label>.md` (answers, with the system prompt used). Each report lists
-the settings that affect its results. Findings in PROJECT_PLAN.md link to the runs they
-rely on.
+the settings that affect its results. Findings in PROJECT_PLAN.md name the date of the
+runs they rely on.
 
 ### `samples/`: test files to upload
 
@@ -115,6 +115,13 @@ distractors. Written as test data, not as reference material.
 
 `samples/private-samples/` holds real files for testing, such as PDFs of books. It's
 gitignored, since they may be copyrighted.
+
+`samples/pdf-mocks/` holds small made-up PDFs for layouts the real ones lack: running
+headers and footers (fixed, numbered, chapter names, book-style alternating, two
+columns, a repeated body heading that must stay) and scanned pages (rejected, or
+skipped in a text PDF). Check them with `npm run chunk -- <file>`. They are generated
+by a script kept outside the repository, whose header lists each mock's expected
+result.
 
 ## Root files
 
