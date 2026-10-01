@@ -15,6 +15,8 @@
 // - citations: the cited chunks, numbered n in order of first citation.
 // - chunks: every chunk searched, for diagnosing wrong replies. rawText is the LLM's
 //   own reply, kept even when it counts as "not found".
+// Options: uploadId searches one upload; limit overrides config.search.limit (how many
+// chunks go to the LLM), for testing other values.
 
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
@@ -32,8 +34,8 @@ const SYSTEM_PROMPT = `You answer questions using only the search results sent w
 
 let anthropic;   // created on first use, so importing this file needs no API key
 
-async function answer(db, question, { uploadId } = {}) {
-  const chunks = await search(db, question, { uploadId });
+async function answer(db, question, { uploadId, limit } = {}) {
+  const chunks = await search(db, question, { uploadId, limit });
   const threshold = uploadId
     ? config.search.notFoundThreshold.oneUpload
     : config.search.notFoundThreshold.allUploads;

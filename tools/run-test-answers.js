@@ -2,10 +2,11 @@
 // threshold check, LLM) and checks each reply: Pass or Fail, and for a Fail, where the
 // problem is. tools/run-test-questions.js tests search only; this tests the answers.
 // The question fields and kinds are described in tools/run-test-questions.js.
-// Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>]
+// Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>]
 // --save writes a report to test-results/<date>-answers-<label>.md, with every answer
 // text, the settings and the system prompt.
 // --only runs just these question ids, e.g. to recheck failures after a prompt change.
+// --limit sends the top n chunks to the LLM instead of config.search.limit.
 //
 // Each question runs in up to three modes:
 // - all:   All uploads.
@@ -36,15 +37,17 @@ const config = require('../src/config');
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test-questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test-results');
-const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>]';
+const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>]';
 
 async function main() {
   const args = process.argv.slice(2);
   const label = takeFlag(args, '--save');
   const only = takeFlag(args, '--only');
+  const limitArg = takeFlag(args, '--limit');
+  const limit = limitArg === undefined ? config.search.limit : Number(limitArg);
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
-  if (args.length || badLabel || only === '') {
+  if (args.length || badLabel || only === '' || !(Number.isInteger(limit) && limit > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
     process.exit(1);
@@ -84,7 +87,7 @@ async function main() {
       for (const mode of modesFor(q)) {
         const row = { q, mode, expectAnswer: q.answerable && mode !== 'wrong' };
         try {
-          row.result = await answer(db, q.question, { uploadId: uploadIdFor(q, mode) });
+          row.result = await answer(db, q.question, { uploadId: uploadIdFor(q, mode), limit });
           Object.assign(row, judge(row));
         } catch (err) {
           row.error = err.message;
@@ -99,7 +102,7 @@ async function main() {
 
     if (reportFile) {
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
-      fs.writeFileSync(reportFile, report({ label, only, rows, summary, uploads }));
+      fs.writeFileSync(reportFile, report({ label, only, limitArg, limit, rows, summary, uploads }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
   } finally {
@@ -242,12 +245,13 @@ function printSummary(s) {
 
 // --- Saved report (Markdown) ---
 
-function report({ label, only, rows, summary: s, uploads }) {
+function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
   const { chunking, search: searchConfig, answer: answerConfig } = config;
   const thresholds = searchConfig.notFoundThreshold;
   const totalChunks = uploads.reduce((sum, upload) => sum + (upload.chunkCount || 0), 0);
   const cell = (text) => String(text).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
-  const command = `npm run test-answers -- --save ${label}${only ? ` --only ${only}` : ''}`;
+  const command = `npm run test-answers -- --save ${label}${only ? ` --only ${only}` : ''}`
+    + `${limitArg !== undefined ? ` --limit ${limitArg}` : ''}`;
 
   const lines = [];
   const add = (...more) => lines.push(...more);
@@ -264,7 +268,7 @@ function report({ label, only, rows, summary: s, uploads }) {
   add('## Settings', '', '| Setting | Value |', '|---|---|');
   add(`| Model | \`${answerConfig.model}\` |`);
   add(`| Threshold | All ${thresholds.allUploads}, One ${thresholds.oneUpload} (config.js) |`);
-  add(`| Search | top ${searchConfig.limit} chunks sent to the LLM |`);
+  add(`| Search | top ${limit} chunks sent to the LLM (${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Uploads | ${uploads.length} complete, ${totalChunks} chunks |`);
   add(`| LLM calls | ${s.llmCalls}; tokens in ${s.inputTokens}, out ${s.outputTokens} |`, '');
