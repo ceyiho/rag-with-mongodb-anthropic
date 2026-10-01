@@ -1,7 +1,7 @@
 # Project Plan: RAG Knowledge Base on MongoDB Atlas
 
 ## What we're building aka functional specifications
-A personal knowledge base. Users upload files (text, markdown, later PDFs) and ask
+A personal knowledge base. Users upload files (text, markdown, PDFs) and ask
 questions in plain language. The app answers using only their content and cites which
 upload and section each answer came from.
 
@@ -50,9 +50,8 @@ so no logins or usage limits are needed.
 - Chunking: custom splitter (sections → paragraphs → sentences), sized in characters
   (≈4 characters per token). No library. Sections come from the extractor: Markdown
   headings, one per plain-text file, pages for PDFs.
-- PDF extraction: a pdf.js-based library (choose in milestone 6), giving text per page.
-  Pages act as sections for citations. Pages with almost no text mean a scanned PDF,
-  which is rejected.
+- PDF extraction: `unpdf`, a pdf.js wrapper that works with `require` and gives text
+  per page. Pages act as sections for citations. Scanned PDFs are rejected.
 - Answer generation: Anthropic API with built-in citations; one call per question,
   skipped when retrieval scores are below the threshold. Model: Claude Sonnet 5.5
   (`claude-sonnet-5-5`).
@@ -185,7 +184,8 @@ so no logins or usage limits are needed.
   - A. Search and count: exact `$vectorSearch` filtered by `uploadId`, `limit` =
     chunkCount, then `$count` (as in tools/probe.js). Checks "searchable", the real end
     result, using public features only. Each check embeds a short query (a few tokens,
-    counts toward the rate limit), and costs more for larger uploads.
+    counts toward the rate limit), and costs more for larger uploads. Works for a
+    311-chunk upload (milestone 6).
   - B. Count embeddings: the generated embeddings collection in `__mdb_internal_search`
     (documented, read-only) holds one MDB doc per embedded chunk with a copy of
     `uploadId`, so `countDocuments({ uploadId })` vs chunkCount shows progress
@@ -207,9 +207,10 @@ so no logins or usage limits are needed.
 - Schema: two collections, names in `config.js`.
   - `uploads`: `_id` (the uploadId), `fileName`, `title`, `fileType`, `status`
     (processing → complete), `uploadedAt`, `chunkCount`. `title` comes from the file
-    (first `#` heading in Markdown; PDF metadata later), else from the file name.
+    (first `#` heading in Markdown, metadata title in a PDF), else from the file name.
   - `chunks`: `uploadId` (ObjectId), `fileName` (copied for citations), `section`,
-    `chunkIndex`, `text` (heading path + body; the auto-embedded field).
+    `chunkIndex`, `text` (heading path + body, or for PDFs title + body; the
+    auto-embedded field).
   - Indexes: `uploads` partial unique on `fileName` where status is complete;
     `chunks` on `uploadId`. The vector index filters on `uploadId` only.
 - Vector index `chunks_vector_cosine` on `chunks` (created by `npm run setup`):
@@ -220,9 +221,16 @@ so no logins or usage limits are needed.
   already exists and never updates one.
 - Chunk size: 1,600 characters (≈400 tokens), max 2,000, overlap 200. Sections are
   hard boundaries (a chunk never spans two): each Markdown heading starts a section, a
-  plain-text file is one section, and PDFs will use pages (how page breaks are handled
-  is decided in milestone 6). Values in `config.js`. Confirmed in milestone 4 against 1,000 (see
-  Findings: Chunk size); re-check with answers (milestone 5) and a real PDF (milestone 6).
+  plain-text file is one section, and each PDF page is one (see PDF pages). Values in
+  `config.js`. Confirmed in milestone 4 against 1,000 (see Findings: Chunk size);
+  re-check with answers (milestone 5) and a real PDF (milestone 6).
+- PDF pages (milestone 6; rules in the header of `src/extractors/pdf.js`): each page is
+  a section, cited by its PDF page number, and page breaks stay hard boundaries. A
+  sentence cut by a page break is repaired by moving it to the next page, except in
+  code, where it moved whole code blocks across pages. Rejected: text flowing across
+  pages with page-range citations (a bigger change to the splitter shared with
+  `.md`/`.txt`). Chunks start with the title, not "page N", which says nothing about
+  the content. Not handled yet: running headers or footers, and images (no OCR).
 - Answers (milestone 5, from the Anthropic documentation on search results and
   citations):
   - Chunks go to the LLM as `search_result` blocks in the user message, one per chunk
@@ -252,7 +260,9 @@ milestones run.
   grow with chunk count at this size. Measured with `npm run probe` ("N of N").
   Building the vector index over 17 existing chunks took about 80 s. For large uploads
   the probe's seconds include ingest time, and embedding beyond the rate limit is
-  queued, so expect longer (to measure in milestone 6).
+  queued, so expect longer.
+  Large upload (milestone 6): the 280-page book (311 chunks) was fully searchable
+  within 13 s of upload, ingest included.
 - Exact vs approximate search (milestone 3, Atlas documentation + test): approximate
   search (default, HNSW) can miss results (the documentation calls 90–95% overlap with
   exact search typical good recall), so it can't be trusted to count chunks. Exact
@@ -260,12 +270,13 @@ milestones run.
   recommends it below 10,000 MDB docs and for selective pre-filters. On our index it
   works with scalar quantization and gives the same scores (within run-to-run jitter:
   ~0.0004 in milestone 3, up to ~0.001 across the 36 test questions in milestone 4).
-  `numCandidates` (approximate only) is capped at 10,000.
+  `numCandidates` (approximate only) is capped at 10,000. Exact search has no
+  documented cap on `limit`; `limit` = 311 returned all 311 chunks of the book
+  (milestone 6, `npm run probe`).
 - Upload size estimate (milestone 3, not measured): a 500-page textbook is about
   1,200–1,800 chunks (≈3,000–3,500 characters per page), up to ~2,500 when very dense.
-  That's ~1M tokens and ~4.5–9 MB (see Storage). Confirm with a real PDF in
-  milestone 6.
-  Measured (milestone 6, `npm run chunk`, not yet ingested): a 280-page technical book
+  That's ~1M tokens and ~4.5–9 MB (see Storage).
+  Measured (milestone 6): a 280-page technical book
   (Practical MongoDB Aggregations, many code examples) gave 311 chunks from 277 pages
   with text, about 1.1 chunks per page. Its pages are far lighter than estimated
   (average 1,197 characters, median 1,147, max 3,325), so most pages are one chunk
@@ -274,11 +285,11 @@ milestones run.
 - Similarity (milestone 3): dotProduct with scalar quantization squeezed every score
   to about 0.50 (relevant vs off-topic differed by ~0.003). Cosine separates them
   (about 0.67–0.72 vs 0.55–0.58), with the same ranking. Chose cosine.
-- Re-embedding triggers (milestone 3, Atlas documentation): inserting a chunk or changing its
-  `text` embeds that chunk; changing other fields or deleting does not. Changing the
-  model, embedded path, dimensions or quantization rebuilds and re-embeds everything.
-  An autoEmbed field can't be edited. Adding filter fields later isn't documented.
-  Dropping an index also removes its stored embeddings.
+- Re-embedding triggers (milestone 3, Atlas documentation): inserting a chunk or
+  changing its `text` embeds that chunk; changing other fields or deleting does not.
+  Changing the model, embedded path, dimensions or quantization rebuilds and re-embeds
+  everything. An autoEmbed field can't be edited. Adding filter fields later isn't
+  documented. Dropping an index also removes its stored embeddings.
 - M0 limits (milestone 3): 3 search indexes (we plan 2, one spare for replacing an
   index side by side). Auto-Embedding needs no extra setup on M0.
 - Storage (milestone 3): about 2.2–2.5 KB per chunk (text ≈1.0 KB, embedding ≈1.2 KB
@@ -290,8 +301,13 @@ milestones run.
   512 MB holds roughly 50–100 of them (about 110 typical, 55 dense). The token
   allowance would cover ~200 (at ~1M tokens each), so storage runs out first.
   Uncertain: the vector index itself (Lucene, on the search side) isn't in these
-  numbers, and it's unclear whether M0 counts it toward 512 MB. Re-measure with
-  real PDFs in milestone 6.
+  numbers, and it's unclear whether M0 counts it toward 512 MB.
+  Measured (milestone 6, 371 chunks including the 280-page book): data 2.4 KB per
+  chunk, as estimated; ~4.4 KB on disk with indexes (the generated embeddings take
+  about twice their data size); plus the vector index, ~1.1 KB. So ~5.5 KB per chunk
+  worst case: the book takes ~1.7 MB, and 512 MB holds ~90,000 chunks. Whether M0
+  counts the embeddings and the vector index toward 512 MB is still unknown; storage
+  isn't a concern at this project's scale either way.
 - "Not found" score threshold (milestone 4): 0.62 for both search modes, confirmed at
   the chosen chunk size (1,600; the rerun gave the same results). Re-check it with a
   real PDF in milestone 6, since more chunks will likely push off-topic scores up. From
@@ -357,5 +373,12 @@ milestones run.
   claude-code-first-steps.txt 6.
 - Milestone 5 is completed: `src/answer.js` answers with citations; `npm run ask`;
   `npm run test-answers` checks answers against `test-questions.json` (42 questions,
-  new kinds partial and broad). Results under Findings. Next: milestone 6 (PDF).
+  new kinds partial and broad). Results under Findings.
+- Milestone 6 is in progress. Done: PDF ingestion (`src/extractors/pdf.js`, see
+  Decisions: PDF pages) and the large-PDF measurements (chunk count, probe, storage;
+  under Findings). Three PDFs are in Atlas, from `samples/private-samples/`
+  (gitignored): Practical MongoDB Aggregations.pdf 311 chunks, its 10-page extract 13,
+  Shanti_Pouch_Instructions.pdf 10 (371 chunks with the five samples). Next: tuning
+  with the PDF (test questions, "not found" threshold, broad questions and
+  `search.limit`, chunk size).
 - Files and commands: see ARCHITECTURE.md.

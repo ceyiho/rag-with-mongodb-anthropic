@@ -42,10 +42,15 @@ npm run index-status   → tools/index-status.js
 npm run probe          → tools/probe.js
 ```
 
-`src/extractors/index.js` picks `text.js` or `markdown.js`; `markdown.js` reuses the
-decoder in `text.js`. Each starting file opens the connection with `src/db.js` and
-passes it down; `src/` modules never open their own. `src/config.js` is read
-almost everywhere. So the chains leave out these two.
+Inside `src/extractors/`:
+- `index.js` picks `text.js`, `markdown.js` or `pdf.js` by file extension.
+- `markdown.js` reuses the decoder in `text.js`.
+- `index.js` and `pdf.js` share `title.js`.
+
+Left out of the chains:
+- `src/db.js`: each starting file opens the connection with it and passes it down;
+  `src/` modules never open their own.
+- `src/config.js`: read almost everywhere.
 
 ## Folders
 
@@ -55,12 +60,14 @@ Scripts and tools import from `src/`, never the reverse.
 
 | File | Purpose |
 |---|---|
-| `config.js` | Application settings: collection and index names, search limits, "not found" thresholds, answer model, chunk sizes. Secrets go in `.env` instead. |
+| `config.js` | Application settings: collection and index names, search limits, "not found" thresholds, answer model, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section. Also decodes file bytes to text. |
 | `extractors/markdown.js` | Markdown: each heading starts a section, named by its heading path; the first `#` heading is the title. |
-| `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name. |
+| `extractors/pdf.js` | PDF (text-based, via `unpdf`): each page is a section ("page 12"); drops page numbers, repairs sentences cut by a page break, rejects scanned PDFs. |
+| `extractors/title.js` | Makes a title from a file name, for files without one. |
+| `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name, or the section's prefix if the extractor gives one (PDFs: the title). |
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
 | `search.js` | Vector search for a question: exact within one upload, approximate across all complete uploads. Returns chunks with scores. |
 | `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Holds the system prompt. |
@@ -105,6 +112,9 @@ rely on.
 Small files on unrelated topics (the fictional Nimbus CLI, MongoDB's document model,
 Claude Code), in both `.md` and `.txt`, so searches across all uploads have
 distractors. Written as test data, not as reference material.
+
+`samples/private-samples/` holds real files for testing, such as PDFs of books. It's
+gitignored, since they may be copyrighted.
 
 ## Root files
 
