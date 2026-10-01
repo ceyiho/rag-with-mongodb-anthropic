@@ -17,7 +17,10 @@ module.exports = {
   // search) only: how many nearest chunks Atlas considers before keeping the top `limit`.
   // The Atlas documentation suggests at least 20× the limit; Atlas caps it at 10,000.
   search: {
-    limit: 5,
+    // How many chunks go to the LLM. 10, not 5: broad questions (summaries, overviews)
+    // then cover a small or medium upload fully. See Findings in PROJECT_PLAN.md
+    // (Broad questions).
+    limit: 10,
     candidatesPerResult: 20,
     // "Not found" thresholds on the top score, one per search mode: below it, the app
     // replies "not found in your uploads" without calling the LLM. See Findings in
