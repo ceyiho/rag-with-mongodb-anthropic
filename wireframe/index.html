@@ -1,0 +1,1245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Base (wireframe)</title>
+<!--
+  Static mock-up of the milestone 8 web page. Fake data, no backend, nothing is saved.
+  The yellow strip at the top switches between states; its "API" note says which
+  route and response would drive each state. Not part of the app: keep it out of src/.
+-->
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --surface: #ffffff;
+    --sidebar: #eef3fa;
+    --border: #d5dfec;
+    --border-strong: #b9c8dc;
+    --text: #1a2b42;
+    --muted: #5a6b83;
+    --faint: #8a99ad;
+    --blue: #1f62d6;
+    --blue-dark: #164aa6;
+    --blue-50: #eaf1fd;
+    --blue-100: #d3e2fb;
+    --blue-200: #b3cdf7;
+    --amber: #8a5300;
+    --amber-bg: #fff3dc;
+    --red: #b42318;
+    --red-bg: #fdecea;
+    --green: #17803d;
+    --green-bg: #e5f5ea;
+    --mono: Consolas, "Cascadia Mono", Menlo, monospace;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--blue-50); padding: 0 4px; border-radius: 4px; }
+
+  /* ---------- Wireframe controls (not part of the app) ---------- */
+  .mockbar {
+    background: #fff8dc;
+    border-bottom: 1px dashed #d9b84a;
+    padding: 6px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: #5c4a10;
+  }
+  .mockbar strong { letter-spacing: 0.04em; }
+  .mockbar select { padding: 2px 6px; border: 1px solid #d9b84a; border-radius: 4px; background: #fffdf3; }
+  .mockbar .api { flex: 1 1 360px; font-family: var(--mono); font-size: 12px; color: #4a3b08; }
+
+  /* ---------- App bar ---------- */
+  .appbar {
+    background: var(--blue-dark);
+    color: #fff;
+    padding: 0 16px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .appbar .logo {
+    width: 24px; height: 24px; border-radius: 6px; background: #fff; color: var(--blue-dark);
+    display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  }
+  .appbar h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  .appbar .sub { color: var(--blue-200); font-size: 12.5px; }
+  .appbar .spacer { flex: 1; }
+  .appbar .status { font-size: 12px; color: var(--blue-100); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #5fd38a; display: inline-block; }
+  .dot.down { background: #ff8a80; }
+
+  .banner {
+    background: var(--red-bg); color: var(--red); border-bottom: 1px solid #f4c7c3;
+    padding: 8px 16px; font-size: 13px; display: none;
+  }
+  .banner.show { display: block; }
+
+  /* ---------- Layout ---------- */
+  .app { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 300px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .workspace { flex: 1; overflow-y: auto; min-width: 0; }
+
+  /* ---------- Sidebar ---------- */
+  .side-head { padding: 12px 12px 8px; display: flex; align-items: center; gap: 8px; }
+  .side-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0; flex: 1; }
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface); border-radius: 6px;
+    padding: 4px 10px; cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { background: var(--blue-50); }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.primary:hover { background: var(--blue-dark); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .linkbtn { border: 0; background: none; color: var(--blue); cursor: pointer; padding: 0; font-size: 12.5px; }
+  .linkbtn:hover { text-decoration: underline; }
+
+  .upload-msgs { padding: 0 12px; display: flex; flex-direction: column; gap: 6px; }
+  .msg {
+    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; position: relative;
+    border: 1px solid var(--border); background: var(--surface);
+  }
+  .msg .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+  .msg.error { background: var(--red-bg); border-color: #f4c7c3; color: var(--red); }
+  .msg.ok { background: var(--green-bg); border-color: #b7e1c4; color: var(--green); }
+  .msg .name { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .msg .hint { color: var(--muted); margin-top: 2px; }
+  .msg.error .hint { color: #8c2b22; }
+  .bar { height: 4px; border-radius: 2px; background: var(--blue-100); overflow: hidden; margin-top: 6px; }
+  .bar span { display: block; height: 100%; width: 35%; background: var(--blue); border-radius: 2px; animation: slide 1.3s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+  .search { padding: 8px 12px; position: relative; }
+  .search input[type="search"] {
+    width: 100%; padding: 7px 10px 7px 30px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235a6b83' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E") no-repeat 10px center;
+  }
+  .search input[type="search"]:focus { outline: 2px solid var(--blue-200); border-color: var(--blue); }
+  .suggest {
+    position: absolute; left: 12px; right: 12px; top: 44px; z-index: 5;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(20, 45, 90, 0.15); display: none; overflow: hidden;
+  }
+  .suggest.show { display: block; }
+  .suggest .row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; cursor: pointer; }
+  .suggest .row:hover, .suggest .row.active { background: var(--blue-50); }
+  .suggest .row input { margin-top: 3px; }
+  .suggest .t { font-size: 13px; }
+  .suggest .f { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .suggest mark { background: var(--blue-100); color: inherit; border-radius: 2px; }
+  .suggest .foot { border-top: 1px solid var(--border); padding: 5px 10px; font-size: 11.5px; color: var(--faint); background: #fafcff; }
+  .suggest .none { padding: 10px; color: var(--muted); font-size: 13px; }
+
+  .all-row {
+    margin: 2px 12px 6px; padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border); cursor: pointer; font-weight: 600; font-size: 13px;
+  }
+  .all-row .count { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 12px; }
+
+  .tree { flex: 1; overflow-y: auto; padding: 0 6px 12px; }
+  .bucket-head {
+    width: 100%; display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 0; background: none;
+    cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-align: left;
+  }
+  .bucket-head:hover { background: var(--blue-50); }
+  .bucket-head .chev { width: 12px; display: inline-block; transition: transform 0.12s; color: var(--faint); }
+  .bucket-head.open .chev { transform: rotate(90deg); }
+  .bucket-head .n { margin-left: auto; font-weight: 400; color: var(--faint); }
+  .bucket-head .selcount { background: var(--blue-100); color: var(--blue-dark); border-radius: 8px; padding: 0 6px; font-weight: 600; font-size: 11px; }
+  .bucket-head.empty { opacity: 0.45; cursor: default; }
+  .bucket-head.empty:hover { background: none; }
+  .items { list-style: none; margin: 0 0 4px; padding: 0; }
+  .item {
+    display: flex; align-items: center; gap: 7px; padding: 3px 6px 3px 22px; border-radius: 4px; cursor: pointer;
+  }
+  .item:hover { background: var(--blue-50); }
+  .item.sel { background: var(--blue-100); }
+  .item.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0% { background: #ffe58a; } 100% { background: var(--blue-100); } }
+  .item .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .item.disabled { cursor: default; color: var(--muted); }
+  .item.disabled:hover { background: none; }
+  .type {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; border-radius: 3px; padding: 0 4px; line-height: 15px;
+    flex-shrink: 0; width: 30px; text-align: center;
+  }
+  .type.pdf { background: #fde3e1; color: #a1281f; }
+  .type.md { background: var(--blue-100); color: var(--blue-dark); }
+  .type.txt { background: #e3e8ef; color: #44546b; }
+  .pill { font-size: 11px; border-radius: 9px; padding: 0 7px; flex-shrink: 0; white-space: nowrap; }
+  .pill.processing { background: var(--amber-bg); color: var(--amber); }
+  .pill.ready { background: var(--green-bg); color: var(--green); }
+  .side-foot {
+    border-top: 1px solid var(--border); padding: 8px 12px; font-size: 12.5px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .side-foot .spacer { flex: 1; }
+  .drop-hint { font-size: 11.5px; color: var(--faint); padding: 0 12px 6px; }
+  .sidebar.dragover { outline: 2px dashed var(--blue); outline-offset: -6px; background: var(--blue-50); }
+  .empty-lib { padding: 20px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+  .empty-lib .big { font-size: 28px; margin-bottom: 6px; }
+
+  /* ---------- Workspace ---------- */
+  .ws-inner { max-width: 860px; margin: 0 auto; padding: 18px 24px 40px; }
+  .scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px; background: var(--blue-50); border: 1px solid var(--blue-200);
+    color: var(--blue-dark); border-radius: 12px; padding: 1px 4px 1px 9px; font-size: 12.5px; max-width: 260px;
+  }
+  .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip button { border: 0; background: none; cursor: pointer; color: var(--blue-dark); padding: 0 4px; font-size: 13px; line-height: 1; }
+  .chip.all { font-weight: 600; }
+  .none-sel { font-style: italic; color: var(--faint); }
+  .ask.off { background: #eef1f5; border-color: var(--border); box-shadow: none; cursor: pointer; }
+  .ask.off textarea { cursor: pointer; }
+  .ask.off textarea::placeholder { color: var(--muted); }
+  .sidebar.nudge { animation: nudge 1.4s ease-out; }
+  @keyframes nudge {
+    0%, 45% { box-shadow: inset 0 0 0 3px var(--blue); background: var(--blue-50); }
+    100% { box-shadow: inset 0 0 0 3px transparent; }
+  }
+
+  .ask {
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+    display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 12px;
+    box-shadow: 0 1px 3px rgba(20, 45, 90, 0.06);
+  }
+  .ask:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-100); }
+  .ask textarea {
+    flex: 1; border: 0; outline: 0; resize: none; padding: 6px 0; font-size: 17px; line-height: 1.5; max-height: 220px;
+    background: transparent; overflow-y: hidden;
+  }
+  .ask .btn.primary { padding: 6px 16px; border-radius: 7px; }
+  .ask-hint { font-size: 12px; color: var(--faint); margin: 6px 2px 18px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .ask-hint .count { margin-left: auto; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .q { font-weight: 600; font-size: 17px; margin-bottom: 2px; }
+  .meta { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
+  .answer { font-size: 17px; line-height: 1.5; }
+  .answer p { margin: 0 0 10px; }
+  .cite {
+    border: 0; background: var(--blue-100); color: var(--blue-dark); font-size: 10.5px; font-weight: 700;
+    border-radius: 4px; padding: 0 4px; margin-left: 2px; cursor: pointer; vertical-align: super; line-height: 1.2;
+  }
+  .cite:hover { background: var(--blue); color: #fff; }
+  .sources { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .sources h3, .details h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; }
+  .src { border: 1px solid transparent; border-radius: 6px; }
+  .src.hl { border-color: var(--blue-200); background: #f7faff; }
+  .src-head { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; cursor: pointer; }
+  .src-head .n { background: var(--blue-100); color: var(--blue-dark); font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 5px; flex-shrink: 0; }
+  .src-head .t { font-weight: 600; font-size: 13px; }
+  .src-head .w { font-size: 12.5px; color: var(--muted); }
+  .src-head .f { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: auto; white-space: nowrap; }
+  .src-head .chev { color: var(--faint); font-size: 11px; width: 10px; flex-shrink: 0; display: inline-block; transition: transform 0.12s; }
+  .src.open .src-head .chev { transform: rotate(90deg); }
+  .excerpt {
+    display: none; margin: 0 6px 8px 34px; padding: 8px 10px; border-left: 3px solid var(--blue-200);
+    background: var(--blue-50); font-size: 13px; color: #33445c; border-radius: 0 4px 4px 0; white-space: pre-wrap;
+  }
+  .src.open .excerpt { display: block; }
+
+  .details { margin-top: 10px; }
+  .details > summary { cursor: pointer; font-size: 12.5px; color: var(--blue); list-style: none; }
+  .details > summary::-webkit-details-marker { display: none; }
+  .details > summary::before { content: "▸ "; }
+  .details[open] > summary::before { content: "▾ "; }
+  .details .box { margin-top: 8px; padding: 10px 12px; background: #f7f9fc; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
+  .details .facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin-bottom: 10px; }
+  .details .facts dt { color: var(--muted); }
+  .details .facts dd { margin: 0; }
+  .hits { width: 100%; border-collapse: collapse; }
+  .hits td { padding: 3px 4px; border-top: 1px solid #e6ecf4; vertical-align: middle; }
+  .hits .rank { color: var(--faint); width: 20px; }
+  .hits .score { width: 150px; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; }
+  .scorebar { display: inline-block; width: 80px; height: 6px; background: #e3e9f2; border-radius: 3px; margin-left: 6px; position: relative; vertical-align: middle; }
+  .scorebar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); border-radius: 3px; }
+  .scorebar i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--red); }
+  .hits .low span { background: var(--faint); }
+  .hits .citedtag { font-size: 11px; color: var(--blue-dark); font-weight: 600; white-space: nowrap; }
+  .modes { margin-top: 8px; color: var(--faint); }
+
+  .notfound .answer { color: var(--muted); }
+  .notfound .nf-title { font-weight: 600; color: var(--text); display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .nf-icon { width: 20px; height: 20px; border-radius: 50%; background: #e3e9f2; color: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .card.err { border-color: #f4c7c3; background: #fffafa; }
+  .card.err .nf-icon { background: var(--red-bg); color: var(--red); }
+  .loading-row { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--blue-100); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .skel { height: 10px; background: linear-gradient(90deg, #edf2f8, #f7f9fc, #edf2f8); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 5px; margin-top: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .ws-empty { text-align: center; color: var(--muted); padding: 50px 20px; }
+  .ws-empty .big { font-size: 34px; }
+  /* Earlier in this session: one line, opening to one line per question */
+  .history { margin-top: 4px; }
+  .history.open { margin-bottom: 40vh; }   /* room to scroll the last rows to the middle */
+  .history-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
+    padding: 8px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+  }
+  .history-head:hover { color: var(--blue); }
+  .history-head .hc { background: #e3e9f2; color: var(--muted); border-radius: 9px; padding: 0 7px; font-size: 11px; letter-spacing: 0; }
+  .history-head .chev, .hist-head .chev { display: inline-block; width: 10px; color: var(--faint); font-size: 11px; transition: transform 0.12s; }
+  .history.open > .history-head .chev, .hist.open > .hist-head .chev { transform: rotate(90deg); }
+  .hist-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .hist + .hist { border-top: 1px solid var(--border); }
+  .hist-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
+    padding: 7px 12px; text-align: left;
+  }
+  .hist-head:hover { background: var(--blue-50); }
+  .hist.open > .hist-head { background: var(--blue-50); font-weight: 600; }
+  .hist-head .hq { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+  .hist-head .hm { font-size: 12px; color: var(--faint); white-space: nowrap; font-weight: 400; }
+  .st { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .st.ok { background: var(--green-bg); color: var(--green); }
+  .st.nf { background: #e3e9f2; color: var(--muted); }
+  .st.err { background: var(--red-bg); color: var(--red); }
+  .hist-body { padding: 8px 16px 14px 48px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar { width: auto; max-height: 45vh; border-right: 0; border-bottom: 1px solid var(--border); }
+    .ws-inner { padding: 14px 16px 30px; }
+    .src-head { flex-wrap: wrap; }
+    .src-head .f { margin-left: 26px; }
+    .hist-body { padding-left: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <strong>WIREFRAME</strong><span>fake data, no backend</span>
+  <label>State:
+    <select id="scenario">
+      <optgroup label="Answers">
+        <option value="first">First visit (nothing ticked)</option>
+        <option value="answer">Answer with citations</option>
+        <option value="partial">Partial answer</option>
+        <option value="nf-threshold">Not found (below threshold)</option>
+        <option value="nf-llm">Not found (LLM found no answer)</option>
+        <option value="loading">Waiting for an answer</option>
+        <option value="answer-error">Answer failed (LLM busy)</option>
+      </optgroup>
+      <optgroup label="Uploads">
+        <option value="up-progress">Upload in progress (large PDF)</option>
+        <option value="up-processing">Processing… then ready</option>
+        <option value="up-duplicate">Rejected: duplicate name</option>
+        <option value="up-unsupported">Rejected: unsupported type</option>
+        <option value="up-scanned">Rejected: scanned PDF</option>
+        <option value="up-busy">Rejected: same name uploading now</option>
+        <option value="up-toolarge">Rejected: file too large</option>
+      </optgroup>
+      <optgroup label="Upload picker">
+        <option value="ac">Title search: suggestions</option>
+        <option value="ac-none">Title search: no matches</option>
+      </optgroup>
+      <optgroup label="Whole page">
+        <option value="empty">No uploads yet</option>
+        <option value="down">Server unreachable</option>
+      </optgroup>
+    </select>
+  </label>
+  <span class="api" id="apiNote"></span>
+</div>
+
+<header class="appbar">
+  <div class="logo">KB</div>
+  <h1>Knowledge Base</h1>
+  <span class="sub">Answers from your uploads · MongoDB Atlas Vector Search</span>
+  <span class="spacer"></span>
+  <span class="status" id="connStatus"><span class="dot"></span>Connected</span>
+</header>
+<div class="banner" id="banner">Can't reach the server. Is it running (<code>npm start</code>)? The page retries every few seconds.</div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <h2>Uploads</h2>
+      <button class="btn primary" id="uploadBtn" title="Upload a .txt, .md or text-based PDF">+ Upload</button>
+      <input type="file" id="fileInput" accept=".txt,.md,.pdf" hidden>
+    </div>
+    <div class="drop-hint">.txt, .md or text-based PDF · or drop a file here</div>
+    <div class="upload-msgs" id="uploadMsgs"></div>
+    <div class="search">
+      <input id="titleSearch" type="search" placeholder="Search titles…" autocomplete="off" aria-label="Search upload titles">
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="all-row" id="allRow">
+      <input type="checkbox" id="allBox" tabindex="-1">
+      <span>All uploads</span><span class="count" id="allCount"></span>
+    </div>
+    <div class="tree" id="tree"></div>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+
+  <main class="workspace">
+    <div class="ws-inner">
+      <div class="scope" id="scope"></div>
+      <div class="ask">
+        <textarea id="question" rows="1" maxlength="1000" placeholder="Ask a question about your uploads…"></textarea>
+        <button class="btn primary" id="askBtn">Ask</button>
+      </div>
+      <div class="ask-hint">
+        <span>Enter to ask · Shift+Enter for a new line</span>
+        <span>Each question is answered on its own; follow-ups don't see earlier answers.</span>
+        <span class="count" id="charCount"></span>
+      </div>
+      <div id="answers"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- Fake data (shaped like the proposed GET /api/uploads response) ----------
+const BASE_UPLOADS = [
+  { id: 'u01', title: '2026 Reading List', fileName: 'reading-list-2026.md', fileType: 'md', chunkCount: 3 },
+  { id: 'u02', title: 'Atlas Vector Search Notes', fileName: 'atlas-vector-notes.md', fileType: 'md', chunkCount: 9 },
+  { id: 'u03', title: 'Baking Bread at Home', fileName: 'baking-bread-at-home.pdf', fileType: 'pdf', chunkCount: 48 },
+  { id: 'u04', title: 'Claude Code First Steps', fileName: 'claude-code-first-steps.txt', fileType: 'txt', chunkCount: 6 },
+  { id: 'u05', title: 'Garden Planning Handbook', fileName: 'garden-planning.pdf', fileType: 'pdf', chunkCount: 31 },
+  { id: 'u06', title: 'Home Network Setup', fileName: 'home-network-setup.md', fileType: 'md', chunkCount: 12 },
+  { id: 'u07', title: 'Lisbon Trip Notes', fileName: 'lisbon-trip-notes.txt', fileType: 'txt', chunkCount: 4 },
+  { id: 'u08', title: 'Nimbus Admin Handbook', fileName: 'nimbus-admin-handbook.txt', fileType: 'txt', chunkCount: 7 },
+  { id: 'u09', title: 'Nimbus CLI Guide', fileName: 'nimbus-guide.md', fileType: 'md', chunkCount: 11 },
+  { id: 'u10', title: 'Nimbus Release Notes', fileName: 'nimbus-release-notes.txt', fileType: 'txt', chunkCount: 5 },
+  { id: 'u11', title: 'Practical MongoDB Aggregations', fileName: 'Practical MongoDB Aggregations.pdf', fileType: 'pdf', chunkCount: 313 },
+  { id: 'u12', title: 'Shanti Pouch Instructions', fileName: 'Shanti_Pouch_Instructions.pdf', fileType: 'pdf', chunkCount: 10 },
+  { id: 'u13', title: 'The MongoDB Document Model', fileName: 'mongodb-document-model.md', fileType: 'md', chunkCount: 13 },
+  { id: 'u14', title: 'Weekly Meal Plan', fileName: 'weekly-meal-plan.md', fileType: 'md', chunkCount: 2 },
+  { id: 'u15', title: 'Zero-Downtime Deploys', fileName: 'zero-downtime-deploys.md', fileType: 'md', chunkCount: 8 },
+];
+
+const BUCKETS = [
+  { key: '#', label: '0–9 & other' },
+  { key: 'AD', label: 'A – D', from: 'A', to: 'D' },
+  { key: 'EH', label: 'E – H', from: 'E', to: 'H' },
+  { key: 'IL', label: 'I – L', from: 'I', to: 'L' },
+  { key: 'MP', label: 'M – P', from: 'M', to: 'P' },
+  { key: 'QT', label: 'Q – T', from: 'Q', to: 'T' },
+  { key: 'UZ', label: 'U – Z', from: 'U', to: 'Z' },
+];
+
+// ---------- Fake answers (shaped like the proposed POST /api/ask response) ----------
+const NIMBUS_SCOPE = ['u08', 'u09'];
+
+const ANSWER_INVITES = {
+  question: 'Who can invite members to a workspace, and how long does an invitation stay valid?',
+  scope: NIMBUS_SCOPE,
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: 'Owners and administrators can invite members; administrators manage members and settings but can\'t delete the workspace or see billing.', cites: [1] }],
+    [{ text: 'An invitation stays valid for 14 days. If it expires, send a new one from Members in the web app; the old link stops working as soon as the new one is sent.', cites: [2] }],
+  ],
+  citations: [
+    { n: 1, uploadId: 'u08', fileType: 'txt', chunkIndex: 0,
+      excerpt: 'Every workspace has at least one owner. Owners can do everything an administrator can, and in addition they can delete the workspace, transfer ownership, and change the billing plan. … Administrators manage members and settings but cannot delete the workspace or see billing details.' },
+    { n: 2, uploadId: 'u08', fileType: 'txt', chunkIndex: 1,
+      excerpt: 'To invite a member, open the web app, go to Members, and choose Invite. … Each person receives an invitation that stays valid for 14 days. If an invitation expires, send a new one from the same page; the old link stops working as soon as a new one is sent.' },
+  ],
+  retrieval: {
+    mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.81, llmCalled: true,
+    hits: [
+      [0.81, 'u08', 'passage 2 of 7', 2], [0.77, 'u08', 'passage 1 of 7', 1], [0.71, 'u08', 'passage 3 of 7'],
+      [0.69, 'u09', 'Configuration'], [0.68, 'u08', 'passage 5 of 7'], [0.66, 'u09', 'Sync behaviour'],
+      [0.65, 'u09', 'Installation › Windows'], [0.64, 'u08', 'passage 4 of 7'], [0.63, 'u09', 'Troubleshooting › Error codes'],
+      [0.61, 'u09', 'Advanced › Proxy settings'],
+    ],
+  },
+};
+
+const ANSWER_GROUP = {
+  question: 'What does the $group stage do, and should I index the fields it groups on?',
+  scope: 'all',
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: '`$group` collects documents that share a key into one output document per key, and computes values such as totals or counts for each group with accumulator operators.', cites: [1] },
+     { text: 'Indexes help a pipeline mainly in its first stages, where `$match` and `$sort` can use them; a `$group` later in the pipeline works on documents already in memory.', cites: [2, 3] }],
+  ],
+  citations: [
+    { n: 1, uploadId: 'u11', fileType: 'pdf', page: 23, chapter: 'Pipeline Building Techniques',
+      excerpt: '(Fake excerpt for the wireframe.) The group stage gathers input documents by a grouping key and outputs one document per distinct key, with accumulators computing fields such as sums and counts…' },
+    { n: 2, uploadId: 'u11', fileType: 'pdf', page: 57, chapter: 'Pipeline Performance Considerations',
+      excerpt: '(Fake excerpt for the wireframe.) Only the stages at the start of a pipeline can take advantage of indexes…' },
+    { n: 3, uploadId: 'u13', fileType: 'md', section: 'Indexes',
+      excerpt: '(Fake excerpt for the wireframe.) Without an index, a query has to scan every document in the collection…' },
+  ],
+  retrieval: {
+    mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.84, llmCalled: true,
+    hits: [
+      [0.84, 'u11', 'PDF p. 23 · Pipeline Building Techniques', 1], [0.80, 'u11', 'PDF p. 57 · Pipeline Performance Considerations', 2],
+      [0.78, 'u11', 'PDF p. 24 · Pipeline Building Techniques'], [0.76, 'u13', 'Indexes', 3], [0.75, 'u11', 'PDF p. 112 · Grouping and Totaling'],
+      [0.73, 'u11', 'PDF p. 58 · Pipeline Performance Considerations'], [0.71, 'u02', 'Filters'], [0.70, 'u11', 'PDF p. 9'],
+      [0.69, 'u13', 'Schema design patterns'], [0.68, 'u11', 'PDF p. 113 · Grouping and Totaling'],
+    ],
+  },
+};
+
+const ANSWER_PARTIAL = {
+  question: 'How long is an invitation valid, and can an administrator change that limit?',
+  scope: NIMBUS_SCOPE,
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: 'An invitation stays valid for 14 days; after that, send a new one from Members.', cites: [1] }],
+    [{ text: 'The uploads don\'t say whether the 14-day limit can be changed.', cites: [] }],
+  ],
+  citations: [ANSWER_INVITES.citations[1]].map((c) => ({ ...c, n: 1 })),
+  retrieval: { ...ANSWER_INVITES.retrieval, topScore: 0.79,
+    hits: ANSWER_INVITES.retrieval.hits.map((h, i) => [h[0] - 0.02, h[1], h[2], i === 0 ? 1 : undefined]) },
+};
+
+const NF_THRESHOLD = {
+  question: 'What hydration should I use for a sourdough loaf?',
+  scope: NIMBUS_SCOPE,
+  found: false, reason: 'belowThreshold',
+  retrieval: { mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.57, llmCalled: false,
+    hits: [[0.57, 'u09', 'Sync behaviour'], [0.56, 'u08', 'passage 6 of 7'], [0.56, 'u09', 'Advanced › Proxy settings'],
+           [0.55, 'u08', 'passage 3 of 7'], [0.55, 'u09', 'Installation › macOS']] },
+};
+
+const ANSWER_BREAD = {
+  question: 'What hydration should I use for a sourdough loaf?',
+  scope: 'all',
+  found: true, reason: 'answered',
+  parts: [[{ text: 'Start at about 70–75% hydration (700–750 g of water per kg of flour). Wetter doughs give a more open crumb but are harder to shape.', cites: [1] }]],
+  citations: [
+    { n: 1, uploadId: 'u03', fileType: 'pdf', page: 14, chapter: 'Sourdough Basics',
+      excerpt: '(Fake excerpt for the wireframe.) A good starting hydration for a sourdough loaf is 70 to 75 percent…' },
+  ],
+  retrieval: { mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.83, llmCalled: true,
+    hits: [[0.83, 'u03', 'PDF p. 14 · Sourdough Basics', 1], [0.78, 'u03', 'PDF p. 15 · Sourdough Basics'],
+           [0.71, 'u03', 'PDF p. 31 · Shaping'], [0.66, 'u14', 'Monday'], [0.63, 'u05', 'PDF p. 4']] },
+};
+
+const NF_LLM = {
+  question: 'Does Nimbus support two-factor authentication?',
+  scope: NIMBUS_SCOPE,
+  found: false, reason: 'noCitations',
+  retrieval: { mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.74, llmCalled: true,
+    hits: [[0.74, 'u08', 'passage 1 of 7'], [0.72, 'u09', 'Configuration'], [0.70, 'u08', 'passage 2 of 7'],
+           [0.69, 'u09', 'Troubleshooting › Error codes'], [0.67, 'u08', 'passage 7 of 7']] },
+};
+
+// Earlier questions in the session, newest first, shown below the latest answer.
+const EARLIER = [ANSWER_GROUP, ANSWER_BREAD, NF_LLM];
+const withEarlier = (latest) => [latest, ...EARLIER.filter((a) => a !== latest)];
+
+const API_NOTES = {
+  'first': 'No request yet. Ticks are saved in localStorage (this browser only, never sent) and restored on reload. POST /api/ask needs uploadIds or scope:"all"; neither → 400.',
+  'answer': 'POST /api/ask {question, uploadIds | scope:"all"} → 200 {found:true, parts, citations[]}. Each citation carries title, section/page, chunkIndex + chunkCount and the excerpt, so showing sources needs no extra request.',
+  'partial': 'Same response as a full answer: citations present ⇒ found. The gap is only in the LLM\'s wording; the page can\'t (and needn\'t) tell partial from full.',
+  'nf-threshold': 'POST /api/ask → 200 {found:false, reason:"belowThreshold", topScore, threshold}. 200, not 404: "not found" is a normal outcome. LLM not called.',
+  'nf-llm': 'POST /api/ask → 200 {found:false, reason:"noCitations"}. Same message for the user; the reason only shows under "How this was found".',
+  'loading': 'One request, no streaming: the page waits (search ≈1 s + LLM a few s). Ask is disabled until the reply, so double-clicks don\'t cost two LLM calls.',
+  'answer-error': 'POST /api/ask → 503 {error:{code:"llmUnavailable", message}}. Errors carry a code so the page picks the wording; the question stays in the box for Retry.',
+  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with status "complete" but searchable:false.',
+  'up-processing': 'GET /api/uploads/:id polled every ~3 s until searchable:true. The server runs the search-and-count check (option A) and stores searchableAt once it passes.',
+  'up-duplicate': '409 {error:{code:"duplicate"}}. The page also warns before sending, since it already has the list; the server check stays the real one.',
+  'up-unsupported': '415 {error:{code:"unsupportedType"}}. The file picker filters types, but drag and drop doesn\'t.',
+  'up-scanned': '422 {error:{code:"scannedPdf"}}. Rejected before anything is saved.',
+  'up-busy': '409 {error:{code:"uploadInProgress"}}: an ingest of the same name started under 10 minutes ago.',
+  'up-toolarge': '413 {error:{code:"fileTooLarge"}}: limit set in the upload middleware (multer), before ingest runs.',
+  'ac': 'GET /api/uploads/search?q=nim → Atlas Search autocomplete on uploads.title (+ fileName). A new search index on uploads: takes the M0 spare slot.',
+  'ac-none': 'Same route, empty array.',
+  'empty': 'GET /api/uploads → []. Ask is disabled until at least one upload is searchable.',
+  'down': 'fetch() rejects (no HTTP status at all). Handled apart from API errors, which always come back as JSON {error:{code,message}}.',
+};
+
+// ---------- State ----------
+let state;
+let processingTimer = null;
+
+// The picker's ticks are saved in localStorage: kept in this browser only, never sent to
+// the server, no expiry. Ids that are no longer in the upload list are dropped on load.
+const SELECTION_KEY = 'kb.selection';
+
+function loadSelection() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SELECTION_KEY));
+    return saved && typeof saved === 'object' ? saved : null;
+  } catch {
+    return null;   // storage blocked or unreadable: start with nothing ticked
+  }
+}
+
+function saveSelection() {
+  try {
+    localStorage.setItem(SELECTION_KEY, JSON.stringify({ all: state.all, uploadIds: [...state.selected] }));
+  } catch { /* storage blocked: the ticks just aren't remembered */ }
+}
+
+function clearSavedSelection() {
+  try { localStorage.removeItem(SELECTION_KEY); } catch { /* nothing to clear */ }
+}
+
+function freshState() {
+  const saved = loadSelection() ?? { all: false, uploadIds: [] };
+  const known = new Map(BASE_UPLOADS.map((u) => [u.id, u]));
+  const selected = new Set((saved.uploadIds ?? []).filter((id) => known.has(id)));
+  return {
+    uploads: BASE_UPLOADS.map((u) => ({ ...u, searchable: true })),
+    all: !!saved.all && !selected.size,   // "All uploads" ticked
+    selected,                             // individually ticked upload ids
+    open: new Set(['AD', ...[...selected].map((id) => bucketOf(known.get(id).title))]),
+    answers: withEarlier(ANSWER_INVITES),
+    historyOpen: false,
+    openEarlier: null,   // index of the open earlier row, if any
+    loading: null,
+    msgs: [],
+    down: false,
+  };
+}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const byId = (id) => state.uploads.find((u) => u.id === id);
+const ready = () => state.uploads.filter((u) => u.searchable);
+const nothingSelected = () => !state.all && !state.selected.size;
+
+function sortKey(title) {
+  return title.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function bucketOf(title) {
+  const c = sortKey(title).charAt(0).toUpperCase();
+  const b = BUCKETS.find((b) => b.from && c >= b.from && c <= b.to);
+  return b ? b.key : '#';
+}
+function sorted(list) {
+  return [...list].sort((a, b) => sortKey(a.title).localeCompare(sortKey(b.title), undefined, { sensitivity: 'base', numeric: true }));
+}
+
+// ---------- Sidebar ----------
+function renderTree() {
+  const tree = $('tree');
+  if (state.down) {
+    tree.innerHTML = '<div class="empty-lib">Couldn\'t load uploads.</div>';
+    return;
+  }
+  if (!state.uploads.length) {
+    tree.innerHTML = '<div class="empty-lib"><div class="big">📂</div>No uploads yet.<br>Upload a .txt, .md or text-based PDF to start asking questions.</div>';
+    return;
+  }
+  const groups = Object.fromEntries(BUCKETS.map((b) => [b.key, []]));
+  for (const u of sorted(state.uploads)) groups[bucketOf(u.title)].push(u);
+
+  tree.innerHTML = BUCKETS.map((b) => {
+    const items = groups[b.key];
+    if (!items.length) {
+      return `<button class="bucket-head empty" disabled><span class="chev">▸</span>${b.label}<span class="n">0</span></button>`;
+    }
+    const isOpen = state.open.has(b.key);
+    const nSel = items.filter((u) => state.selected.has(u.id)).length;
+    const head = `<button class="bucket-head ${isOpen ? 'open' : ''}" data-bucket="${b.key}">
+        <span class="chev">▸</span>${b.label}
+        ${nSel ? `<span class="selcount" title="${nSel} selected">${nSel}</span>` : ''}
+        <span class="n">${items.length}</span></button>`;
+    if (!isOpen) return head;
+    const rows = items.map((u) => {
+      const sel = state.selected.has(u.id);
+      const tip = `${u.title}\n${u.fileName}\n${u.searchable ? u.chunkCount + ' chunks' : 'Being indexed for search'}`;
+      return `<li class="item ${sel ? 'sel' : ''} ${u.searchable ? '' : 'disabled'} ${u.flash ? 'flash' : ''}" data-id="${u.id}" title="${esc(tip)}">
+          <input type="checkbox" ${sel ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
+          <span class="type ${u.fileType}">${u.fileType.toUpperCase()}</span>
+          <span class="title">${esc(u.title)}</span>
+          ${u.searchable ? (u.justReady ? '<span class="pill ready">ready</span>' : '') : '<span class="pill processing">processing…</span>'}
+        </li>`;
+    }).join('');
+    return head + `<ul class="items">${rows}</ul>`;
+  }).join('');
+  state.uploads.forEach((u) => { u.flash = false; });
+}
+
+function renderAllRow() {
+  $('allBox').checked = state.all;
+  $('allBox').disabled = !ready().length;
+  const n = ready().length;
+  const pending = state.uploads.length - n;
+  $('allCount').textContent = state.down ? '' : `${n}${pending ? ` ready, ${pending} processing` : ''}`;
+  $('allRow').style.display = state.uploads.length || state.down ? '' : 'none';
+}
+
+function renderFoot() {
+  const n = state.selected.size;
+  const label = state.all ? 'All uploads selected' : n ? `${n} selected` : 'Nothing selected';
+  $('sideFoot').innerHTML = state.uploads.length
+    ? `<span>${label}</span><span class="spacer"></span>
+       ${nothingSelected() ? '' : '<button class="linkbtn" id="clearSel">Clear</button>'}
+       <button class="linkbtn" id="collapseAll">Collapse all</button>`
+    : '';
+}
+
+function renderMsgs() {
+  $('uploadMsgs').innerHTML = state.msgs.map((m, i) => {
+    if (m.kind === 'progress') {
+      return `<div class="msg"><div>Uploading <span class="name">${esc(m.name)}</span></div>
+        <div class="hint">${esc(m.hint)}</div><div class="bar"><span></span></div></div>`;
+    }
+    return `<div class="msg ${m.kind}"><button class="close" data-msg="${i}" aria-label="Dismiss">×</button>
+      <div><span class="name">${esc(m.name)}</span></div><div>${m.text}</div>
+      ${m.hint ? `<div class="hint">${m.hint}</div>` : ''}</div>`;
+  }).join('');
+  $('uploadMsgs').style.marginBottom = state.msgs.length ? '4px' : '0';
+}
+
+// ---------- Title search (simulates Atlas Search autocomplete on uploads.title) ----------
+let activeSuggestion = -1;
+
+function matches(u, q) {
+  const words = (u.title + ' ' + u.fileName.replace(/[-_.]/g, ' ')).toLowerCase().split(/\s+/);
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every((part) => words.some((w) => w.startsWith(part)));
+}
+function highlight(title, q) {
+  let html = esc(title);
+  for (const part of q.split(/\s+/).filter(Boolean)) {
+    const re = new RegExp(`(^|\\s)(${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
+    html = html.replace(re, '$1<mark>$2</mark>');
+  }
+  return html;
+}
+function renderSuggest() {
+  const q = $('titleSearch').value.trim();
+  const box = $('suggest');
+  if (!q) { box.classList.remove('show'); return; }
+  const hits = sorted(state.uploads.filter((u) => matches(u, q))).slice(0, 8);
+  box.innerHTML = (hits.length
+    ? hits.map((u, i) => `<div class="row ${i === activeSuggestion ? 'active' : ''}" data-id="${u.id}">
+        <input type="checkbox" ${state.selected.has(u.id) ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
+        <div><div class="t">${highlight(u.title, q)}${u.searchable ? '' : ' <span class="pill processing">processing…</span>'}</div>
+        <div class="f">${esc(u.fileName)}</div></div></div>`).join('')
+    : `<div class="none">No upload titles match "${esc(q)}".</div>`)
+    + '<div class="foot">Atlas Search · autocomplete on title · ↑↓ to move, Enter to tick, Esc to close</div>';
+  box.classList.add('show');
+}
+
+// ---------- Workspace ----------
+function scopeIds(scope) { return scope === 'all' ? null : scope; }
+
+function renderScope() {
+  const el = $('scope');
+  if (state.down || !state.uploads.length) { el.innerHTML = ''; return; }
+  if (nothingSelected()) {
+    el.innerHTML = 'Asking: <span class="none-sel">nothing selected yet</span>';
+    return;
+  }
+  if (state.all) {
+    el.innerHTML = `Asking: <span class="chip all"><span>All uploads (${ready().length})</span>
+      <button data-unselect="all" aria-label="Remove">×</button></span>`;
+    return;
+  }
+  const chips = sorted([...state.selected].map(byId)).map((u) =>
+    `<span class="chip" title="${esc(u.fileName)}"><span>${esc(u.title)}</span><button data-unselect="${u.id}" aria-label="Remove">×</button></span>`).join('');
+  el.innerHTML = `Asking: ${chips}`;
+}
+
+function whereOf(c) {
+  const u = byId(c.uploadId);
+  if (c.fileType === 'pdf') return `PDF p. ${c.page}${c.chapter ? ` · ${c.chapter}` : ''}`;
+  if (c.fileType === 'md') return c.section;
+  return `passage ${c.chunkIndex + 1} of ${u ? u.chunkCount : '?'}`;
+}
+
+function scopeLabel(scope) {
+  if (scope === 'all') return 'All uploads';
+  const names = scope.map((id) => byId(id)?.title ?? id);
+  return names.length <= 2 ? names.join(', ') : `${names[0]} and ${names.length - 1} more`;
+}
+
+function detailsHtml(r, scope) {
+  const span = 0.95 - 0.45;
+  const pct = (s) => Math.max(0, Math.min(100, ((s - 0.45) / span) * 100));
+  const rows = r.hits.map(([score, uid, where, cited], i) => {
+    const u = byId(uid);
+    return `<tr class="${score < r.threshold ? 'low' : ''}"><td class="rank">${i + 1}</td>
+      <td class="score">${score.toFixed(2)}<span class="scorebar"><span style="width:${pct(score)}%"></span><i style="left:${pct(r.threshold)}%"></i></span></td>
+      <td>${esc(u ? u.title : uid)} <span style="color:var(--muted)">· ${esc(where)}</span></td>
+      <td>${cited ? `<span class="citedtag">cited [${cited}]</span>` : ''}</td></tr>`;
+  }).join('');
+  const nUploads = scope === 'all' ? ready().length : scope.length;
+  const verdict = r.topScore < r.threshold
+    ? `best match ${r.topScore.toFixed(2)} < ${r.threshold}, so the LLM was not called`
+    : `best match ${r.topScore.toFixed(2)} ≥ ${r.threshold}, so the top ${r.hits.length >= 10 ? 10 : r.hits.length} passages went to the LLM`;
+  return `<details class="details"><summary>How this was found</summary><div class="box">
+    <dl class="facts">
+      <dt>Search</dt><dd>${r.mode} vector search over ${nUploads} upload${nUploads === 1 ? '' : 's'} (${r.chunksSearched} chunks)</dd>
+      <dt>Threshold</dt><dd>${verdict}</dd>
+    </dl>
+    <table class="hits">${rows}</table>
+    <div class="modes">Search mode: Vector. Keyword and Hybrid come with milestone 9.</div>
+  </div></details>`;
+}
+
+function ago(a) {
+  const seconds = (Date.now() - (a.askedAt ?? Date.now())) / 1000;
+  return seconds < 60 ? 'just now' : `${Math.round(seconds / 60)} min ago`;
+}
+
+function cardClass(a) {
+  return a.loading ? '' : a.error ? 'err' : !a.found ? 'notfound' : '';
+}
+
+// The latest question and answer, shown in full.
+function answerCard(a, idx) {
+  return `<div class="card ${cardClass(a)}"><div class="q">${esc(a.question)}</div>${answerBody(a, idx)}</div>`;
+}
+
+// One line per earlier question; the open one shows its answer below the line.
+function earlierRow(a, idx) {
+  const open = state.openEarlier === idx;
+  const [cls, icon, label] = a.error ? ['err', '!', 'Failed']
+    : !a.found ? ['nf', '?', 'Not found']
+    : ['ok', '✓', `${a.citations.length} source${a.citations.length === 1 ? '' : 's'}`];
+  return `<div class="hist ${open ? 'open' : ''}" id="hist-${idx}">
+    <button class="hist-head" data-hist="${idx}" aria-expanded="${open}">
+      <span class="chev">▸</span><span class="st ${cls}" title="${label}">${icon}</span>
+      <span class="hq" title="${esc(a.question)}">${esc(a.question)}</span>
+      <span class="hm">${label} · ${ago(a)}</span>
+    </button>
+    ${open ? `<div class="hist-body ${cardClass(a)}">${answerBody(a, idx)}</div>` : ''}
+  </div>`;
+}
+
+// Everything below the question: used by the latest card and by an open earlier row.
+function answerBody(a, idx) {
+  if (a.loading) {
+    return `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))}</div>
+      <div class="loading-row"><div class="spinner"></div>Searching ${a.scope === 'all' ? 'all uploads' : a.scope.length + ' upload' + (a.scope.length === 1 ? '' : 's')} and writing an answer… usually a few seconds</div>
+      <div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div>`;
+  }
+  if (a.error) {
+    return `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))}</div>
+      <div class="nf-title"><span class="nf-icon">!</span>Couldn't get an answer</div>
+      <div style="color:var(--red)">The answer service is busy right now. Your question is still in the box above.</div>
+      <div style="margin-top:8px"><button class="btn" data-retry="${idx}">Try again</button></div>`;
+  }
+  const meta = `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))} · ${ago(a)}</div>`;
+  if (!a.found) {
+    const why = a.reason === 'belowThreshold'
+      ? 'Nothing in the selected uploads is close to this question.'
+      : 'Passages on this topic were found, but none of them answers the question.';
+    const tryAll = a.scope !== 'all'
+      ? `<div style="margin-top:8px"><button class="btn" data-askall="${idx}">Ask all uploads instead</button></div>` : '';
+    return `${meta}
+      <div class="nf-title"><span class="nf-icon">?</span>Not found in your uploads</div>
+      <div class="answer">${why}</div>${tryAll}
+      ${detailsHtml(a.retrieval, a.scope)}`;
+  }
+  const body = a.parts.map((p) => '<p>' + p.map((seg) =>
+    fmt(seg.text) + seg.cites.map((n) => `<button class="cite" data-card="${idx}" data-n="${n}">${n}</button>`).join('')
+  ).join(' ') + '</p>').join('');
+  const sources = a.citations.map((c) => {
+    const u = byId(c.uploadId);
+    return `<div class="src" id="src-${idx}-${c.n}">
+      <div class="src-head" data-toggle="src-${idx}-${c.n}"><span class="chev">▸</span><span class="n">${c.n}</span>
+        <span class="t">${esc(u.title)}</span><span class="w">· ${esc(whereOf(c))}</span><span class="f">${esc(u.fileName)}</span></div>
+      <div class="excerpt">${esc(c.excerpt)}</div></div>`;
+  }).join('');
+  return `${meta}
+    <div class="answer">${body}</div>
+    <div class="sources"><h3>Sources</h3>${sources}</div>
+    ${detailsHtml(a.retrieval, a.scope)}`;
+}
+
+function renderAnswers() {
+  const el = $('answers');
+  if (state.down) {
+    el.innerHTML = '<div class="ws-empty"><div class="big">⚠️</div>The page can\'t reach the server, so questions can\'t be asked right now.</div>';
+    return;
+  }
+  if (!state.uploads.length) {
+    el.innerHTML = '<div class="ws-empty"><div class="big">💬</div>Upload a file on the left, then ask questions about it here.<br>Answers come only from your uploads, with sources.</div>';
+    return;
+  }
+  const list = state.loading ? [state.loading, ...state.answers] : state.answers;
+  if (!list.length) {
+    el.innerHTML = nothingSelected()
+      ? '<div class="ws-empty"><div class="big">☑️</div>Choose what to ask about: tick uploads on the left, or All uploads.<br>Answers come only from the uploads you choose, with sources.</div>'
+      : '<div class="ws-empty"><div class="big">💬</div>Ask a question about your uploads.</div>';
+    return;
+  }
+  // Indexes are positions in `list`, so citation and row ids stay unique.
+  const [latest, ...earlier] = list;
+  let html = answerCard(latest, 0);
+  if (earlier.length) {
+    html += `<div class="history ${state.historyOpen ? 'open' : ''}" id="history">
+      <button class="history-head" id="historyHead" aria-expanded="${state.historyOpen}">
+        <span class="chev">▸</span>Earlier in this session<span class="hc">${earlier.length}</span></button>
+      ${state.historyOpen ? `<div class="hist-list">${earlier.map((a, i) => earlierRow(a, i + 1)).join('')}</div>` : ''}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Scrolls an opened section or row to the middle of the workspace. One taller than the
+// workspace goes to the top instead, so its start stays visible.
+function centerOn(el) {
+  const workspace = document.querySelector('.workspace');
+  const block = el.offsetHeight > workspace.clientHeight * 0.9 ? 'start' : 'center';
+  el.scrollIntoView({ block, behavior: 'smooth' });
+}
+
+// With nothing ticked the box is greyed and read-only, not disabled: a disabled box
+// ignores clicks, and a click should point the user to the picker.
+function renderAsk() {
+  const off = !state.down && ready().length > 0 && nothingSelected();
+  const disabled = state.down || !ready().length || !!state.loading || off;
+  $('askBtn').disabled = disabled || !$('question').value.trim();
+  $('question').disabled = state.down || !ready().length;
+  $('question').readOnly = off;
+  $('question').placeholder = off
+    ? 'Tick uploads on the left, or All uploads, to ask a question.'
+    : 'Ask a question about your uploads…';
+  document.querySelector('.ask').classList.toggle('off', off);
+  const len = $('question').value.length;
+  $('charCount').textContent = len > 800 ? `${len} / 1000` : '';
+}
+
+function render() {
+  $('banner').classList.toggle('show', state.down);
+  $('connStatus').innerHTML = state.down ? '<span class="dot down"></span>Disconnected' : '<span class="dot"></span>Connected';
+  $('uploadBtn').disabled = state.down;
+  renderMsgs(); renderAllRow(); renderTree(); renderFoot(); renderScope(); renderAnswers(); renderAsk();
+}
+
+// ---------- Interactions ----------
+function toggleUpload(id) {
+  const u = byId(id);
+  if (!u || !u.searchable) return;
+  state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+  state.all = false;   // individual ticks and "All uploads" don't mix
+  state.open.add(bucketOf(u.title));
+  saveSelection();
+  render();
+}
+
+$('tree').addEventListener('click', (e) => {
+  const head = e.target.closest('.bucket-head[data-bucket]');
+  if (head) {
+    const k = head.dataset.bucket;
+    state.open.has(k) ? state.open.delete(k) : state.open.add(k);
+    renderTree();
+    return;
+  }
+  const item = e.target.closest('.item');
+  if (item) toggleUpload(item.dataset.id);
+});
+
+$('allRow').addEventListener('click', () => {
+  if (!ready().length) return;
+  state.all = !state.all;
+  state.selected.clear();
+  saveSelection();
+  render();
+});
+
+function clearSelection() {
+  state.all = false;
+  state.selected.clear();
+  saveSelection();
+  render();
+}
+
+$('sideFoot').addEventListener('click', (e) => {
+  if (e.target.id === 'clearSel') clearSelection();
+  if (e.target.id === 'collapseAll') { state.open.clear(); renderTree(); }
+});
+
+$('scope').addEventListener('click', (e) => {
+  const id = e.target.dataset.unselect;
+  if (id === 'all') return clearSelection();
+  if (id) { state.selected.delete(id); saveSelection(); render(); }
+});
+
+// A click on the greyed question box briefly highlights the picker.
+document.querySelector('.ask').addEventListener('click', () => {
+  if (!nothingSelected() || state.down || !ready().length) return;
+  sidebar.classList.remove('nudge');
+  void sidebar.offsetWidth;   // restart the animation on repeated clicks
+  sidebar.classList.add('nudge');
+});
+
+const search = $('titleSearch');
+search.addEventListener('input', () => { activeSuggestion = -1; renderSuggest(); });
+search.addEventListener('focus', renderSuggest);
+search.addEventListener('keydown', (e) => {
+  const rows = [...$('suggest').querySelectorAll('.row')];
+  if (e.key === 'ArrowDown') { activeSuggestion = Math.min(rows.length - 1, activeSuggestion + 1); renderSuggest(); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { activeSuggestion = Math.max(0, activeSuggestion - 1); renderSuggest(); e.preventDefault(); }
+  if (e.key === 'Enter' && rows[activeSuggestion]) { pickSuggestion(rows[activeSuggestion].dataset.id); e.preventDefault(); }
+  if (e.key === 'Escape') { search.value = ''; $('suggest').classList.remove('show'); }
+});
+$('suggest').addEventListener('mousedown', (e) => {
+  const row = e.target.closest('.row');
+  if (row) { e.preventDefault(); pickSuggestion(row.dataset.id); }
+});
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.search')) $('suggest').classList.remove('show');
+});
+function pickSuggestion(id) {
+  const u = byId(id);
+  if (!u || !u.searchable) return;
+  toggleUpload(id);
+  u.flash = true;
+  renderTree();
+  document.querySelector(`.item[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+  renderSuggest();
+}
+
+// Question box grows with its content, up to max-height, then scrolls.
+const q = $('question');
+function grow() {
+  q.style.height = 'auto';
+  q.style.height = Math.min(q.scrollHeight, 220) + 'px';
+  q.style.overflowY = q.scrollHeight > 220 ? 'auto' : 'hidden';
+  renderAsk();
+}
+q.addEventListener('input', grow);
+window.addEventListener('load', grow);
+window.addEventListener('resize', grow);
+q.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }
+});
+$('askBtn').addEventListener('click', () => ask());
+
+function currentScope() { return state.all ? 'all' : [...state.selected]; }
+
+// scopeOverride is for "Ask all uploads instead"; otherwise the picker must have a choice.
+function ask(scopeOverride, questionOverride) {
+  const text = (questionOverride ?? q.value).trim();
+  if (!text || state.loading || state.down) return;
+  if (!scopeOverride && nothingSelected()) return;
+  const scope = scopeOverride ?? currentScope();
+  state.loading = { loading: true, question: text, scope };
+  state.historyOpen = false;   // a new question gets the focus
+  state.openEarlier = null;
+  document.querySelector('.workspace').scrollTo({ top: 0, behavior: 'smooth' });
+  render();
+  const outcome = $('scenario').value;
+  setTimeout(() => {
+    state.loading = null;
+    let reply;
+    if (/bread|sourdough|flour|hydration/i.test(text)) {
+      reply = scope === 'all' || scope.includes('u03') ? ANSWER_BREAD : NF_THRESHOLD;
+    }
+    else if (outcome === 'nf-llm') reply = NF_LLM;
+    else if (outcome === 'nf-threshold') reply = NF_THRESHOLD;
+    else if (outcome === 'answer-error') reply = { error: true };
+    else if (outcome === 'partial') reply = ANSWER_PARTIAL;
+    else reply = ANSWER_INVITES;
+    state.answers = [{ ...reply, question: text, scope, askedAt: Date.now() }, ...state.answers];
+    if (!reply.error) { q.value = ''; grow(); }
+    render();
+  }, 1800);
+}
+
+$('answers').addEventListener('click', (e) => {
+  const cite = e.target.closest('.cite');
+  if (cite) {
+    const src = $(`src-${cite.dataset.card}-${cite.dataset.n}`);
+    document.querySelectorAll('.src.hl').forEach((s) => s.classList.remove('hl'));
+    src.classList.add('open', 'hl');
+    src.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  const head = e.target.closest('[data-toggle]');
+  if (head) { $(head.dataset.toggle).classList.toggle('open'); return; }
+  if (e.target.closest('#historyHead')) {
+    state.historyOpen = !state.historyOpen;
+    state.openEarlier = null;
+    renderAnswers();
+    if (state.historyOpen) centerOn($('history'));
+    return;
+  }
+  const row = e.target.closest('[data-hist]');
+  if (row) {
+    const idx = Number(row.dataset.hist);
+    state.openEarlier = state.openEarlier === idx ? null : idx;   // one open at a time
+    renderAnswers();
+    centerOn($(`hist-${idx}`));
+    return;
+  }
+  if (e.target.dataset.askall !== undefined) {
+    const a = state.answers[Number(e.target.dataset.askall) - (state.loading ? 1 : 0)];
+    ask('all', a.question);
+  }
+  if (e.target.dataset.retry !== undefined) {
+    $('scenario').value = 'answer';
+    ask();
+  }
+});
+
+// ---------- Simulated upload ----------
+$('uploadBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) simulateUpload(file.name, file.size);
+  e.target.value = '';
+});
+const sidebar = $('sidebar');
+sidebar.addEventListener('dragover', (e) => { e.preventDefault(); sidebar.classList.add('dragover'); });
+sidebar.addEventListener('dragleave', (e) => { if (!sidebar.contains(e.relatedTarget)) sidebar.classList.remove('dragover'); });
+sidebar.addEventListener('drop', (e) => {
+  e.preventDefault();
+  sidebar.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) simulateUpload(file.name, file.size);
+});
+$('uploadMsgs').addEventListener('click', (e) => {
+  const i = e.target.dataset.msg;
+  if (i !== undefined) { state.msgs.splice(Number(i), 1); renderMsgs(); }
+});
+
+function titleFromFileName(name) {
+  return name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const ERRORS = {
+  duplicate: (n) => ({ text: 'This file name has already been uploaded.', hint: 'Uploads can\'t be replaced in the app. Rename the file to upload it as a new one.' }),
+  unsupportedType: () => ({ text: 'This file type isn\'t supported.', hint: 'Upload a .txt, .md or text-based PDF.' }),
+  scannedPdf: () => ({ text: 'This PDF has almost no text: it looks scanned.', hint: 'Scanned PDFs and images aren\'t supported (no OCR). Nothing was saved.' }),
+  uploadInProgress: () => ({ text: 'A file with this name is being uploaded right now.', hint: 'Try again in a few minutes.' }),
+  fileTooLarge: () => ({ text: 'This file is too large (limit 50 MB).', hint: '' }),
+};
+
+function showError(name, code) {
+  state.msgs = state.msgs.filter((m) => m.kind !== 'error');
+  state.msgs.unshift({ kind: 'error', name, ...ERRORS[code](name) });
+  render();
+}
+
+function simulateUpload(name, size = 0) {
+  const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  if (!['.txt', '.md', '.pdf'].includes(ext)) return showError(name, 'unsupportedType');
+  if (state.uploads.some((u) => u.fileName === name)) return showError(name, 'duplicate');
+  if (size > 50 * 1024 * 1024) return showError(name, 'fileTooLarge');
+  const big = ext === '.pdf';
+  const progress = { kind: 'progress', name, hint: big ? 'Reading pages and saving chunks. A long PDF can take a minute.' : 'Saving chunks…' };
+  state.msgs = [progress, ...state.msgs.filter((m) => m.kind !== 'error')];
+  render();
+  setTimeout(() => {
+    state.msgs = state.msgs.filter((m) => m !== progress);
+    const upload = { id: 'n' + Date.now(), title: titleFromFileName(name), fileName: name, fileType: ext.slice(1),
+      chunkCount: big ? 120 : 6, searchable: false, flash: true };
+    state.uploads.push(upload);
+    state.open.add(bucketOf(upload.title));
+    state.msgs.unshift({ kind: 'ok', name, text: `Saved (${upload.chunkCount} chunks).`, hint: 'It can be searched in a few seconds; until then it shows "processing…".' });
+    render();
+    finishProcessing(upload, 6000);
+  }, big ? 3000 : 1200);
+}
+
+function finishProcessing(upload, ms) {
+  clearTimeout(processingTimer);
+  processingTimer = setTimeout(() => {
+    upload.searchable = true;
+    upload.justReady = true;
+    upload.flash = true;
+    state.msgs = state.msgs.filter((m) => !(m.kind === 'ok' && m.name === upload.fileName));
+    render();
+    setTimeout(() => { upload.justReady = false; renderTree(); }, 5000);
+  }, ms);
+}
+
+// ---------- Scenarios ----------
+function applyScenario(name) {
+  clearTimeout(processingTimer);
+  state = freshState();
+  $('titleSearch').value = '';
+  $('suggest').classList.remove('show');
+  q.value = '';
+
+  switch (name) {
+    case 'first':
+      clearSavedSelection();
+      state.all = false;
+      state.selected.clear();
+      state.answers = [];
+      break;
+    case 'partial':
+      state.answers = withEarlier(ANSWER_PARTIAL);
+      break;
+    case 'nf-threshold':
+      state.answers = withEarlier(NF_THRESHOLD);
+      break;
+    case 'nf-llm':
+      state.answers = withEarlier(NF_LLM);
+      break;
+    case 'loading':
+      state.loading = { loading: true, question: 'Which ports does Nimbus need open through a proxy?', scope: NIMBUS_SCOPE };
+      break;
+    case 'answer-error':
+      q.value = 'Which ports does Nimbus need open through a proxy?';
+      state.answers = [{ error: true, question: q.value, scope: NIMBUS_SCOPE }, ...withEarlier(ANSWER_INVITES)];
+      break;
+    case 'up-progress':
+      state.msgs = [{ kind: 'progress', name: 'Kubernetes in Depth.pdf', hint: 'Reading pages and saving chunks. A long PDF can take a minute.' }];
+      break;
+    case 'up-processing': {
+      const u = { id: 'u16', title: 'Kubernetes in Depth', fileName: 'Kubernetes in Depth.pdf', fileType: 'pdf', chunkCount: 412, searchable: false, flash: true };
+      state.uploads.push(u);
+      state.open.add('IL');
+      state.msgs = [{ kind: 'ok', name: u.fileName, text: 'Saved (412 chunks).', hint: 'It can be searched in a few seconds; until then it shows "processing…".' }];
+      finishProcessing(u, 8000);
+      break;
+    }
+    case 'up-duplicate': state.msgs = [{ kind: 'error', name: 'nimbus-guide.md', ...ERRORS.duplicate() }]; break;
+    case 'up-unsupported': state.msgs = [{ kind: 'error', name: 'team-photo.jpg', ...ERRORS.unsupportedType() }]; break;
+    case 'up-scanned': state.msgs = [{ kind: 'error', name: 'signed-lease.pdf', ...ERRORS.scannedPdf() }]; break;
+    case 'up-busy': state.msgs = [{ kind: 'error', name: 'Kubernetes in Depth.pdf', ...ERRORS.uploadInProgress() }]; break;
+    case 'up-toolarge': state.msgs = [{ kind: 'error', name: 'scanned-archive-2019.pdf', ...ERRORS.fileTooLarge() }]; break;
+    case 'empty':
+      state.uploads = [];
+      state.all = false;
+      state.selected.clear();
+      state.answers = [];
+      break;
+    case 'down':
+      state.down = true;
+      state.answers = [];
+      break;
+  }
+
+  // Fake times: the latest answer is recent, earlier ones a few minutes apart.
+  state.answers = state.answers.map((a, i) => ({ ...a, askedAt: Date.now() - (i === 0 ? 20 : 120 + i * 180) * 1000 }));
+  $('apiNote').textContent = 'API: ' + API_NOTES[name];
+  render();
+  grow();
+
+  if (name === 'ac' || name === 'ac-none') {
+    search.value = name === 'ac' ? 'nim' : 'kuber';
+    search.focus();
+    renderSuggest();
+  }
+}
+
+$('scenario').addEventListener('change', (e) => applyScenario(e.target.value));
+// A first visit (nothing saved) starts with nothing ticked; a return visit restores the ticks.
+const startAt = loadSelection() ? 'answer' : 'first';
+$('scenario').value = startAt;
+applyScenario(startAt);
+</script>
+</body>
+</html>
