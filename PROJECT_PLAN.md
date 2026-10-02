@@ -13,7 +13,7 @@ with a clear message.
 
 Upload-scoped questions: all uploads are shared and visible to everyone (no logins).
 The user ticks one or more uploads, or "All uploads", before asking; nothing is ticked
-on a first visit. With uploads ticked, the search pre-filters by their uploadIds, so
+when the page opens. With uploads ticked, the search pre-filters by their uploadIds, so
 answers come only from those uploads. With "All uploads", answers can come from any
 searchable upload. Grounding rules below apply either way. Each question is answered
 on its own (no follow-ups).
@@ -217,7 +217,7 @@ so no logins or usage limits are needed.
     says what the uploads don't cover. It counts as an answer.
 - Web page and API (milestones 7–8; details, reasons and rejected options in
   API_SPEC.md):
-  - Picker: several uploads or "All uploads"; nothing ticked on a first visit.
+  - Picker: several uploads or "All uploads"; nothing ticked when the page opens.
   - Readiness: search and count, saved as `searchableAt` by the page, `npm run ingest`
     and `npm run setup`; never from `status`.
   - `GET /api/health` tells a stopped server from an unreachable database.

@@ -271,9 +271,8 @@ The page:
 
 ## Page state that never reaches the server
 
-- Ticks: saved in the browser's `localStorage` under `kb.selection` as
-  `{ "all": false, "uploadIds": [...] }`. Restored on reload; ids no longer in the
-  list are dropped. A first visit starts with nothing ticked.
+- Ticks: in page memory only. They last while the page stays open; every page load
+  starts with nothing ticked. Nothing is saved in the browser.
 - Earlier questions in the session: in page memory only, lost on reload.
 
 ## `src/` changes for milestone 7
@@ -313,9 +312,11 @@ page in `public/`.
 The reasons behind PROJECT_PLAN.md's "Web page and API" decisions, settled during the
 wireframe review (2026-10-02).
 
-- Picker: nothing ticked on a first visit, so asking is a deliberate choice. Not
-  chosen: "All uploads" as the default. Ticks are remembered in the browser, since
-  losing them on every reload gets annoying; no cookies or server involved.
+- Picker: nothing ticked when the page opens, so asking is a deliberate choice. Not
+  chosen: "All uploads" as the default. Ticks aren't kept across reloads, since the
+  next visit may be about different uploads. Not chosen: remembering them in the
+  browser (`localStorage`), first agreed, then dropped after trying it in the
+  wireframe.
 - Readiness: search and count checks "searchable", the real end result, using public
   features only. Not chosen: counting the generated embeddings (one step short of
   searchable, and their collection is found by a generated name whose format has

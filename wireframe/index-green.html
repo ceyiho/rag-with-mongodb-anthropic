@@ -352,7 +352,7 @@
   <label>State:
     <select id="scenario">
       <optgroup label="Answers">
-        <option value="first">First visit (nothing ticked)</option>
+        <option value="first">Page opened (nothing ticked)</option>
         <option value="answer">Answer with citations</option>
         <option value="partial">Partial answer</option>
         <option value="nf-threshold">Not found (below threshold)</option>
@@ -564,7 +564,7 @@ const EARLIER = [ANSWER_GROUP, ANSWER_BREAD, NF_LLM];
 const withEarlier = (latest) => [latest, ...EARLIER.filter((a) => a !== latest)];
 
 const API_NOTES = {
-  'first': 'No request yet. Ticks are saved in localStorage (this browser only, never sent) and restored on reload. POST /api/ask needs uploadIds or scope:"all"; neither → 400.',
+  'first': 'No request yet. Ticks last for the visit only (page memory): every page load starts with nothing ticked. POST /api/ask needs uploadIds or scope:"all"; neither → 400.',
   'answer': 'POST /api/ask {question, uploadIds | scope:"all"} → 200 {found:true, parts, citations[]}. Each citation carries title, section/page, chunkIndex + chunkCount and the excerpt, so showing sources needs no extra request.',
   'partial': 'Same response as a full answer: citations present ⇒ found. The gap is only in the LLM\'s wording; the page can\'t (and needn\'t) tell partial from full.',
   'nf-threshold': 'POST /api/ask → 200 {found:false, reason:"belowThreshold", topScore, threshold}. 200, not 404: "not found" is a normal outcome. LLM not called.',
@@ -588,31 +588,17 @@ const API_NOTES = {
 let state;
 let processingTimer = null;
 
-// The picker's ticks are saved in localStorage: kept in this browser only, never sent to
-// the server, no expiry. Ids that are no longer in the upload list are dropped on load.
-const SELECTION_KEY = 'kb.selection';
-
-function loadSelection() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SELECTION_KEY));
-    return saved && typeof saved === 'object' ? saved : null;
-  } catch {
-    return null;   // storage blocked or unreadable: start with nothing ticked
-  }
-}
+// The picker's ticks last for the visit only: every page load starts with nothing
+// ticked, since the next visit may be about different uploads. Switching wireframe
+// states keeps them, like staying on the page.
+let currentTicks = { all: false, uploadIds: [] };
 
 function saveSelection() {
-  try {
-    localStorage.setItem(SELECTION_KEY, JSON.stringify({ all: state.all, uploadIds: [...state.selected] }));
-  } catch { /* storage blocked: the ticks just aren't remembered */ }
-}
-
-function clearSavedSelection() {
-  try { localStorage.removeItem(SELECTION_KEY); } catch { /* nothing to clear */ }
+  currentTicks = { all: state.all, uploadIds: [...state.selected] };
 }
 
 function freshState() {
-  const saved = loadSelection() ?? { all: false, uploadIds: [] };
+  const saved = currentTicks;
   const known = new Map(BASE_UPLOADS.map((u) => [u.id, u]));
   const selected = new Set((saved.uploadIds ?? []).filter((id) => known.has(id)));
   return {
@@ -1017,9 +1003,15 @@ search.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && rows[activeSuggestion]) { pickSuggestion(rows[activeSuggestion].dataset.id); e.preventDefault(); }
   if (e.key === 'Escape') { search.value = ''; $('suggest').classList.remove('show'); }
 });
+// Clicks inside the dropdown stay there: ticking redraws the rows, so by the time the
+// page-wide "click outside closes it" check below ran, the clicked row would no longer
+// be in the page and the dropdown would close after every tick. preventDefault keeps
+// the focus in the search box, so typing can continue.
 $('suggest').addEventListener('mousedown', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
   const row = e.target.closest('.row');
-  if (row) { e.preventDefault(); pickSuggestion(row.dataset.id); }
+  if (row) pickSuggestion(row.dataset.id);
 });
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.search')) $('suggest').classList.remove('show');
@@ -1218,7 +1210,7 @@ function applyScenario(name) {
 
   switch (name) {
     case 'first':
-      clearSavedSelection();
+      currentTicks = { all: false, uploadIds: [] };
       state.all = false;
       state.selected.clear();
       state.answers = [];
@@ -1281,10 +1273,9 @@ function applyScenario(name) {
 }
 
 $('scenario').addEventListener('change', (e) => applyScenario(e.target.value));
-// A first visit (nothing saved) starts with nothing ticked; a return visit restores the ticks.
-const startAt = loadSelection() ? 'answer' : 'first';
-$('scenario').value = startAt;
-applyScenario(startAt);
+// Every page load starts with nothing ticked.
+$('scenario').value = 'first';
+applyScenario('first');
 </script>
 </body>
 </html>
