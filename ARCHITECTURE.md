@@ -72,7 +72,8 @@ Scripts and tools import from `src/`, never the reverse.
 | `search.js` | Vector search for a question: exact within one upload, approximate across all complete uploads. Returns chunks with scores. |
 | `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Holds the system prompt. |
 
-Later: `server.js` and routes (milestone 7), the web page (milestone 8).
+Later: `server.js` and routes (milestone 7; planned in API_SPEC.md), the web page in
+`public/` (milestone 8).
 
 ### `scripts/`: needed to make the app work
 
@@ -127,6 +128,13 @@ skipped in a text PDF). Check them with `npm run chunk -- <file>`. They are gene
 by a script kept outside the repository, whose header lists each mock's expected
 result.
 
+### `wireframe/`: static mock-up of the web page
+
+`index.html`: one self-contained page with fake data and no backend, opened straight
+from disk. A state menu at the top switches between answers, "not found", errors,
+uploads and rejections, title search, and an empty library; each state names the API
+route behind it. Milestone 8 builds the real page from it. Not part of the app.
+
 ## Root files
 
 | File | Purpose |
@@ -134,6 +142,7 @@ result.
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
+| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–8). |
 | `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |
