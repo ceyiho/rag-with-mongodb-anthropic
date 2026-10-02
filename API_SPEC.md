@@ -273,7 +273,22 @@ The page:
 
 - Ticks: in page memory only. They last while the page stays open; every page load
   starts with nothing ticked. Nothing is saved in the browser.
-- Earlier questions in the session: in page memory only, lost on reload.
+- Earlier questions: saved in the browser's `localStorage` (key `kb.history`), so they
+  survive closing and reopening the page. Kept per browser and per address (localhost
+  and the VM keep separate lists). Never sent to the server, and never sent to the
+  LLM: each question is still answered on its own.
+  - Saved: each finished answer as the API returned it (`parts`, `citations`,
+    `retrieval`), with the question, the ticked uploads' ids and titles at the time,
+    and when it was asked. Failed questions aren't saved.
+  - A saved answer is a snapshot: it still shows if an upload it cites is removed
+    later, since its titles and excerpts are stored with it.
+  - The newest 50 are kept and older ones dropped (`localStorage` holds about 5 MB per
+    address; an answer takes a few KB).
+  - Stored with a format version. A page that finds another version starts an empty
+    list rather than misreading it.
+  - The section is labelled "Earlier questions" (not "in this session") and has a
+    "Clear" link, since anyone using that browser sees the list.
+  - If storage is blocked (e.g. a private window), the list just isn't kept.
 
 ## `src/` changes for milestone 7
 
@@ -341,6 +356,10 @@ wireframe review (2026-10-02).
 - Answers as parts: the page never parses markers out of text. "How this was found"
   is shown to everyone, collapsed: it is the visible Vector Search showcase, and there
   are no logins or public access to protect. Not chosen: a debug-only mode.
+- Earlier questions in `localStorage` (2026-10-03): wanted after closing and reopening
+  the page. Not chosen: `sessionStorage` (lost when the tab closes), or a `questions`
+  collection in Atlas (a server change; the parked analytics milestone may log
+  questions there anyway).
 - Standalone questions: follow-ups would need an extra LLM call to rewrite a question
   like "what about macOS?" before searching, would resend earlier answers, and would
   let earlier answers leak into a reply its citations don't support. Out of scope for

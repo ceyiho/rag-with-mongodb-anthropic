@@ -224,6 +224,7 @@ so no logins or usage limits are needed.
   - Uploads: the request waits for the ingest; one at a time; 50 MB limit.
   - Answers: parts with citation numbers; "How this was found" on every answer.
   - Questions are standalone; no follow-ups.
+  - Earlier questions are kept in the browser (`localStorage`), not in Atlas.
   - The server listens on `127.0.0.1` unless `HOST` is set.
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
