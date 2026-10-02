@@ -95,7 +95,9 @@
     width: 300px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
     display: flex; flex-direction: column; min-height: 0;
   }
-  .workspace { flex: 1; overflow-y: auto; min-width: 0; }
+  /* scrollbar-gutter keeps room for the scrollbar even when there's nothing to scroll,
+     so the centred column doesn't shift when the content grows (e.g. opening history). */
+  .workspace { flex: 1; overflow-y: auto; min-width: 0; scrollbar-gutter: stable; }
 
   /* ---------- Sidebar ---------- */
   .side-head { padding: 12px 12px 8px; display: flex; align-items: center; gap: 8px; }
