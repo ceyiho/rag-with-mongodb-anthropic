@@ -555,7 +555,7 @@ const API_NOTES = {
   'nf-llm': 'POST /api/ask → 200 {found:false, reason:"noCitations"}. Same message for the user; the reason only shows under "How this was found".',
   'loading': 'One request, no streaming: the page waits (search ≈1 s + LLM a few s). Ask is disabled until the reply, so double-clicks don\'t cost two LLM calls.',
   'answer-error': 'POST /api/ask → 503 {error:{code:"llmUnavailable", message}}. Errors carry a code so the page picks the wording; the question stays in the box for Retry.',
-  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with status "complete" but searchable:false.',
+  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with status "complete" but searchable:false. One upload at a time; leaving the page asks first (the server finishes the ingest anyway).',
   'up-processing': 'GET /api/uploads/:id polled every ~3 s until searchable:true. The server runs the search-and-count check (option A) and stores searchableAt once it passes.',
   'up-duplicate': '409 {error:{code:"duplicate"}}. The page also warns before sending, since it already has the list; the server check stays the real one.',
   'up-unsupported': '415 {error:{code:"unsupportedType"}}. The file picker filters types, but drag and drop doesn\'t.',
@@ -920,7 +920,8 @@ function renderAsk() {
 function render() {
   $('banner').classList.toggle('show', state.down);
   $('connStatus').innerHTML = state.down ? '<span class="dot down"></span>Disconnected' : '<span class="dot"></span>Connected';
-  $('uploadBtn').disabled = state.down;
+  $('uploadBtn').disabled = state.down || uploadInFlight();
+  $('uploadBtn').textContent = uploadInFlight() ? 'Uploading…' : '+ Upload';
   renderMsgs(); renderAllRow(); renderTree(); renderFoot(); renderScope(); renderAnswers(); renderAsk();
 }
 
@@ -1130,14 +1131,33 @@ function showError(name, code) {
   render();
 }
 
+// One upload at a time: while one runs, the button is greyed and a dropped file is refused.
+function uploadInFlight() {
+  return !!state && state.msgs.some((m) => m.kind === 'progress');
+}
+
+// Leaving or reloading mid-upload: the browser asks first. The server would finish the
+// ingest anyway; only the progress card would be lost.
+window.addEventListener('beforeunload', (e) => {
+  if (uploadInFlight()) {
+    e.preventDefault();
+    e.returnValue = '';   // older browsers need this to show the prompt
+  }
+});
+
 function simulateUpload(name, size = 0) {
+  if (uploadInFlight()) {
+    state.msgs = state.msgs.filter((m) => m.kind === 'progress');
+    state.msgs.push({ kind: 'info', name, text: 'Wait for the current upload to finish.', hint: 'Files upload one at a time.' });
+    return render();
+  }
   const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
   if (!['.txt', '.md', '.pdf'].includes(ext)) return showError(name, 'unsupportedType');
   if (state.uploads.some((u) => u.fileName === name)) return showError(name, 'duplicate');
   if (size > 50 * 1024 * 1024) return showError(name, 'fileTooLarge');
   const big = ext === '.pdf';
   const progress = { kind: 'progress', name, hint: big ? 'Reading pages and saving chunks. A long PDF can take a minute.' : 'Saving chunks…' };
-  state.msgs = [progress, ...state.msgs.filter((m) => m.kind !== 'error')];
+  state.msgs = [progress, ...state.msgs.filter((m) => m.kind !== 'error' && m.kind !== 'info')];
   render();
   setTimeout(() => {
     state.msgs = state.msgs.filter((m) => m !== progress);
