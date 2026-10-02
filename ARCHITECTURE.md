@@ -135,6 +135,9 @@ from disk. A state menu at the top switches between answers, "not found", errors
 uploads and rejections, title search, and an empty library; each state names the API
 route behind it. Milestone 8 builds the real page from it. Not part of the app.
 
+`index-green.html`: the same page in a light green scheme modelled on MongoDB's
+palette. Only the colours and the empty-state icons differ.
+
 ## Root files
 
 | File | Purpose |

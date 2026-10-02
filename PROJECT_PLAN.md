@@ -129,7 +129,9 @@ so no logins or usage limits are needed.
 8. Web page in `public/`, built from the wireframe (`wireframe/index.html`): upload
    form, picker (several uploads or "All uploads", title search), question box,
    answers with citations and "How this was found". Show "processing… → ready" after
-   upload, since new chunks are not searchable until their embeddings exist.
+   upload, since new chunks are not searchable until their embeddings exist. Choose
+   the colour scheme: blue (`index.html`) or MongoDB-style green (`index-green.html`).
+   Use line icons, not emoji, which keep the operating system's colours.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
    Combined scores use a different scale, so re-tune the "not found" threshold (record
    it under Findings), and
