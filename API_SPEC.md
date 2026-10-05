@@ -12,8 +12,9 @@ this file is the detail. Update it when a route changes.
 - Ids are an upload's `_id` as a 24-character hex string. The server converts them to
   ObjectIds (the vector index filter needs ObjectIds); a malformed id is a 400.
 - Errors: an HTTP status plus `{ "error": { "code": "...", "message": "..." } }`. The
-  message is written for the user. The page picks its wording by `code`. A 500 says
-  only "Something went wrong"; the details go to the server log.
+  message is written for the user. The page picks its wording by `code`, and shows
+  `message` for a code it has no wording for. A 500 says only "Something went wrong";
+  the details go to the server log.
 - "Not found in your uploads" is a normal answer (200), not an error.
 - A failed `fetch()` (no HTTP status at all) means the server is unreachable; the page
   handles it apart from API errors, and tells it apart from an unreachable database
@@ -189,7 +190,6 @@ The page:
       "fileType": "txt",
       "section": null,
       "page": null,
-      "chapter": null,
       "chunkIndex": 0,
       "chunkCount": 7,
       "excerpt": "Every workspace has at least one owner. …"
@@ -204,7 +204,8 @@ The page:
     "llmCalled": true,
     "hits": [
       { "score": 0.81, "uploadId": "66f1...", "title": "Nimbus Admin Handbook",
-        "section": null, "page": null, "chunkIndex": 1, "cited": 2 }
+        "fileType": "txt", "section": null, "page": null, "chunkIndex": 1,
+        "chunkCount": 7, "cited": 2 }
     ]
   }
 }
@@ -218,19 +219,25 @@ The page:
   marker goes, escapes everything, then turns a small set of Markdown into formatting
   (paragraphs, bullet and numbered lists, `code`, **bold**), and finally turns the
   placeholders into marker buttons. Anything else shows as plain text.
+- Where the citation fields come from: `title`, `fileType` and `chunkCount` from
+  `uploads`, joined to the search results with a `$lookup` stage after
+  `$vectorSearch`; `section` and `chunkIndex` from the chunk.
 - Where a citation points, by file type, and how the page shows it:
-  - PDF: `page` (from the section "page 12") and `chapter` (or null), shown as
-    "PDF p. 12 · Chapter". It's the PDF's page number, not the printed one.
+  - PDF: `page`, read from the section ("page 12"), shown as "PDF p. 12". It's the
+    PDF's page number, not the printed one. No chapter, even when the chunk's prefix
+    line names one.
   - Markdown: `section`, the heading path without the title, shown as
-    "Installation › Windows".
+    "Installation › Windows". Text before the first heading (stored with the file
+    name as its section) has `section: null` and shows no location.
   - Plain text: `section` is null, so it's shown as "passage 2 of 7" (`chunkIndex`
     + 1 of `chunkCount`).
 
-- `excerpt`: the cited chunk's text without its prefix line (a built-in citation
-  quotes the whole chunk).
+- `excerpt`: the cited chunk's text without its prefix line, i.e. up to the first
+  blank line (a built-in citation quotes the whole chunk).
 - `retrieval`: for the "How this was found" panel, shown on every answer, collapsed.
   `hits` are the chunks sent to the LLM (or that would have been), best first; `cited`
-  is the citation number or null. No chunk text, so it stays small. Milestone 9's
+  is the citation number or null. Each hit has the same location fields as a citation,
+  so the page labels it the same way. No chunk text, so it stays small. Milestone 9's
   optional search mode switch would add `mode` values here.
 
 `200`, "not found in your uploads":
@@ -299,11 +306,10 @@ The page:
    filters on `searchableAt` instead of `status: 'complete'`; approximate search for
    ticked uploads over 10,000 chunks.
 3. `src/answer.js`: the threshold by mode (selected uploads or all); returns `parts`,
-   the citation fields above (`title` and `chunkCount` from `uploads`, `page`,
-   `chapter`, `excerpt`) and `retrieval`. Keeps `text` for `scripts/ask.js`. The
-   chapter is only inside the chunk text today: read it from the prefix line, or store
-   a `chapter` field at ingest (a field other than `text` doesn't re-embed, but
-   existing chunks would need it added).
+   the citation fields above (`title`, `fileType` and `chunkCount` joined from
+   `uploads` with `$lookup` in `src/search.js`, `page`, `excerpt`) and `retrieval`.
+   Keeps `text` for `scripts/ask.js`. No data change: every field comes from what is
+   stored.
 4. `src/readiness.js`: the search-and-count check, moved from `tools/probe.js`, which
    then calls it. Also used by `scripts/ingest-file.js` (wait until searchable) and
    `scripts/setup-db.js` (fill in uploads that lack `searchableAt`). Must land
@@ -318,9 +324,9 @@ The page:
    support in `tools/run-test-questions.js` and `tools/run-test-answers.js`, to check
    the threshold for selected uploads.
 
-New in milestone 7: `server.js` (`npm start`), its routes (including
-`GET /api/health`), and the dependencies `express` and `multer`. Milestone 8 adds the
-page in `public/`.
+New in milestone 7: `server.js` at the root (`npm start`), its routes in `src/api/`
+(including `GET /api/health`), and the dependencies `express` 5 and `multer` 2.
+Milestone 8 adds the page in `public/`.
 
 ## Why it's built this way
 
@@ -353,6 +359,10 @@ wireframe review (2026-10-02).
   seconds, and Node waits up to 5 minutes by default. A background job is only worth
   building if a real upload gets close to that. One at a time keeps the page simple
   and stops two large PDFs racing for embedding. Not chosen: queueing a second file.
+- PDF citations give the page only (2026-10-05): the page number says clearly where a
+  citation comes from, and the API stays simple. The chapter is only in the chunk's
+  prefix line, and neither real PDF has chapter names. Not chosen: reading it from
+  that line, or storing a `chapter` field (a schema change and a backfill).
 - Answers as parts: the page never parses markers out of text. "How this was found"
   is shown to everyone, collapsed: it is the visible Vector Search showcase, and there
   are no logins or public access to protect. Not chosen: a debug-only mode.

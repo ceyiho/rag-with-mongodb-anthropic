@@ -40,7 +40,8 @@ so no logins or usage limits are needed.
 
 ## Tech stack
 - Runtime: Node.js (LTS)
-- Backend: Express; file uploads read with `multer`
+- Backend: Express 5 (catches errors in `async` route handlers itself); file uploads
+  read with `multer` 2
 - Database: MongoDB Atlas (free M0 cluster) via the official MongoDB Node.js driver
 - Frontend: plain HTML + JavaScript (no framework for now)
 - Language: plain JavaScript (no TypeScript for now)
@@ -120,10 +121,11 @@ so no logins or usage limits are needed.
    check readiness, ask, and check the database connection. Routes, formats, error
    codes and the `src/` changes this milestone needs are in API_SPEC.md; check it
    against the wireframe first, and update it as routes change. Test with curl before
-   building any UI. Name the entry file `server.js` (not `index.js`) and point
-   `npm start` at it; `package.json` needs no `main` field, since the app is run,
-   never imported. Move the index definitions from `scripts/setup-db.js` into
-   `src/indexes.js`, so the server can check at startup that the vector index exists.
+   building any UI. Name the entry file `server.js` (not `index.js`), at the root,
+   with the routes in `src/api/`, and point `npm start` at it; `package.json` needs
+   no `main` field, since the app is run, never imported. Move the index definitions
+   from `scripts/setup-db.js` into `src/indexes.js`, so the server can check at
+   startup that the vector index exists.
    Add test questions for several ticked uploads, to check the threshold for selected
    uploads.
 8. Web page in `public/`, built from the wireframe (`wireframe/index.html`): upload
@@ -131,7 +133,10 @@ so no logins or usage limits are needed.
    answers with citations and "How this was found". Show "processing… → ready" after
    upload, since new chunks are not searchable until their embeddings exist. Choose
    the colour scheme: blue (`index.html`) or MongoDB-style green (`index-green.html`).
-   Use line icons, not emoji, which keep the operating system's colours.
+   Use line icons, not emoji, which keep the operating system's colours. The wireframe
+   sets the layout, the states and how the page behaves, not its code or exact
+   styling; where it and API_SPEC.md differ, the spec wins. It isn't updated after
+   milestone 7.
 9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
    Combined scores use a different scale, so re-tune the "not found" threshold (record
    it under Findings), and
@@ -230,8 +235,9 @@ so no logins or usage limits are needed.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
   user-facing commands ingest and ask until the web page); `tools/` is maintenance and
   testing, including everything that shows the app's internals (e.g. the command-line
-  search); `public/` is the web page (milestone 8); `wireframe/` is the static mock-up
-  it's built from. ARCHITECTURE.md maps each folder and file.
+  search); `server.js` at the root starts the API server, whose routes are in
+  `src/api/` (milestone 7); `public/` is the web page (milestone 8); `wireframe/` is
+  the static mock-up it's built from. ARCHITECTURE.md maps each folder and file.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as

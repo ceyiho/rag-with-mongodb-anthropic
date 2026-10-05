@@ -496,9 +496,9 @@ const ANSWER_GROUP = {
      { text: 'Indexes help a pipeline mainly in its first stages, where `$match` and `$sort` can use them; a `$group` later in the pipeline works on documents already in memory.', cites: [2, 3] }],
   ],
   citations: [
-    { n: 1, uploadId: 'u11', fileType: 'pdf', page: 23, chapter: 'Pipeline Building Techniques',
+    { n: 1, uploadId: 'u11', fileType: 'pdf', page: 23,
       excerpt: '(Fake excerpt for the wireframe.) The group stage gathers input documents by a grouping key and outputs one document per distinct key, with accumulators computing fields such as sums and counts…' },
-    { n: 2, uploadId: 'u11', fileType: 'pdf', page: 57, chapter: 'Pipeline Performance Considerations',
+    { n: 2, uploadId: 'u11', fileType: 'pdf', page: 57,
       excerpt: '(Fake excerpt for the wireframe.) Only the stages at the start of a pipeline can take advantage of indexes…' },
     { n: 3, uploadId: 'u13', fileType: 'md', section: 'Indexes',
       excerpt: '(Fake excerpt for the wireframe.) Without an index, a query has to scan every document in the collection…' },
@@ -506,10 +506,10 @@ const ANSWER_GROUP = {
   retrieval: {
     mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.84, llmCalled: true,
     hits: [
-      [0.84, 'u11', 'PDF p. 23 · Pipeline Building Techniques', 1], [0.80, 'u11', 'PDF p. 57 · Pipeline Performance Considerations', 2],
-      [0.78, 'u11', 'PDF p. 24 · Pipeline Building Techniques'], [0.76, 'u13', 'Indexes', 3], [0.75, 'u11', 'PDF p. 112 · Grouping and Totaling'],
-      [0.73, 'u11', 'PDF p. 58 · Pipeline Performance Considerations'], [0.71, 'u02', 'Filters'], [0.70, 'u11', 'PDF p. 9'],
-      [0.69, 'u13', 'Schema design patterns'], [0.68, 'u11', 'PDF p. 113 · Grouping and Totaling'],
+      [0.84, 'u11', 'PDF p. 23', 1], [0.80, 'u11', 'PDF p. 57', 2],
+      [0.78, 'u11', 'PDF p. 24'], [0.76, 'u13', 'Indexes', 3], [0.75, 'u11', 'PDF p. 112'],
+      [0.73, 'u11', 'PDF p. 58'], [0.71, 'u02', 'Filters'], [0.70, 'u11', 'PDF p. 9'],
+      [0.69, 'u13', 'Schema design patterns'], [0.68, 'u11', 'PDF p. 113'],
     ],
   },
 };
@@ -542,12 +542,12 @@ const ANSWER_BREAD = {
   found: true, reason: 'answered',
   parts: [[{ text: 'Start at about 70–75% hydration (700–750 g of water per kg of flour). Wetter doughs give a more open crumb but are harder to shape.', cites: [1] }]],
   citations: [
-    { n: 1, uploadId: 'u03', fileType: 'pdf', page: 14, chapter: 'Sourdough Basics',
+    { n: 1, uploadId: 'u03', fileType: 'pdf', page: 14,
       excerpt: '(Fake excerpt for the wireframe.) A good starting hydration for a sourdough loaf is 70 to 75 percent…' },
   ],
   retrieval: { mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.83, llmCalled: true,
-    hits: [[0.83, 'u03', 'PDF p. 14 · Sourdough Basics', 1], [0.78, 'u03', 'PDF p. 15 · Sourdough Basics'],
-           [0.71, 'u03', 'PDF p. 31 · Shaping'], [0.66, 'u14', 'Monday'], [0.63, 'u05', 'PDF p. 4']] },
+    hits: [[0.83, 'u03', 'PDF p. 14', 1], [0.78, 'u03', 'PDF p. 15'],
+           [0.71, 'u03', 'PDF p. 31'], [0.66, 'u14', 'Monday'], [0.63, 'u05', 'PDF p. 4']] },
 };
 
 const NF_LLM = {
@@ -567,12 +567,12 @@ const API_NOTES = {
   'first': 'No request yet. Ticks last for the visit only (page memory): every page load starts with nothing ticked. POST /api/ask needs uploadIds or scope:"all"; neither → 400.',
   'answer': 'POST /api/ask {question, uploadIds | scope:"all"} → 200 {found:true, parts, citations[]}. Each citation carries title, section/page, chunkIndex + chunkCount and the excerpt, so showing sources needs no extra request.',
   'partial': 'Same response as a full answer: citations present ⇒ found. The gap is only in the LLM\'s wording; the page can\'t (and needn\'t) tell partial from full.',
-  'nf-threshold': 'POST /api/ask → 200 {found:false, reason:"belowThreshold", topScore, threshold}. 200, not 404: "not found" is a normal outcome. LLM not called.',
+  'nf-threshold': 'POST /api/ask → 200 {found:false, reason:"belowThreshold", retrieval:{topScore, threshold, llmCalled:false}}. 200, not 404: "not found" is a normal outcome. LLM not called.',
   'nf-llm': 'POST /api/ask → 200 {found:false, reason:"noCitations"}. Same message for the user; the reason only shows under "How this was found".',
   'loading': 'One request, no streaming: the page waits (search ≈1 s + LLM a few s). Ask is disabled until the reply, so double-clicks don\'t cost two LLM calls.',
   'answer-error': 'POST /api/ask → 503 {error:{code:"llmUnavailable", message}}. Errors carry a code so the page picks the wording; the question stays in the box for Retry.',
-  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with status "complete" but searchable:false. One upload at a time; leaving the page asks first (the server finishes the ingest anyway).',
-  'up-processing': 'GET /api/uploads/:id polled every ~3 s until searchable:true. The server runs the search-and-count check (option A) and stores searchableAt once it passes.',
+  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with searchable:false. One upload at a time; leaving the page asks first (the server finishes the ingest anyway).',
+  'up-processing': 'GET /api/uploads/:id polled every ~3 s until searchable:true. The server runs the search-and-count check and stores searchableAt once it passes.',
   'up-duplicate': '409 {error:{code:"duplicate"}}. The page also warns before sending, since it already has the list; the server check stays the real one.',
   'up-unsupported': '415 {error:{code:"unsupportedType"}}. The file picker filters types, but drag and drop doesn\'t.',
   'up-scanned': '422 {error:{code:"scannedPdf"}}. Rejected before anything is saved.',
@@ -768,7 +768,7 @@ function renderScope() {
 
 function whereOf(c) {
   const u = byId(c.uploadId);
-  if (c.fileType === 'pdf') return `PDF p. ${c.page}${c.chapter ? ` · ${c.chapter}` : ''}`;
+  if (c.fileType === 'pdf') return `PDF p. ${c.page}`;
   if (c.fileType === 'md') return c.section;
   return `passage ${c.chunkIndex + 1} of ${u ? u.chunkCount : '?'}`;
 }
