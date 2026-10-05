@@ -121,9 +121,11 @@ Until it is set, an upload is left out of "All uploads" and can't be ticked.
 
 `multipart/form-data` with one field, `file`. Read by `multer` into memory; the file
 is never written to disk. Its file name:
-- arrives decoded as Latin-1, so non-ASCII names ("café.pdf") are converted back to
-  UTF-8;
+- is read as UTF-8 (multer's `defParamCharset`; its default, Latin-1, would garble
+  "café.pdf");
 - is cut to its last part, in case a browser sends a folder path;
+- is put in composed Unicode form (NFC): macOS sends "é" as "e" plus an accent, which
+  would otherwise slip past the duplicate check as a different name;
 - is limited to 255 characters (`400` `fileNameTooLong`).
 
 The request stays open until the ingest has finished (all or nothing, as on the
@@ -134,6 +136,8 @@ command line).
 | Status | Code | When |
 |---|---|---|
 | 400 | `noFile` | No `file` field. |
+| 400 | `unexpectedFile` | A file in another field, or more than one file. |
+| 400 | `invalidUpload` | A multipart body that can't be read (e.g. cut off). |
 | 400 | `fileNameTooLong` | A file name over 255 characters. |
 | 413 | `fileTooLarge` | Over 50 MB. |
 | 415 | `unsupportedType` | Not `.txt`, `.md` or `.pdf`. |

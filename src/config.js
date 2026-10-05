@@ -41,6 +41,13 @@ module.exports = {
     notFoundReply: 'not found in your uploads',
   },
 
+  // Uploads from the web page (POST /api/uploads). The file is held in memory while it
+  // is ingested, so this also caps the server's memory per upload.
+  upload: {
+    maxMegabytes: 50,
+    maxFileNameLength: 255,
+  },
+
   // PDF extraction (src/extractors/pdf.js). A PDF averaging fewer characters per page
   // than this is rejected as scanned. Text PDFs here averaged ~800–1,200; covers and
   // picture pages pull the average down, so keep this well below that.
