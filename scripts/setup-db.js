@@ -55,6 +55,10 @@ async function main() {
     const chunks = db.collection(config.collections.chunks);
 
     // Only complete uploads count as duplicates, so a failed ingest can be retried.
+    // Being partial, the index holds complete uploads only: a lookup by name uses it only
+    // if it includes status: 'complete' ({ fileName } alone scans the collection, as an
+    // explain run showed). Leave the status out to find unfinished uploads too, as the
+    // ingest's leftover check and npm run cleanup do; at this size the scan is fine.
     await uploads.createIndex(
       { fileName: 1 },
       {
