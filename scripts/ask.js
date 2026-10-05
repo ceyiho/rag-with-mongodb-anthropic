@@ -1,6 +1,6 @@
 // Asks a question from the command line and prints the answer with its sources.
 // Usage: npm run ask -- "<question>" [--upload <fileName>]
-// --upload asks one complete upload; without it, all complete uploads.
+// --upload asks one complete upload; without it, all searchable uploads.
 // Each run embeds the question, and calls the LLM unless the top score is below the
 // "not found" threshold. To see the raw chunks and scores, use npm run search.
 

@@ -1,6 +1,6 @@
 // Asks a question from the command line and prints the closest chunks with their scores.
 // Usage: npm run search -- "<question>" [--upload <fileName>] [--limit <n>]
-// --upload searches one complete upload (exact search); without it, all complete uploads.
+// --upload searches one complete upload (exact search); without it, all searchable uploads.
 // --limit sets how many chunks to return (default in config.js).
 // Each run embeds the question: a few tokens and one request against the rate limit.
 

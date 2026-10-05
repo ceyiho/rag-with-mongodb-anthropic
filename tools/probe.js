@@ -1,7 +1,7 @@
 // Checks whether an upload's chunks are searchable yet (embedded and in the vector index).
-// Runs one exact vector search filtered to that upload and prints how many of its chunks
-// are searchable, plus the time since the upload was saved. Used in milestone 3 to measure
-// the embedding delay; the reference version of readiness check A (see Open decisions).
+// Prints how many of its chunks are searchable, plus the time since the upload was saved,
+// using the readiness check in src/readiness.js (search and count). Used in milestone 3
+// to measure the embedding delay. Only counts: it never sets searchableAt.
 // Usage: npm run probe -- <fileName> [--index <name>]
 // --index searches another vector index instead of the one in config.js (to compare indexes).
 //
@@ -22,6 +22,7 @@
 
 const { connect } = require('../src/db');
 const config = require('../src/config');
+const { countSearchable } = require('../src/readiness');
 
 async function main() {
   const args = process.argv.slice(2);
@@ -48,26 +49,7 @@ async function main() {
       process.exit(1);
     }
 
-    // Vector search always returns the closest chunks, however unrelated, so any query text
-    // works: a chunk comes back if and only if it is searchable. Exact search (not
-    // approximate) checks every chunk of the upload, so none are missed; $count returns
-    // just the number instead of the chunks.
-    const [counted] = await db.collection(config.collections.chunks).aggregate([
-      {
-        $vectorSearch: {
-          index: indexName,
-          path: 'text',
-          query: { text: 'overview' },
-          filter: { uploadId: upload._id },
-          exact: true,
-          limit: upload.chunkCount,
-        },
-      },
-      { $count: 'searchable' },
-    ]).toArray();
-
-    // $count returns nothing at all when no chunk matched.
-    const searchable = counted ? counted.searchable : 0;
+    const searchable = await countSearchable(db, upload, { index: indexName });
     const seconds = Math.round((Date.now() - upload.uploadedAt.getTime()) / 1000);
     console.log(`${fileName} [${indexName}]: ${searchable} of ${upload.chunkCount} chunk(s) searchable, ${seconds}s after upload`);
   } finally {

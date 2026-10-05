@@ -6,9 +6,10 @@
 // - One upload (uploadId given): exact search within that upload. Exact search checks
 //   every chunk that passes the filter, so nothing is missed, and it's cheap within one
 //   upload. The caller passes the id of a complete upload.
-// - All uploads (no uploadId): approximate search over complete uploads only, so chunks
-//   left behind by a failed ingest never reach an answer. Approximate search can miss a
-//   few results (see Findings: exact vs approximate search).
+// - All uploads (no uploadId): approximate search over searchable uploads only (those
+//   with searchableAt, see src/readiness.js), so chunks left behind by a failed ingest,
+//   and uploads still being embedded, never reach an answer. Approximate search can
+//   miss a few results (see Findings: exact vs approximate search).
 //
 // Returns the chunks best first, each with its score (cosine: higher is closer).
 
@@ -32,7 +33,7 @@ async function search(db, question, { uploadId, limit = config.search.limit } = 
     vectorSearch.filter = { uploadId };
     vectorSearch.exact = true;
   } else {
-    const uploadIds = await completeUploadIds(db);
+    const uploadIds = await searchableUploadIds(db);
     if (!uploadIds.length) return [];
     vectorSearch.filter = { uploadId: { $in: uploadIds } };
     vectorSearch.numCandidates = Math.min(limit * config.search.candidatesPerResult, MAX_CANDIDATES);
@@ -53,12 +54,13 @@ async function search(db, question, { uploadId, limit = config.search.limit } = 
   ]).toArray();
 }
 
-// Ids of the complete uploads, for the "All uploads" filter. Chunks have no status
-// (it's on the upload), and $vectorSearch can only filter on fields in the vector
-// index (uploadId), so the status check happens here first, on the uploads collection.
-async function completeUploadIds(db) {
+// Ids of the searchable uploads, for the "All uploads" filter. searchableAt is on the
+// upload, not the chunks, and $vectorSearch can only filter on fields in the vector
+// index (uploadId), so the check happens here first, on the uploads collection.
+// searchableAt is only ever set on complete uploads.
+async function searchableUploadIds(db) {
   const uploads = await db.collection(config.collections.uploads)
-    .find({ status: 'complete' }, { projection: { _id: 1 } })
+    .find({ searchableAt: { $exists: true } }, { projection: { _id: 1 } })
     .toArray();
   return uploads.map((upload) => upload._id);
 }

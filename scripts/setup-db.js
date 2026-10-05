@@ -1,9 +1,14 @@
-// Creates the collections, regular indexes, and search indexes. Safe to run more than once:
-// createIndex does nothing if an identical index already exists, and search indexes
-// that already exist are skipped.
+// Creates the collections, regular indexes, and search indexes, then sets searchableAt on
+// complete uploads that lack it (see src/readiness.js). Safe to run more than once:
+// createIndex does nothing if an identical index already exists, search indexes that
+// already exist are skipped, and uploads that have searchableAt aren't checked again.
+// The first run filled in the uploads saved before searchableAt existed (milestone 7),
+// so their searchableAt says nothing about the embedding delay. Later runs catch an
+// upload whose ingest or page was closed before it was searchable.
 
 const { connect } = require('../src/db');
 const config = require('../src/config');
+const { checkReadiness } = require('../src/readiness');
 
 // Vector search index with Auto-Embedding: Atlas embeds each chunk's text with Voyage AI.
 // Scalar quantization, 1024 dimensions, cosine similarity. Cosine, not dotProduct:
@@ -43,6 +48,27 @@ async function ensureSearchIndex(collection, index) {
   console.log('run "npm run index-status" to check when it is ready.');
 }
 
+// Runs the readiness check on each complete upload without searchableAt. An upload that
+// isn't fully searchable yet (still embedding, or the vector index still building) is
+// left as it is, to be caught by a later run.
+async function fillSearchableAt(db, uploads) {
+  const pending = await uploads
+    .find({ status: 'complete', searchableAt: { $exists: false } })
+    .toArray();
+  if (!pending.length) {
+    console.log('Every complete upload has searchableAt.');
+    return;
+  }
+  console.log(`Checking ${pending.length} upload(s) without searchableAt:`);
+  for (const upload of pending) {
+    const { searchableAt, searchable } = await checkReadiness(db, upload);
+    console.log(searchableAt
+      ? `  ${upload.fileName}: searchable, searchableAt set`
+      : `  ${upload.fileName}: ${searchable} of ${upload.chunkCount} chunk(s) searchable, `
+        + 'left unset; run npm run setup again later');
+  }
+}
+
 async function main() {
   const { client, db } = await connect();
 
@@ -73,8 +99,10 @@ async function main() {
       }
     }
 
-    // Last, because a search index needs its collection to exist.
+    // After the collections, because a search index needs its collection to exist.
     await ensureSearchIndex(chunks, vectorIndex);
+
+    await fillSearchableAt(db, uploads);
   } finally {
     await client.close();
   }
