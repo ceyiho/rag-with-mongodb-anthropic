@@ -52,8 +52,8 @@ function readUpload(req, res) {
 }
 
 // The file name as the user sees it: the last part only, in case a browser sends a
-// folder path, and in the composed Unicode form (macOS sends "é" as e + accent), so
-// the duplicate check treats both spellings as one name.
+// folder path. Put in the composed Unicode form here only so its length is counted as
+// stored; src/ingest.js normalises it for the duplicate check.
 function cleanFileName(name) {
   const fileName = name.split(/[\\/]/).pop().normalize('NFC').trim();
   if ([...fileName].length > config.upload.maxFileNameLength) {

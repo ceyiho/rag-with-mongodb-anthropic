@@ -49,13 +49,23 @@ async function main() {
     console.log(`API server on http://${HOST}:${PORT}`);
   });
 
-  // Ctrl+C (SIGINT) or SIGTERM: stop taking requests, then close the database
-  // connection so the process can exit. The message shows the stop was clean.
+  // Ctrl+C (SIGINT) or SIGTERM: stop taking requests, let the ones in progress finish
+  // (an upload cut off midway couldn't clean up after itself), then close the database
+  // connection so the process can exit. The message shows the stop was clean. A second
+  // Ctrl+C stops at once.
   // On Windows, npm run dev's watcher ends the server with a hard kill instead (on
   // Ctrl+C and on each restart), so this doesn't run and no message shows. That's
-  // harmless: Windows closes the connections, and Atlas drops them.
+  // harmless unless a request is in progress: Windows closes the connections, and
+  // Atlas drops them.
+  let stopping = false;
   const stop = async () => {
-    server.close();
+    if (stopping) {
+      console.log('Stopped without waiting.');
+      process.exit(1);
+    }
+    stopping = true;
+    console.log('Stopping: finishing requests in progress (Ctrl+C again to stop now)…');
+    await new Promise((resolve) => server.close(resolve));
     await client.close();
     console.log('Server stopped.');
     process.exit(0);
@@ -80,4 +90,9 @@ async function checkSearchIndexes(db) {
   }
 }
 
-main();
+// main() is async, so an unexpected startup error (e.g. listing the search indexes
+// fails) arrives as a rejected promise; print one readable line instead of a crash.
+main().catch((err) => {
+  console.error('The server could not start:', err.message);
+  process.exit(1);
+});

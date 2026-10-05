@@ -16,7 +16,11 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 
 const DUPLICATE_KEY = 11000;
 
-async function ingest(db, fileName, buffer) {
+async function ingest(db, name, buffer) {
+  // The composed Unicode form, so the duplicate check treats both spellings of "é"
+  // (one character, or e + accent as macOS sends it) as one name, from the command
+  // line and the web page alike.
+  const fileName = name.normalize('NFC');
   getExtractor(fileName);   // rejects unsupported types before touching the database
   const uploads = db.collection(config.collections.uploads);
   const chunks = db.collection(config.collections.chunks);
