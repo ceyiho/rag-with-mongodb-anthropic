@@ -1,11 +1,14 @@
 // Saves an upload and its chunks, all or nothing:
 // the upload is inserted as "processing", then its chunks, then it is flipped to
 // "complete". If anything fails, the upload and its chunks are removed again.
+// Problems the user can fix (a duplicate name, a wrong or empty file) throw an
+// UploadError with a code (src/upload-error.js); anything else is a plain Error.
 
 const path = require('path');
 const config = require('./config');
 const { getExtractor, extract } = require('./extractors');
 const { splitSections } = require('./splitter');
+const { UploadError } = require('./upload-error');
 
 // A "processing" upload older than this is a leftover from a crashed ingest.
 // A newer one is probably still being saved by another ingest.
@@ -25,7 +28,7 @@ async function ingest(db, fileName, buffer) {
 
   const { title, sections } = await extract(fileName, buffer);
   const pieces = splitSections(sections);
-  if (!pieces.length) throw new Error(`"${fileName}" contains no text.`);
+  if (!pieces.length) throw new UploadError('noText', `"${fileName}" contains no text.`);
 
   const { insertedId: uploadId } = await uploads.insertOne({
     fileName,
@@ -58,7 +61,7 @@ async function removeLeftovers(uploads, chunks, fileName) {
   const leftovers = await uploads.find({ fileName, status: 'processing' }).toArray();
   const staleBefore = Date.now() - STALE_AFTER_MS;
   if (leftovers.some((upload) => upload.uploadedAt.getTime() > staleBefore)) {
-    throw new Error(`"${fileName}" is being uploaded right now. Try again in a few minutes.`);
+    throw new UploadError('uploadInProgress', `"${fileName}" is being uploaded right now. Try again in a few minutes.`);
   }
   if (leftovers.length) {
     await removeUploads(uploads, chunks, leftovers.map((upload) => upload._id));
@@ -71,7 +74,7 @@ async function removeUploads(uploads, chunks, uploadIds) {
 }
 
 function alreadyUploaded(fileName) {
-  return new Error(`"${fileName}" has already been uploaded.`);
+  return new UploadError('duplicate', `"${fileName}" has already been uploaded.`);
 }
 
 module.exports = { ingest, removeUploads, STALE_AFTER_MS };

@@ -58,6 +58,7 @@
 const { getDocumentProxy, extractTextItems, getMeta } = require('unpdf');
 const config = require('../config');
 const { titleFromFileName } = require('./title');
+const { UploadError } = require('../upload-error');
 
 const PAGE_NUMBER = /^\s*(page\s+)?(\d+|[ivxlc]{1,7})(\s+of\s+\d+)?\s*$/i;
 const ENDS_SENTENCE = /[.!?]["')\]”’]*$/;
@@ -85,7 +86,7 @@ async function extract(buffer, fileName) {
     // verbosity 0: pdf.js logs errors only, not its warnings about damaged files.
     pdf = await getDocumentProxy(new Uint8Array(buffer), { verbosity: 0 });
   } catch (err) {
-    throw new Error(`Can't read this PDF (${err.message}).`);
+    throw new UploadError('unreadablePdf', `Can't read this PDF (${err.message}).`);
   }
 
   try {
@@ -98,7 +99,7 @@ async function extract(buffer, fileName) {
     const totalChars = pages.reduce((sum, page) => sum + page.length, 0);
     const average = Math.round(totalChars / totalPages);
     if (average < config.pdf.minAverageChars) {
-      throw new Error(`This PDF has almost no text (${average} characters per page on average). `
+      throw new UploadError('scannedPdf', `This PDF has almost no text (${average} characters per page on average). `
         + 'It looks scanned or made of images; only text-based PDFs are supported.');
     }
 

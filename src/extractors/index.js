@@ -5,6 +5,7 @@
 
 const path = require('path');
 const { titleFromFileName } = require('./title');
+const { UploadError } = require('../upload-error');
 
 const EXTRACTORS = {
   '.txt': require('./text'),
@@ -17,7 +18,7 @@ function getExtractor(fileName) {
   const extractor = EXTRACTORS[ext];
   if (!extractor) {
     const supported = Object.keys(EXTRACTORS).join(', ');
-    throw new Error(`Unsupported file type "${ext || fileName}". Supported: ${supported}`);
+    throw new UploadError('unsupportedType', `Unsupported file type "${ext || fileName}". Supported: ${supported}`);
   }
   return extractor;
 }
