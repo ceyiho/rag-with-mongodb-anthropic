@@ -8,19 +8,23 @@
 // --only runs just these question ids, e.g. to recheck failures after a prompt change.
 // --limit sends the top n chunks to the LLM instead of config.search.limit.
 //
-// Each question runs in up to three modes:
-// - all:   All uploads.
-// - one:   scoped to `upload`.
-// - wrong: scoped to `wrongUpload` (answerable questions only). Should be "not found".
+// Each question runs in up to four modes (see tools/test-modes.js):
+// - all:     All uploads.
+// - one:     scoped to `upload`.
+// - wrong:   scoped to `wrongUpload` (answerable questions only). Should be "not found".
+// - several: scoped to the uploads in `several`, if the question has the field, as
+//            when several uploads are ticked on the page.
 //
 // Pass rules:
-// - Answerable (all, one): answered, and a cited chunk contains one of the `expect`
-//   phrases. The LLM may paraphrase, so the fact is checked in the cited chunks, not in
-//   the answer text. Broad questions have no `expect`: a cited chunk from an expected
-//   upload (`upload`, or `alsoIn` in all) is enough, and coverage is judged by reading.
-//   For partial questions, whether the answer names the missing part is also judged by
-//   reading (see the question's note).
-// - Everything else (not answerable, wrong upload): "not found".
+// - Expecting an answer (an answerable question, in a mode that searches an upload
+//   answering it): answered, and a cited chunk contains one of the `expect` phrases.
+//   The LLM may paraphrase, so the fact is checked in the cited chunks, not in the
+//   answer text. Broad questions have no `expect`: a cited chunk from an answering
+//   upload (`upload`, or `alsoIn`, if searched) is enough, and coverage is judged by
+//   reading. For partial questions, whether the answer names the missing part is also
+//   judged by reading (see the question's note).
+// - Everything else (not answerable, wrong upload, `several` without an answering
+//   upload): "not found".
 // A Fail is diagnosed as in HANDOFF.md: threshold (answerable question below it),
 // retrieval (the expected fact or upload wasn't in the chunks sent), or prompt/LLM (it
 // was, or the question had no answer to give).
@@ -33,6 +37,7 @@ const path = require('path');
 const { connect } = require('../src/db');
 const { answer, locationLabel, SYSTEM_PROMPT } = require('../src/answer');
 const config = require('../src/config');
+const { uploadsFor, answeringUploads, expectsAnswer } = require('./test-modes');
 
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
@@ -76,16 +81,18 @@ async function main() {
       .find({ status: 'complete' }).sort({ uploadedAt: 1 }).toArray();
     const idOf = new Map(uploads.map((upload) => [upload.fileName, upload._id]));
     const uploadIdsFor = (q, mode) => {
-      if (mode === 'all') return undefined;
-      const fileName = mode === 'one' ? q.upload : q.wrongUpload;
-      if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
-      return [idOf.get(fileName)];
+      const fileNames = uploadsFor(q, mode);
+      if (!fileNames) return undefined;
+      return fileNames.map((fileName) => {
+        if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
+        return idOf.get(fileName);
+      });
     };
 
     const rows = [];
     for (const q of questions) {
       for (const mode of modesFor(q)) {
-        const row = { q, mode, expectAnswer: q.answerable && mode !== 'wrong' };
+        const row = { q, mode, expectAnswer: expectsAnswer(q, mode) };
         try {
           row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit });
           Object.assign(row, judge(row));
@@ -125,7 +132,8 @@ function today() {
 }
 
 function modesFor(q) {
-  return q.answerable && q.wrongUpload ? ['all', 'one', 'wrong'] : ['all', 'one'];
+  const modes = q.answerable && q.wrongUpload ? ['all', 'one', 'wrong'] : ['all', 'one'];
+  return q.several ? [...modes, 'several'] : modes;
 }
 
 // Whether any of the chunks contains one of the phrases. Ignores case and spacing.
@@ -142,7 +150,7 @@ const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ');
 // broad question (no phrases), any chunk from an expected upload.
 function holdsAnswer(q, mode, chunks) {
   if (q.expect) return hasPhrase(chunks, q.expect);
-  const uploads = mode === 'all' ? [q.upload, ...(q.alsoIn || [])] : [q.upload];
+  const uploads = answeringUploads(q, mode);
   return chunks.some((chunk) => uploads.includes(chunk.fileName));
 }
 
@@ -202,6 +210,7 @@ function printRow(row) {
 
 function groupOf(row) {
   if (row.mode === 'wrong') return 'wrong upload';
+  if (row.mode === 'several') return row.expectAnswer ? 'answerable (several)' : 'several, no answer';
   return row.q.answerable ? `answerable (${row.mode})` : row.q.kind;
 }
 
@@ -267,7 +276,7 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
 
   add('## Settings', '', '| Setting | Value |', '|---|---|');
   add(`| Model | \`${answerConfig.model}\` |`);
-  add(`| Threshold | All ${thresholds.allUploads}, One ${thresholds.selectedUploads} (config.js) |`);
+  add(`| Threshold | All ${thresholds.allUploads}, selected uploads ${thresholds.selectedUploads} (config.js) |`);
   add(`| Search | top ${limit} chunks sent to the LLM (${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Uploads | ${uploads.length} complete, ${totalChunks} chunks |`);
@@ -275,7 +284,8 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
 
   add('## How to read the results', '');
   add('- **Modes**: all = All uploads; one = the question\'s `upload`; wrong = the question\'s');
-  add('  `wrongUpload` (should be "not found").');
+  add('  `wrongUpload` (should be "not found"); several = the uploads in its `several` list,');
+  add('  ticked together (an answer is expected if one of them answers the question).');
   add('- **Pass**: an answerable question is answered and a cited chunk contains one of its');
   add('  `expect` phrases (broad: cites a chunk from the expected upload); everything else comes');
   add('  back "not found". Not checked automatically, so read the answers: coverage for broad');

@@ -10,6 +10,9 @@
 // - one:   scoped to `upload` (exact).
 // - wrong: scoped to `wrongUpload` (exact), answerable questions only: an easy negative,
 //          like a user who picked the wrong upload.
+// - several: scoped to the uploads in `several` (exact), if the question has the field:
+//          several uploads ticked together. An answer is expected if one of them
+//          answers the question (tools/test-modes.js).
 // The threshold check uses the top score, so that's what is compared. A question that
 // fails is reported and the run carries on.
 // Answer text: for answerable questions, the position of the first chunk that contains
@@ -24,6 +27,8 @@
 //   closest to. Used for the one-upload search.
 // - alsoIn: other uploads that also answer it (optional). A hit in any of them counts.
 // - wrongUpload: an upload on another topic, for the wrong-upload search (answerable only).
+// - several: uploads to search together (optional), e.g. the answering upload with
+//   distractors, or only uploads that don't answer it.
 // - expect: phrases copied from the sample that hold the answer; any one counts
 //   (answerable only, except broad). Specific enough that only the right passage
 //   contains them.
@@ -47,6 +52,7 @@ const path = require('path');
 const { connect } = require('../src/db');
 const { search } = require('../src/search');
 const config = require('../src/config');
+const { answeringUploads, expectsAnswer } = require('./test-modes');
 
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
@@ -80,10 +86,12 @@ async function main() {
     const uploads = await db.collection(config.collections.uploads)
       .find({ status: 'complete' }).sort({ uploadedAt: 1 }).toArray();
     const idOf = new Map(uploads.map((upload) => [upload.fileName, upload._id]));
-    const scoped = (fileName) => {
-      if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
-      return { uploadIds: [idOf.get(fileName)] };
-    };
+    const scoped = (...fileNames) => ({
+      uploadIds: fileNames.map((fileName) => {
+        if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
+        return idOf.get(fileName);
+      }),
+    });
 
     const results = [];
     for (const q of questions) {
@@ -100,6 +108,17 @@ async function main() {
         result.oneText = phraseRank(one, q.expect);
         if (q.wrongUpload) {
           result.wrong = topScore((await search(db, q.question, scoped(q.wrongUpload))).chunks);
+        }
+        if (q.several) {
+          const { chunks: several } = await search(db, q.question, scoped(...q.several));
+          const answering = answeringUploads(q, 'several');
+          const rank = several.findIndex((chunk) => answering.includes(chunk.fileName));
+          result.several = {
+            score: topScore(several),
+            expectAnswer: expectsAnswer(q, 'several'),
+            rank: rank === -1 ? null : rank + 1,
+            text: phraseRank(several, q.expect),
+          };
         }
       } catch (err) {
         result.error = err.message;
@@ -156,7 +175,7 @@ const position = (rank) => (rank ? `#${rank}` : '-');
 
 // --- Console output ---
 
-function printRow({ q, all, rank, one, wrong, allText, oneText, error }) {
+function printRow({ q, all, rank, one, wrong, several, allText, oneText, error }) {
   const label = `${q.answerable ? 'Y' : 'N'} ${q.id.padEnd(30)} ${q.kind.padEnd(11)}`;
   if (error) {
     console.log(`${label} ERROR: ${error}`);
@@ -164,7 +183,8 @@ function printRow({ q, all, rank, one, wrong, allText, oneText, error }) {
   }
   const hit = q.answerable ? (rank ? `#${rank}` : 'miss') : '';
   const text = allText === undefined ? '' : `  answer ${position(allText)}/${position(oneText)}`;
-  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}`);
+  const many = several ? `  several(${q.several.length}) ${fmt(several.score)} ${several.expectAnswer ? 'Y' : 'N'}` : '';
+  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}${many}`);
 }
 
 function printSummary(results, thresholds) {
@@ -199,6 +219,34 @@ function printSummary(results, thresholds) {
   for (const line of thresholdRows(ok, thresholds)) {
     console.log(`  ${line.group.padEnd(22)} ${line.text}`);
   }
+
+  const many = severalSummary(ok, thresholds);
+  if (many.total) {
+    console.log(`\nSeveral uploads ticked (exact, threshold ${thresholds.selectedUploads}), ${many.total} questions`);
+    console.log(`  answer expected: kept ${many.kept} of ${many.answering.length}, `
+      + `answering upload ranked #1 for ${many.first}, answer text found for ${many.textFound} of ${many.textChecked}`);
+    console.log(`  no answer:       rejected ${many.rejected} of ${many.other.length} (the rest go to the LLM)`);
+  }
+}
+
+// The several-uploads mode at the selected-uploads threshold: questions expecting an
+// answer should be kept, the others rejected (or left to the LLM).
+function severalSummary(ok, thresholds) {
+  const rows = ok.filter((r) => r.several);
+  const answering = rows.filter((r) => r.several.expectAnswer);
+  const other = rows.filter((r) => !r.several.expectAnswer);
+  const above = (r) => r.several.score != null && r.several.score >= thresholds.selectedUploads;
+  const withText = answering.filter((r) => r.several.text !== undefined);
+  return {
+    total: rows.length,
+    answering,
+    other,
+    kept: answering.filter(above).length,
+    first: answering.filter((r) => r.several.rank === 1).length,
+    textChecked: withText.length,
+    textFound: withText.filter((r) => r.several.text).length,
+    rejected: other.filter((r) => !above(r)).length,
+  };
 }
 
 // Prints the lowest positive score, the highest score of each negative group, and the
@@ -373,6 +421,24 @@ function report({ label, results, thresholds, uploads, index }) {
   }
   add('');
 
+  const severalRows = ok.filter((r) => r.several);
+  if (severalRows.length) {
+    add(`## Several uploads ticked (${severalRows.length})`, '');
+    add('Exact search over the uploads in the question\'s `several` list, at the selected-uploads');
+    add(`threshold (${tOne}). An answer is expected if one of them answers the question. Rank is`);
+    add('the position of the first chunk from an answering upload; Answer as above.', '');
+    add(`| id | Kind | Uploads | Score | Expected | Rank | Answer | At ${tOne} |`, '|---|---|---|---|---|---|---|---|');
+    for (const r of severalRows) {
+      const s = r.several;
+      const above = s.score != null && s.score >= tOne;
+      const verdict = s.expectAnswer ? (above ? 'kept' : '**refused**') : (above ? 'passes' : 'rejected');
+      add(`| ${r.q.id} | ${r.q.kind} | ${cell(r.q.several.join(', '))} | ${fmt(s.score)} | `
+        + `${s.expectAnswer ? 'answer' : 'not found'} | ${s.expectAnswer ? (s.rank ? `#${s.rank}` : '**miss**') : ''} | `
+        + `${s.expectAnswer ? answerCell(s.text) : ''} | ${verdict} |`);
+    }
+    add('');
+  }
+
   add('## Summary', '');
   const { top1, inTop } = ranking(answerable);
   add(`**Ranking (All uploads):** the expected upload ranked #1 for ${top1} of ${answerable.length} `
@@ -400,6 +466,11 @@ function report({ label, results, thresholds, uploads, index }) {
 
   add(`**At ${thresholdText}:**`, '', '| Group | Result |', '|---|---|');
   for (const line of thresholdRows(ok, thresholds)) add(`| ${line.group} | ${line.text} |`);
+  const many = severalSummary(ok, thresholds);
+  if (many.total) {
+    add(`| several, answer expected: kept | ${many.kept} of ${many.answering.length} |`);
+    add(`| several, no answer: rejected | ${many.rejected} of ${many.other.length} |`);
+  }
   add('');
 
   const byId = new Map(ok.map((r) => [r.q.id, r]));

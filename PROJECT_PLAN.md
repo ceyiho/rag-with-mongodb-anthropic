@@ -301,12 +301,13 @@ milestones run.
   content, so they aren't merged. One weak retrieval: a book answer on a mostly-code
   page ranks #10, behind symbol-only cheatsheet pages; try neighbour expansion (send
   each hit with the chunks at `chunkIndex` ± 1) or hybrid search (milestone 9).
-- Answers (milestones 5, 6; runs of 2026-09-29 and 2026-10-01): all 112 question/mode
-  pairs passed; with the PDFs, 188 of 191 (the 3 failures were badly designed
-  questions, since fixed). The LLM replied "not found" to every near-miss and
-  off-topic question the threshold let through (up to 0.80), so threshold plus LLM
-  work as planned. Detecting "not found" by citations held, and partial answers named
-  their missing part.
+- Answers (milestones 5–7; runs of 2026-09-29, 2026-10-01 and 2026-10-05): all 112
+  question/mode pairs passed; with the PDFs, 188 of 191 (the 3 failures were badly
+  designed questions, since fixed); after milestone 7's search and answer changes,
+  with several ticked uploads added, 203 of 203. The LLM replied "not found" to every
+  near-miss and off-topic question the threshold let through (up to 0.80), so
+  threshold plus LLM work as planned. Detecting "not found" by citations held, and
+  partial answers named their missing part.
 - Answer prompt (milestone 5; runs of 2026-09-29): tuned against unasked gap notes, an
   invented example value and long answers; the kept rules are in the system prompt.
   Accepted: proxy answers note that no exact syntax is given. Replies vary between
@@ -328,6 +329,14 @@ milestones run.
   to match PDFs. No measurable effect (runs of 2026-10-01): ranks, answers and the
   threshold unchanged; scores of the plain-text uploads' own questions moved by
   -0.006 to +0.006, mostly slightly down. Kept for consistency.
+- Several ticked uploads (milestone 7; runs of 2026-10-05): kept 0.62 for selected
+  uploads. 11 questions got a `several` list of 2–3 uploads to search together: 7
+  with an answering upload among distractors (same topic or not), 4 without one
+  (near-misses, off-topic, and an answerable question with its upload left out). All 7
+  stayed above the threshold, with the answering upload ranked #1. More ticked uploads
+  raise an unrelated question's best match (0.63 with one wrong upload, 0.68 with
+  two), so none of the 4 fell below it; the LLM replied "not found" to all 4. All 11
+  passed in the full answer run.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status

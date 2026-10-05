@@ -6,6 +6,7 @@
     "upload": "nimbus-guide.md",
     "alsoIn": ["nimbus-release-notes.txt"],
     "wrongUpload": "mongodb-document-model.md",
+    "several": ["nimbus-guide.md", "nimbus-admin-handbook.txt", "nimbus-release-notes.txt"],
     "kind": "direct",
     "expect": ["set the HTTPS_PROXY environment variable"],
     "note": "HTTPS_PROXY environment variable."
@@ -63,6 +64,7 @@
     "answerable": true,
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "claude-code-first-steps.txt",
+    "several": ["nimbus-admin-handbook.txt", "nimbus-guide.md"],
     "kind": "direct",
     "expect": ["valid for 14 days"],
     "note": "14 days."
@@ -102,6 +104,7 @@
     "question": "How much does a Nimbus workspace cost per month?",
     "answerable": false,
     "upload": "nimbus-admin-handbook.txt",
+    "several": ["nimbus-admin-handbook.txt", "nimbus-guide.md", "nimbus-release-notes.txt"],
     "kind": "near-miss",
     "note": "Billing plans are mentioned, prices are not."
   },
@@ -140,6 +143,7 @@
     "answerable": true,
     "upload": "mongodb-document-model.md",
     "wrongUpload": "nimbus-release-notes.txt",
+    "several": ["nimbus-guide.md", "claude-code-first-steps.txt"],
     "kind": "direct",
     "expect": ["at most 16 MB"],
     "note": "16 MB."
@@ -197,6 +201,7 @@
     "answerable": true,
     "upload": "claude-code-first-steps.txt",
     "wrongUpload": "mongodb-document-model.md",
+    "several": ["claude-code-first-steps.txt", "nimbus-guide.md"],
     "kind": "direct",
     "expect": ["irm https://claude.ai/install.ps1 | iex"],
     "note": "Distractor: Nimbus's Windows install section."
@@ -292,6 +297,7 @@
     "answerable": true,
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "claude-code-first-steps.txt",
+    "several": ["nimbus-admin-handbook.txt", "nimbus-guide.md", "nimbus-release-notes.txt"],
     "kind": "partial",
     "expect": ["valid for 14 days"],
     "note": "14 days; should say the uploads don't give a price per member (no upload does)."
@@ -322,6 +328,7 @@
     "answerable": true,
     "upload": "nimbus-admin-handbook.txt",
     "wrongUpload": "mongodb-document-model.md",
+    "several": ["nimbus-admin-handbook.txt", "nimbus-guide.md"],
     "kind": "broad",
     "note": "Spans all 6 chunks: owners, invitations, permissions, storage, audit log, support requests. Judge coverage by reading the answer."
   },
@@ -359,6 +366,7 @@
     "answerable": true,
     "upload": "Practical MongoDB Aggregations.pdf",
     "wrongUpload": "Shanti_Pouch_Instructions.pdf",
+    "several": ["Practical MongoDB Aggregations.pdf", "mongodb-document-model.md"],
     "kind": "direct",
     "expect": ["limited to 100 MB of consumed", "100 MB RAM limit for blocking stages"],
     "note": "100 MB, unless allowDiskUse:true. Pages 40 and 41."
@@ -489,6 +497,7 @@
     "question": "How do I use the $vectorSearch stage in an aggregation pipeline?",
     "answerable": false,
     "upload": "Practical MongoDB Aggregations.pdf",
+    "several": ["Practical MongoDB Aggregations.pdf", "mongodb-document-model.md"],
     "kind": "near-miss",
     "note": "The book covers $search and $searchMeta (Atlas Search), not $vectorSearch."
   },
@@ -541,6 +550,7 @@
     "answerable": true,
     "upload": "Shanti_Pouch_Instructions.pdf",
     "wrongUpload": "mongodb-document-model.md",
+    "several": ["Shanti_Pouch_Instructions.pdf", "claude-code-first-steps.txt", "mongodb-document-model.md"],
     "kind": "direct",
     "expect": ["(6 mm) unless otherwise noted"],
     "note": "1/4\" (6 mm), basting and topstitching 1/8\". Page 2; some steps use 3/8\" (1cm)."
@@ -653,6 +663,7 @@
     "question": "How do I install Python on Windows?",
     "answerable": false,
     "upload": "nimbus-guide.md",
+    "several": ["nimbus-guide.md", "claude-code-first-steps.txt"],
     "kind": "off-topic",
     "note": "Same wording as the Windows install sections in Nimbus and Claude Code."
   },
