@@ -10,6 +10,7 @@ const express = require('express');
 const { connect } = require('./src/db');
 const health = require('./src/api/health');
 const uploads = require('./src/api/uploads');
+const ask = require('./src/api/ask');
 const { routeNotFound, handleErrors } = require('./src/api/errors');
 
 const HOST = process.env.HOST || '127.0.0.1';
@@ -33,6 +34,7 @@ async function main() {
   app.use(express.static(path.join(__dirname, 'public')));
   app.use('/api', health(db));
   app.use('/api', uploads(db));
+  app.use('/api', ask(db));
   app.use('/api', routeNotFound);   // no route above matched
   app.use(handleErrors);            // turns thrown errors into { error: { code, message } }
 

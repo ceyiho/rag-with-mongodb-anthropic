@@ -263,8 +263,11 @@ all uploads instead".
 |---|---|---|
 | 400 | `missingQuestion` | Empty after trimming. |
 | 400 | `questionTooLong` | Over 1,000 characters. |
-| 400 | `missingScope` | Neither `uploadIds` nor `scope: "all"`. |
+| 400 | `missingScope` | Neither `uploadIds` nor `scope: "all"`, or an empty `uploadIds`. |
+| 400 | `invalidScope` | Both, a `scope` other than `"all"`, or `uploadIds` not a list. |
 | 400 | `invalidId` | A malformed id. |
+| 400 | `invalidJson` | The body isn't valid JSON. |
+| 413 | `requestTooLarge` | The body is over 100 KB (Express's default limit). |
 | 404 | `uploadNotFound` | An id that isn't a complete upload. |
 | 409 | `uploadNotReady` | An upload that isn't searchable yet. |
 | 503 | `llmUnavailable` | The Anthropic API is overloaded or rate-limited. |

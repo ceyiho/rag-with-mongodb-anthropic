@@ -21,12 +21,25 @@ function routeNotFound(req, res) {
 // Error-handling middleware: Express recognises it by its four parameters, so `next`
 // stays even though it's unused.
 function handleErrors(err, req, res, next) {
-  if (err instanceof ApiError) {
-    res.status(err.status).json({ error: { code: err.code, message: err.message } });
+  const known = err instanceof ApiError ? err : fromBodyParser(err);
+  if (known) {
+    res.status(known.status).json({ error: { code: known.code, message: known.message } });
     return;
   }
   console.error(`${req.method} ${req.originalUrl} failed:`, err);
   res.status(500).json({ error: { code: 'internal', message: 'Something went wrong.' } });
+}
+
+// express.json() rejects a body it can't read before any route runs; its errors carry
+// a `type`. Those are the client's mistake, so a 4xx rather than a 500.
+function fromBodyParser(err) {
+  if (err.type === 'entity.parse.failed') {
+    return new ApiError(400, 'invalidJson', 'The request body isn\'t valid JSON.');
+  }
+  if (err.type === 'entity.too.large') {
+    return new ApiError(413, 'requestTooLarge', 'The request body is too large.');
+  }
+  return null;
 }
 
 module.exports = { ApiError, routeNotFound, handleErrors };
