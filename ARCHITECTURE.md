@@ -24,23 +24,43 @@ The LLM (Claude, through the Anthropic API) gets the top chunks as search result
 cites the ones it uses; each citation maps back to an upload and section. A reply with
 no citations counts as "not found in your uploads".
 
+An upload is searchable once all its chunks are embedded: the readiness check (an
+exact vector search and a count) then sets `searchableAt`, and only then does the
+upload take part in "All uploads" and become selectable on the page.
+
+The API server (`server.js`, Express) offers all of this over HTTP for the web page:
+listing, uploading and title search of uploads, readiness checks, and questions.
+API_SPEC.md describes its routes and formats.
+
 ## Call chains
 
 Where each part of the app starts, and which `src/` files it calls, in order.
 
 ```
+npm start              → server.js → src/indexes.js (startup check), then the routes:
+  GET  /api/health          → src/api/health.js
+  GET  /api/uploads         → src/api/uploads.js
+  GET  /api/uploads/search  → src/api/uploads.js → src/title-search.js
+  GET  /api/uploads/:id     → src/api/uploads.js → src/readiness.js
+  POST /api/uploads         → src/api/uploads.js → src/ingest.js → src/extractors/ + src/splitter.js
+  POST /api/ask             → src/api/ask.js → src/answer.js → src/search.js
 npm run ask            → scripts/ask.js → src/answer.js → src/search.js
-npm run ingest         → scripts/ingest-file.js → src/ingest.js → src/extractors/ + src/splitter.js
-npm run setup          → scripts/setup-db.js
+npm run ingest         → scripts/ingest-file.js → src/ingest.js → src/extractors/ + src/splitter.js,
+                         then src/readiness.js (waits until searchable)
+npm run setup          → scripts/setup-db.js → src/indexes.js, src/readiness.js
 npm run search         → tools/search.js → src/search.js
 npm run test-questions → tools/run-test-questions.js → src/search.js
 npm run test-answers   → tools/run-test-answers.js → src/answer.js → src/search.js
 npm run chunk          → tools/chunk-file.js → src/extractors/ + src/splitter.js  (no database)
 npm run cleanup        → tools/cleanup.js → src/ingest.js (removeUploads)
 npm run check-db       → tools/check-db.js
-npm run index-status   → tools/index-status.js
-npm run probe          → tools/probe.js
+npm run index-status   → tools/index-status.js → src/indexes.js
+npm run probe          → tools/probe.js → src/readiness.js
 ```
+
+`npm run dev` is `npm start` that restarts whenever a file changes, for use while
+editing. On Windows its restarts and Ctrl+C end the server with a hard kill, so
+"Server stopped." doesn't show (harmless); use `npm start` for demos and a clean stop.
 
 Inside `src/extractors/`:
 - `index.js` picks `text.js`, `markdown.js` or `pdf.js` by file extension.
@@ -49,8 +69,11 @@ Inside `src/extractors/`:
 
 Left out of the chains:
 - `src/db.js`: each starting file opens the connection with it and passes it down;
-  `src/` modules never open their own.
+  `src/` modules never open their own. The server opens one at startup and shares it.
 - `src/config.js`: read almost everywhere.
+- `src/upload-error.js`: thrown by `src/ingest.js` and the extractors.
+- `src/api/errors.js` and `src/api/ids.js`: used by every route.
+- `tools/test-modes.js`: shared by both test runners.
 
 ## Folders
 
@@ -60,7 +83,7 @@ Scripts and tools import from `src/`, never the reverse.
 
 | File | Purpose |
 |---|---|
-| `config.js` | Application settings: collection and index names, search limits, "not found" thresholds, answer model, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
+| `config.js` | Application settings: collection and search index names, search limits, "not found" thresholds (all uploads, selected uploads), answer model, upload size and file-name limits, title search settings, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section; its chunks start with a title made from the file name. Also decodes file bytes to text. |
@@ -69,11 +92,26 @@ Scripts and tools import from `src/`, never the reverse.
 | `extractors/title.js` | Makes a title from a file name, for files without one. |
 | `splitter.js` | Splits sections into overlapping chunks (paragraphs → sentences → lines → words); each chunk starts with its section name, or the section's prefix if the extractor gives one (plain text: the title; PDFs: the title, and the chapter if found). |
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
-| `search.js` | Vector search for a question: exact within one upload, approximate across all complete uploads. Returns chunks with scores. |
-| `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Holds the system prompt. |
+| `upload-error.js` | `UploadError`: an upload problem the user can fix (duplicate, unsupported type, scanned PDF…), with a code the API turns into a 4xx. |
+| `readiness.js` | The readiness check: counts an upload's searchable chunks (exact vector search, then `$count`) and sets `searchableAt` once all are. |
+| `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; joins each chunk's upload (`$lookup`). Returns the chunks with scores, and the mode and counts. |
+| `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format). Holds the system prompt. |
+| `indexes.js` | The Atlas Search index definitions (vector, title autocomplete) and their status. |
+| `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. |
 
-Later: `server.js` and routes (milestone 7; planned in API_SPEC.md), the web page in
-`public/` (milestone 8).
+Later: the web page in `public/` (milestone 8).
+
+### `src/api/`: the API server's routes (used by `server.js`)
+
+Route files handle a request first; helpers are only called by them.
+
+| File | Routes it handles | Purpose |
+|---|---|---|
+| `health.js` | `GET /api/health` | Whether the server can reach the database. |
+| `uploads.js` | `GET /api/uploads`<br>`GET /api/uploads/search`<br>`GET /api/uploads/:id`<br>`POST /api/uploads` | Upload routes: the list, title search, one upload with its readiness check, and the upload itself (`multer`). |
+| `ask.js` | `POST /api/ask` | Checks the request, answers it, and sends the fields API_SPEC.md lists. |
+| `errors.js` | Any other `/api` route (a 404) | Helper: `ApiError`, and the error handler that turns every route's errors into `{ error: { code, message } }`. |
+| `ids.js` | – | Helper: turns upload ids from requests into ObjectIds, or a 400 (for `uploads.js` and `ask.js`). |
 
 ### `scripts/`: needed to make the app work
 
@@ -81,9 +119,9 @@ Setup, and the user-facing command-line commands until the web page exists.
 
 | File | Command | Purpose |
 |---|---|---|
-| `setup-db.js` | `npm run setup` | Creates the collections, regular indexes and vector index. Skips ones that exist. |
-| `ingest-file.js` | `npm run ingest -- <file>` | Uploads a file from the command line. |
-| `ask.js` | `npm run ask -- "<question>" [--upload <fileName>]` | Asks a question from the command line; prints the answer and its sources. |
+| `setup-db.js` | `npm run setup` | Creates the collections, regular indexes and search indexes (skips ones that exist), then sets `searchableAt` on complete uploads that lack it. |
+| `ingest-file.js` | `npm run ingest -- <file>` | Uploads a file from the command line, then waits until it is searchable. |
+| `ask.js` | `npm run ask -- "<question>" [--upload <fileName>]...` | Asks a question from the command line, of all uploads or the ones named; prints the answer and its sources. |
 
 ### `tools/`: maintenance and testing, not needed for the app to work
 
@@ -92,25 +130,27 @@ Everything that shows the app's internals.
 | File | Command | Purpose |
 |---|---|---|
 | `check-db.js` | `npm run check-db` | Connection check and MDB doc counts per collection. |
-| `index-status.js` | `npm run index-status` | Search index build status. |
-| `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. |
+| `index-status.js` | `npm run index-status` | Status of each search index, or that it's missing. |
+| `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. Only counts; never sets `searchableAt`. |
 | `chunk-file.js` | `npm run chunk -- <file> [--full]` | Chunking preview, no database: each chunk's start and end on one line, with the PDF prefix; `--full` prints whole chunks. |
-| `search.js` | `npm run search -- "<question>"` | Raw search results with scores, for testing and tuning. |
+| `search.js` | `npm run search -- "<question>" [--upload <fileName>]...` | Raw search results with scores, for testing and tuning. |
 | `run-test-questions.js` | `npm run test-questions` | Runs `test/questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test/results/`. Its header describes the question fields and kinds. |
 | `run-test-answers.js` | `npm run test-answers` | Runs `test/questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
 | `cleanup.js` | `npm run cleanup` | Removes orphan chunks, stale ingests, or one named upload. Lists first; `--yes` removes. |
+| `test-modes.js` | – | The search modes both test runners use (all, one, wrong, several) and when each expects an answer. |
 
 ### `test/`: test questions and saved test runs
 
 `questions.json` holds the test questions against the samples: which upload should
-answer each, the answer phrases, and a wrong upload for each answerable one. Fields and
-kinds are described in `tools/run-test-questions.js`.
+answer each, the answer phrases, a wrong upload for each answerable one, and for some,
+several uploads to search together. Fields and kinds are described in
+`tools/run-test-questions.js`.
 
-`results/` holds one Markdown report per saved run: `npm run test-questions -- --save <label>` writes
-`<date>-<label>.md` (search scores), and `npm run test-answers -- --save <label>` writes
-`<date>-answers-<label>.md` (answers, with the system prompt used). Each report lists
-the settings that affect its results. Findings in PROJECT_PLAN.md name the date of the
-runs they rely on.
+`results/` holds one Markdown report per saved run:
+`npm run test-questions -- --save <label>` writes `<date>-<label>.md` (search scores),
+and `npm run test-answers -- --save <label>` writes `<date>-answers-<label>.md`
+(answers, with the system prompt used). Each report lists the settings that affect its
+results. Findings in PROJECT_PLAN.md name the date of the runs they rely on.
 
 ### `samples/`: test files to upload
 
@@ -133,7 +173,8 @@ result.
 `index.html`: one self-contained page with fake data and no backend, opened straight
 from disk. A state menu at the top switches between answers, "not found", errors,
 uploads and rejections, title search, and an empty library; each state names the API
-route behind it. Milestone 8 builds the real page from it. Not part of the app.
+route behind it. Milestone 8 builds the real page from it. Not part of the app, and
+not updated after milestone 7 (see milestone 8 in PROJECT_PLAN.md).
 
 `index-green.html`: the same page in a light green scheme modelled on MongoDB's
 palette. Only the colours and the empty-state icons differ.
@@ -142,6 +183,7 @@ palette. Only the colours and the empty-state icons differ.
 
 | File | Purpose |
 |---|---|
+| `server.js` | Starts the API server (`npm start`): connects to Atlas, checks the search indexes, mounts the routes in `src/api/`, and listens on `127.0.0.1:3000` unless `HOST` or `PORT` is set. |
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |

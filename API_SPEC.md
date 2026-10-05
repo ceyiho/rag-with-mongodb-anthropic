@@ -1,10 +1,11 @@
 # API spec
 
 The Express API (milestone 7) and how the web page (milestone 8) uses it: routes,
-request and response formats, error codes, and the `src/` changes milestone 7 needs.
+request and response formats, error codes, and the `src/` changes milestone 7 made.
 Written before milestone 7 from the wireframe (`wireframe/index.html`, whose state
-menu names the route behind each state). Decisions and reasons are in PROJECT_PLAN.md;
-this file is the detail. Update it when a route changes.
+menu names the route behind each state), and kept in step with the routes as they
+were built. Decisions and reasons are in PROJECT_PLAN.md; this file is the detail.
+Update it when a route changes.
 
 ## Conventions
 
@@ -20,8 +21,8 @@ this file is the detail. Update it when a route changes.
   handles it apart from API errors, and tells it apart from an unreachable database
   with `GET /api/health`.
 - The server listens on `127.0.0.1:3000` by default; `HOST` and `PORT` in `.env`
-  change it (e.g. for the VM). It serves the page from `public/` at `/`, so page and API share an
-  address and the browser needs no cross-site (CORS) permission.
+  change it (e.g. for the VM). It serves the page from `public/` at `/`, so page and
+  API share an address and the browser needs no cross-site (CORS) permission.
 
 ## Server
 
@@ -136,7 +137,8 @@ is never written to disk. Its file name:
   "café.pdf");
 - is cut to its last part, in case a browser sends a folder path;
 - is put in composed Unicode form (NFC): macOS sends "é" as "e" plus an accent, which
-  would otherwise slip past the duplicate check as a different name;
+  would otherwise slip past the duplicate check as a different name (done in
+  `src/ingest.js`, so `npm run ingest` does it too);
 - is limited to 255 characters (`400` `fileNameTooLong`).
 
 The request stays open until the ingest has finished (all or nothing, as on the
@@ -317,11 +319,11 @@ The page:
     "Clear" link, since anyone using that browser sees the list.
   - If storage is blocked (e.g. a private window), the list just isn't kept.
 
-## `src/` changes for milestone 7
+## `src/` changes made in milestone 7
 
-1. Error codes: `src/ingest.js` and the extractors throw errors that carry a `code`
-   (the codes above), so the API can tell a user mistake (4xx) from a server fault
-   (500). Today both are a plain `Error`.
+1. Error codes: `src/ingest.js` and the extractors throw an `UploadError`
+   (`src/upload-error.js`) that carries a `code` (the codes above), so the API can tell
+   a user mistake (4xx) from a server fault (500, a plain `Error`).
 2. `src/search.js`: `uploadIds` (an array) instead of `uploadId`; "All uploads"
    filters on `searchableAt` instead of `status: 'complete'`; approximate search for
    ticked uploads over 10,000 chunks.
@@ -335,14 +337,16 @@ The page:
    `scripts/setup-db.js` (fill in uploads that lack `searchableAt`). Must land
    together with change 2, or "All uploads" would find nothing.
 5. `src/indexes.js`: the index definitions, moved from `scripts/setup-db.js`, plus the
-   title index (`uploads_title_autocomplete`). At startup the server stops if the vector
-   index is missing and only warns if the title index is.
-6. `src/config.js`: the title index name, the upload size limit, and the threshold
-   names (`oneUpload` becomes the threshold for selected uploads).
-7. `scripts/ask.js`: `--upload` may be given more than once.
-8. Tests: a few questions in `test/questions.json` that use 2–3 ticked uploads, with
-   support in `tools/run-test-questions.js` and `tools/run-test-answers.js`, to check
-   the threshold for selected uploads.
+   title index (`uploads_title_autocomplete`), and their status. At startup the server
+   stops if the vector index is missing and only warns if the title index is.
+   `src/title-search.js` queries the title index.
+6. `src/config.js`: the title index name and title search settings, the upload size
+   and file-name limits, and the threshold names (`oneUpload` became
+   `selectedUploads`).
+7. `scripts/ask.js` and `tools/search.js`: `--upload` may be given more than once.
+8. Tests: 11 questions in `test/questions.json` have a `several` list of 2–3 uploads,
+   with a "several" mode in both test runners (`tools/test-modes.js`), to check the
+   threshold for selected uploads (PROJECT_PLAN.md, Findings: Several ticked uploads).
 
 New in milestone 7: `server.js` at the root (`npm start`), its routes in `src/api/`
 (including `GET /api/health`), and the dependencies `express` 5 and `multer` 2.
@@ -379,6 +383,9 @@ wireframe review (2026-10-02).
   seconds, and Node waits up to 5 minutes by default. A background job is only worth
   building if a real upload gets close to that. One at a time keeps the page simple
   and stops two large PDFs racing for embedding. Not chosen: queueing a second file.
+  Known limitation: Node runs JavaScript on one thread, so while pdf.js reads a large
+  PDF, other requests wait (a few seconds for the 280-page book). Not chosen: reading
+  PDFs in a worker thread, more than a demo needs.
 - PDF citations give the page only (2026-10-05): the page number says clearly where a
   citation comes from, and the API stays simple. The chapter is only in the chunk's
   prefix line, and neither real PDF has chapter names. Not chosen: reading it from

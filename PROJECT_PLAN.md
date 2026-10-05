@@ -360,5 +360,12 @@ milestones run.
 - Before milestone 7: a static wireframe of the web page (`wireframe/index.html`)
   settled what the page needs from the API; the decisions are under Decisions (Web
   page and API, Search indexes on M0), the routes and formats in API_SPEC.md.
-- Next: milestone 7 (Express API).
+- Milestone 7 is completed: the Express API (`npm start`, `server.js` and `src/api/`)
+  with every route in API_SPEC.md, tested with curl: health, the upload list, title
+  search (Atlas Search autocomplete, the M0's second search index), readiness
+  (`searchableAt`, also set by `npm run setup` and `npm run ingest`), uploads, and
+  questions for several uploads or all. Answers come as parts, citations and
+  "How this was found" details. The threshold holds for several uploads (Findings:
+  Several ticked uploads); a full answer run passed 203 of 203.
+- Next: milestone 8 (web page).
 - Files and commands: see ARCHITECTURE.md.
