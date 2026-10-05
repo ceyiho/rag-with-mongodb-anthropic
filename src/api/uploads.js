@@ -1,6 +1,7 @@
 // Upload routes (see API_SPEC.md: Uploads). Only complete uploads are returned;
 // "processing" is the ingest's internal state and never reaches the page.
 //   GET /api/uploads       all complete uploads, sorted by title
+//   GET /api/uploads/search?q=   title search for the picker (Atlas Search autocomplete)
 //   GET /api/uploads/:id   one upload, after the readiness check if it isn't searchable
 //   POST /api/uploads      saves an uploaded file (multipart/form-data, field "file")
 
@@ -9,6 +10,7 @@ const multer = require('multer');
 const config = require('../config');
 const { ingest } = require('../ingest');
 const { checkReadiness } = require('../readiness');
+const { searchTitles } = require('../title-search');
 const { UploadError } = require('../upload-error');
 const { ApiError } = require('./errors');
 const { toObjectId } = require('./ids');
@@ -87,6 +89,18 @@ module.exports = function uploadsRoutes(db) {
       .sort({ title: 1 })
       .collation({ locale: 'en' })
       .toArray();
+    res.json(found.map(toUpload));
+  });
+
+  // The picker's title search, asked once typing pauses. An empty q gives []. If the
+  // title index is missing (e.g. dropped while being changed), the page filters its
+  // own list instead.
+  router.get('/uploads/search', async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 200) : '';
+    const found = await searchTitles(db, q);
+    if (!found) {
+      throw new ApiError(503, 'titleSearchUnavailable', 'Title search is unavailable right now.');
+    }
     res.json(found.map(toUpload));
   });
 

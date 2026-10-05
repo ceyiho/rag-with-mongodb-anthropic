@@ -1,24 +1,19 @@
-// Lists the search indexes on the chunks collection and their status.
+// Lists the app's search indexes (src/indexes.js) and their status.
 // Atlas builds search indexes in the background; an index can be used once it is queryable.
 
 const { connect } = require('../src/db');
-const config = require('../src/config');
+const { searchIndexStatus } = require('../src/indexes');
 
 async function main() {
   const { client, db } = await connect();
 
   try {
-    const chunks = db.collection(config.collections.chunks);
-    const indexes = await chunks.listSearchIndexes().toArray();
-
-    if (indexes.length === 0) {
-      console.log(`No search indexes on ${db.databaseName}.${chunks.collectionName}. Run "npm run setup".`);
-      return;
-    }
-
-    console.log(`${db.databaseName}.${chunks.collectionName} search indexes:`);
-    for (const index of indexes) {
-      console.log(`  ${index.name} (${index.type}): status ${index.status}, queryable: ${index.queryable}`);
+    console.log(`${db.databaseName} search indexes:`);
+    for (const { index, exists, status, queryable } of await searchIndexStatus(db)) {
+      const where = `${index.collection}.${index.name} (${index.type})`;
+      console.log(exists
+        ? `  ${where}: status ${status}, queryable: ${queryable}`
+        : `  ${where}: missing. Run "npm run setup".`);
     }
   } finally {
     await client.close();

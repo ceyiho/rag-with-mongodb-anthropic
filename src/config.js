@@ -7,10 +7,18 @@ module.exports = {
     chunks: 'chunks',
   },
 
-  // Atlas Search indexes on the chunks collection. The definitions are in scripts/setup-db.js.
-  // Search indexes can't be edited, so a changed definition gets a new name.
+  // Atlas Search index names. The definitions are in src/indexes.js.
   searchIndexes: {
-    vector: 'chunks_vector_cosine',
+    vector: 'chunks_vector_cosine',        // on chunks
+    title: 'uploads_title_autocomplete',   // on uploads
+  },
+
+  // Title search (GET /api/uploads/search): how many suggestions, and the typo
+  // tolerance (one edit: a wrong, missing, extra or swapped letter). Typos only count
+  // from fuzzyFrom letters on; on shorter input they match too much.
+  titleSearch: {
+    limit: 8,
+    fuzzyFrom: 4,
   },
 
   // Vector search (src/search.js). numCandidates applies to "All uploads" (approximate

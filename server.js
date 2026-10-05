@@ -7,7 +7,9 @@
 
 const path = require('path');
 const express = require('express');
+const config = require('./src/config');
 const { connect } = require('./src/db');
+const { searchIndexStatus } = require('./src/indexes');
 const health = require('./src/api/health');
 const uploads = require('./src/api/uploads');
 const ask = require('./src/api/ask');
@@ -28,6 +30,7 @@ async function main() {
     console.error('If your IP address has changed, add it in Atlas Network Access.');
     process.exit(1);
   }
+  await checkSearchIndexes(db);
 
   // Every request passes through these in order (middleware), until one replies.
   const app = express();
@@ -59,6 +62,22 @@ async function main() {
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+}
+
+// Without the vector index no question can be answered, so the server doesn't start.
+// Without the title index only the picker's title search is lost (the page filters its
+// own list instead), so it only warns.
+async function checkSearchIndexes(db) {
+  for (const { index, exists, queryable } of await searchIndexStatus(db)) {
+    if (queryable) continue;
+    const problem = exists ? 'is not queryable yet' : 'is missing';
+    const fix = exists ? 'check "npm run index-status"' : 'run "npm run setup"';
+    if (index.name === config.searchIndexes.vector) {
+      console.error(`The vector search index ${index.name} ${problem}; ${fix}.`);
+      process.exit(1);
+    }
+    console.warn(`Warning: the search index ${index.name} ${problem}, so title search is off; ${fix}.`);
+  }
 }
 
 main();

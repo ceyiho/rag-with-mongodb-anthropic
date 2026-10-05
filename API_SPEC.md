@@ -83,10 +83,21 @@ fuzzy matching (a typo like "nimbsu" finds Nimbus), complete uploads only, at mo
 - `503` `titleSearchUnavailable`: the title index is missing (e.g. dropped while being
   changed). The page then filters its own list in the browser.
 
-To settle in milestone 7, with the real titles: how autocomplete splits file names
-with hyphens (`nimbus-admin-handbook.txt`), and how many characters are typed before
-suggestions appear. The page sends a request once typing pauses for about 200 ms,
-not on every key.
+How it matches (settled in milestone 7 with the real titles; index in
+`src/indexes.js`, query in `src/title-search.js`):
+- Every typed word must match the start of a word in the title or the file name, so
+  "nim admin" finds only "Nimbus Admin Handbook".
+- File names are split into words at hyphens, underscores and dots, so
+  "instructions" finds `Shanti_Pouch_Instructions.pdf`. The extension is a word too:
+  "pdf" lists the PDFs.
+- Suggestions start at 2 letters; a 1-letter word is skipped while another word is
+  there ("nimbus g" searches "nimbus").
+- Words of 4 letters or more may have one typo ("nimbsu", "aggregatoins").
+- Only titles and file names are searched, not the text inside the files.
+
+The page sends a request once typing pauses for about 200 ms, not on every key. At
+startup the server warns if the title index is missing; the vector index missing
+stops it.
 
 ### `GET /api/uploads/:id`
 
