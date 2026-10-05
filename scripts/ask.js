@@ -6,7 +6,7 @@
 // "not found" threshold. To see the raw chunks and scores, use npm run search.
 
 const { connect } = require('../src/db');
-const { answer } = require('../src/answer');
+const { answer, locationLabel } = require('../src/answer');
 const config = require('../src/config');
 
 // Removes every "--name value" from args and returns the values ([] if absent).
@@ -61,13 +61,13 @@ async function main() {
     console.log(`"${question}" in ${fileNames.join(', ') || 'All uploads'}\n`);
     console.log(result.text);
 
-    // Sources: one line per [n] marker in the answer. A plain-text file's only section
-    // is named after the file, so show the file name once instead of twice.
+    // Sources: one line per [n] marker in the answer, with where it points ("page 12",
+    // a heading path, or "passage 2 of 6").
     if (result.citations.length) {
       console.log('\nSources:');
       for (const c of result.citations) {
-        const where = c.section && c.section !== c.fileName ? `${c.fileName}: ${c.section}` : c.fileName;
-        console.log(`[${c.n}] ${where}`);
+        const where = locationLabel(c);
+        console.log(`[${c.n}] ${c.fileName}${where ? `: ${where}` : ''}`);
       }
     }
   } finally {

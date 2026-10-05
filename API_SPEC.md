@@ -62,8 +62,10 @@ Every route returns uploads in this shape:
 
 ### `GET /api/uploads`
 
-All complete uploads, sorted by title (case-insensitive). Reports what is stored; it
-never runs the readiness check, so it stays cheap however many uploads are processing.
+All complete uploads, sorted by title as a person would: case and accents don't split
+the list (a MongoDB collation, locale `en`; without one, "Zebra" sorts before
+"apple"). Reports what is stored; it never runs the readiness check, so it stays cheap
+however many uploads are processing.
 
 `200` `[upload, ...]`
 

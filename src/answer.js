@@ -8,13 +8,21 @@
 // - A reply with at least one citation is an answer; one with none is "not found",
 //   whatever its wording (see Decisions in PROJECT_PLAN.md: Answers).
 //
-// Returns { found, reason, text, citations, topScore, threshold, chunks, usage }:
-// - reason: 'answered', 'belowThreshold' (LLM not called) or 'noCitations' (the LLM
-//   found no answer in the chunks).
-// - text: the answer with [n] markers after cited passages, or the "not found" reply.
-// - citations: the cited chunks, numbered n in order of first citation.
-// - chunks: every chunk searched, for diagnosing wrong replies. rawText is the LLM's
-//   own reply, kept even when it counts as "not found".
+// Returns the answer in the API's format (API_SPEC.md: POST /api/ask), plus fields for
+// the command line and the tests:
+// - found, reason: 'answered', 'belowThreshold' (LLM not called) or 'noCitations' (the
+//   LLM found no answer in the chunks).
+// - parts: the answer split where the LLM's citations fall, each { text, cites }, with
+//   cites the citation numbers; [] when not found. Joined, the texts are the answer.
+// - citations: the cited chunks, numbered n in order of first citation, each with where
+//   it points (see location below), its upload's title, and the excerpt.
+// - retrieval: how the answer was found (search mode, threshold, top score, whether the
+//   LLM was called) and the chunks sent to it (hits), for "How this was found".
+// - text: the answer with [n] markers after cited parts, or the "not found" reply
+//   (for npm run ask).
+// - chunks: every chunk searched, with its text, for diagnosing wrong replies. rawText
+//   is the LLM's own reply, kept even when it counts as "not found". usage is the LLM's
+//   token count (null when it wasn't called).
 // Options: uploadIds searches those uploads (ObjectIds) instead of all; limit overrides
 // config.search.limit (how many chunks go to the LLM), for testing other values.
 
@@ -35,15 +43,20 @@ const SYSTEM_PROMPT = `You answer questions using only the search results sent w
 let anthropic;   // created on first use, so importing this file needs no API key
 
 async function answer(db, question, { uploadIds, limit } = {}) {
-  const { chunks } = await search(db, question, { uploadIds, limit });
+  const { mode, uploadCount, chunksSearched, chunks } = await search(db, question, { uploadIds, limit });
   const threshold = uploadIds
     ? config.search.notFoundThreshold.selectedUploads
     : config.search.notFoundThreshold.allUploads;
   const topScore = chunks.length ? chunks[0].score : null;
-  const result = { topScore, threshold, chunks };
+  const retrieval = (llmCalled, citations = []) => ({
+    mode, uploadCount, chunksSearched, threshold, topScore, llmCalled,
+    hits: chunks.map((chunk) => toHit(chunk, citations)),
+  });
 
   if (!chunks.length || topScore < threshold) {
-    return { ...result, ...notFound('belowThreshold'), rawText: null, usage: null };
+    return {
+      ...notFound('belowThreshold'), retrieval: retrieval(false), chunks, rawText: null, usage: null,
+    };
   }
 
   anthropic ??= new Anthropic();
@@ -63,14 +76,75 @@ async function answer(db, question, { uploadIds, limit } = {}) {
     throw new Error(`LLM reply ended with stop_reason "${response.stop_reason}"`);
   }
 
-  const { text, citations, rawText } = readReply(response.content, chunks);
+  const { parts, citations, rawText } = readReply(response.content, chunks);
   const usage = response.usage;
-  if (!citations.length) return { ...result, ...notFound('noCitations'), rawText, usage };
-  return { ...result, found: true, reason: 'answered', text, citations, rawText, usage };
+  if (!citations.length) {
+    return { ...notFound('noCitations'), retrieval: retrieval(true), chunks, rawText, usage };
+  }
+  return {
+    found: true,
+    reason: 'answered',
+    parts,
+    citations,
+    retrieval: retrieval(true, citations),
+    text: withMarkers(parts),
+    chunks,
+    rawText,
+    usage,
+  };
 }
 
 function notFound(reason) {
-  return { found: false, reason, text: config.answer.notFoundReply, citations: [] };
+  return { found: false, reason, parts: [], citations: [], text: config.answer.notFoundReply };
+}
+
+// Where a chunk points, by file type (API_SPEC.md: where a citation points):
+// - PDF: page, from the section ("page 12"); section null.
+// - Markdown: section, the heading path without the title (the first "#" heading,
+//   which starts every path). Null for text under the title alone, or before the first
+//   heading (stored with the file name as its section).
+// - Plain text: section null; the page shows "passage n of chunkCount".
+function location(chunk) {
+  if (chunk.fileType === 'pdf') {
+    const page = Number(/^page (\d+)$/.exec(chunk.section)?.[1]);
+    return { section: null, page: page || null };
+  }
+  if (chunk.fileType === 'md' && chunk.section !== chunk.fileName) {
+    const path = chunk.section.startsWith(`${chunk.title} > `)
+      ? chunk.section.slice(chunk.title.length + 3)
+      : chunk.section;
+    return { section: path === chunk.title ? null : path, page: null };
+  }
+  return { section: null, page: null };
+}
+
+// A chunk without its prefix line (the title or heading path), which the splitter
+// separates from the body with a blank line.
+function excerpt(text) {
+  const start = text.indexOf('\n\n');
+  return start === -1 ? text : text.slice(start + 2);
+}
+
+// One chunk sent to the LLM, for "How this was found": no text, so the reply stays
+// small. cited is its citation number, or null.
+function toHit(chunk, citations) {
+  const citation = citations.find((c) => c.uploadId.equals(chunk.uploadId) && c.chunkIndex === chunk.chunkIndex);
+  return {
+    score: chunk.score,
+    uploadId: chunk.uploadId,
+    title: chunk.title,
+    fileType: chunk.fileType,
+    ...location(chunk),
+    chunkIndex: chunk.chunkIndex,
+    chunkCount: chunk.chunkCount,
+    cited: citation ? citation.n : null,
+  };
+}
+
+// The parts as one text with [n] markers after cited parts, for the command line.
+function withMarkers(parts) {
+  return parts.map(({ text, cites }) => text + (cites.length ? ` ${cites.map((n) => `[${n}]`).join('')}` : ''))
+    .join('').trim();
 }
 
 // One chunk as a search_result block. title is what the LLM sees as the source's name;
@@ -87,20 +161,21 @@ function toSearchResult(chunk) {
   };
 }
 
-// The reply comes as several text blocks; cited ones carry a citations array. Builds
-// the answer text with [n] markers and the list of cited chunks.
+// The reply comes as several text blocks; cited ones carry a citations array. Each
+// block becomes a part with the numbers of the chunks it cites; uncited blocks next to
+// each other are merged. Texts are kept as the LLM wrote them (Markdown, line breaks),
+// so the parts join back into the answer. Also builds the list of cited chunks.
 function readReply(content, chunks) {
+  const parts = [];
   const citations = [];
   const numberOf = new Map();   // search_result_index -> n
-  let text = '';
   let rawText = '';
 
   for (const block of content) {
     if (block.type !== 'text') continue;   // e.g. thinking blocks
     rawText += block.text;
-    text += block.text;
 
-    const markers = [];
+    const cites = [];
     for (const citation of block.citations ?? []) {
       if (citation.type !== 'search_result_location') continue;
       const index = citation.search_result_index;
@@ -110,19 +185,40 @@ function readReply(content, chunks) {
         citations.push({
           n: citations.length + 1,
           uploadId: chunk.uploadId,
+          title: chunk.title,
           fileName: chunk.fileName,
-          section: chunk.section,
+          fileType: chunk.fileType,
+          ...location(chunk),
           chunkIndex: chunk.chunkIndex,
+          chunkCount: chunk.chunkCount,
+          excerpt: excerpt(chunk.text),
           score: chunk.score,
         });
       }
-      const marker = `[${numberOf.get(index)}]`;
-      if (!markers.includes(marker)) markers.push(marker);
+      const n = numberOf.get(index);
+      if (!cites.includes(n)) cites.push(n);
     }
-    if (markers.length) text += ` ${markers.join('')}`;
+
+    const previous = parts[parts.length - 1];
+    if (!cites.length && previous && !previous.cites.length) previous.text += block.text;
+    else parts.push({ text: block.text, cites });
   }
 
-  return { text: text.trim(), citations, rawText: rawText.trim() };
+  // Leading and trailing whitespace of the whole answer only; inner parts stay as they
+  // are, so the joined text keeps its spacing.
+  if (parts.length) {
+    parts[0].text = parts[0].text.trimStart();
+    parts[parts.length - 1].text = parts[parts.length - 1].text.trimEnd();
+  }
+  return { parts: parts.filter((part) => part.text || part.cites.length), citations, rawText: rawText.trim() };
 }
 
-module.exports = { answer, SYSTEM_PROMPT };
+// The location as one short label, for the command line and test reports
+// ("page 12", "Installation > Windows", "passage 2 of 6"); null when there is none.
+function locationLabel(c) {
+  if (c.page) return `page ${c.page}`;
+  if (c.fileType === 'txt') return `passage ${c.chunkIndex + 1} of ${c.chunkCount}`;
+  return c.section;
+}
+
+module.exports = { answer, locationLabel, SYSTEM_PROMPT };

@@ -31,7 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../src/db');
-const { answer, SYSTEM_PROMPT } = require('../src/answer');
+const { answer, locationLabel, SYSTEM_PROMPT } = require('../src/answer');
 const config = require('../src/config');
 
 const ROOT = path.join(__dirname, '..');
@@ -197,7 +197,7 @@ function printRow(row) {
   }
   const verdict = row.pass ? 'PASS' : `FAIL (${row.diagnosis})`;
   const notes = row.notes.length ? `  note: ${row.notes.join('; ')}` : '';
-  console.log(`${start} top ${fmt(row.result.topScore)} got ${got(row).padEnd(22)} ${verdict}${notes}`);
+  console.log(`${start} top ${fmt(row.result.retrieval.topScore)} got ${got(row).padEnd(22)} ${verdict}${notes}`);
 }
 
 function groupOf(row) {
@@ -295,7 +295,7 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
   add('|---|---|---|---|---|---|---|---|---|');
   for (const row of rows.filter((r) => !r.error)) {
     const verdict = row.pass ? 'Pass' : `**Fail** (${row.diagnosis})`;
-    add(`| ${row.q.id} | ${row.q.kind} | ${row.mode} | ${cell(row.q.question)} | ${fmt(row.result.topScore)} | `
+    add(`| ${row.q.id} | ${row.q.kind} | ${row.mode} | ${cell(row.q.question)} | ${fmt(row.result.retrieval.topScore)} | `
       + `${expected(row)} | ${got(row)} | ${verdict} | ${cell(row.notes.join('; '))} |`);
   }
   add('');
@@ -304,13 +304,13 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
   for (const row of rows.filter((r) => !r.error && r.result.usage)) {
     const r = row.result;
     add(`### ${row.q.id} (${row.mode}): ${row.pass ? 'Pass' : `Fail (${row.diagnosis})`}, `
-      + `top score ${fmt(r.topScore)}`, '');
+      + `top score ${fmt(r.retrieval.topScore)}`, '');
     add(`**Q:** ${row.q.question}`, '');
     if (row.q.note) add(`*Note in test/questions.json:* ${row.q.note}`, '');
     add(...quote(r.found ? r.text : r.rawText), '');
     for (const c of r.citations) {
-      const where = c.section && c.section !== c.fileName ? `${c.fileName}: ${c.section}` : c.fileName;
-      add(`- [${c.n}] ${where} (#${c.chunkIndex}, score ${c.score.toFixed(4)})`);
+      const where = locationLabel(c);
+      add(`- [${c.n}] ${c.fileName}${where ? `: ${where}` : ''} (#${c.chunkIndex}, score ${c.score.toFixed(4)})`);
     }
     if (r.citations.length) add('');
   }

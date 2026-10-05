@@ -172,6 +172,11 @@ so no logins or usage limits are needed.
     PDFs: title, chapter if any, + body; the auto-embedded field).
   - Indexes: `uploads` partial unique on `fileName` where status is complete;
     `chunks` on `uploadId`. The vector index filters on `uploadId` only.
+  - Not indexed (milestone 7): `searchableAt` and `title`. `uploads` holds one MDB
+    doc per file, so scanning it is trivial next to the vector search and the LLM. If
+    it reaches thousands of MDB docs, or `explain` shows a slow scan, add a partial
+    index on `searchableAt` (where it exists) for "All uploads", and one on `title`
+    with the upload list's collation.
 - Vector index `chunks_vector_cosine` on `chunks` (created by `npm run setup`):
   autoEmbed on `text`, model `voyage-4`, 1024 dimensions, scalar quantization, cosine
   similarity; filter on `uploadId` (queries must pass ObjectIds, not strings).
