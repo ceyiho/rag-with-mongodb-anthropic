@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "start": "node --env-file=.env server.js",
+    "dev": "node --env-file=.env --watch server.js",
     "check-db": "node --env-file=.env tools/check-db.js",
     "setup": "node --env-file=.env scripts/setup-db.js",
     "index-status": "node --env-file=.env tools/index-status.js",
@@ -21,7 +23,9 @@
   "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
+    "express": "^5.2.1",
     "mongodb": "^7.6.0",
+    "multer": "^2.4.0",
     "unpdf": "^1.8.1"
   }
 }

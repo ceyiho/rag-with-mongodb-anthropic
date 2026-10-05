@@ -14,13 +14,13 @@ this file is the detail. Update it when a route changes.
 - Errors: an HTTP status plus `{ "error": { "code": "...", "message": "..." } }`. The
   message is written for the user. The page picks its wording by `code`, and shows
   `message` for a code it has no wording for. A 500 says only "Something went wrong";
-  the details go to the server log.
+  the details go to the server log. An unknown `/api` route is a 404 `routeNotFound`.
 - "Not found in your uploads" is a normal answer (200), not an error.
 - A failed `fetch()` (no HTTP status at all) means the server is unreachable; the page
   handles it apart from API errors, and tells it apart from an unreachable database
   with `GET /api/health`.
-- The server listens on `127.0.0.1` by default; `HOST` and `PORT` in `.env` change it
-  (e.g. for the VM). It serves the page from `public/` at `/`, so page and API share an
+- The server listens on `127.0.0.1:3000` by default; `HOST` and `PORT` in `.env`
+  change it (e.g. for the VM). It serves the page from `public/` at `/`, so page and API share an
   address and the browser needs no cross-site (CORS) permission.
 
 ## Server
