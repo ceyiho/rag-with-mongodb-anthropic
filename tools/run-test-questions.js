@@ -59,10 +59,10 @@ async function main() {
   const thresholdArg = takeFlag(args, '--threshold');
   const thresholds = thresholdArg === undefined
     ? config.search.notFoundThreshold
-    : { oneUpload: Number(thresholdArg), allUploads: Number(thresholdArg) };
+    : { selectedUploads: Number(thresholdArg), allUploads: Number(thresholdArg) };
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
-  if (args.length || badLabel || !(thresholds.oneUpload > 0 && thresholds.allUploads > 0)) {
+  if (args.length || badLabel || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
     process.exit(1);
@@ -82,24 +82,24 @@ async function main() {
     const idOf = new Map(uploads.map((upload) => [upload.fileName, upload._id]));
     const scoped = (fileName) => {
       if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
-      return { uploadId: idOf.get(fileName) };
+      return { uploadIds: [idOf.get(fileName)] };
     };
 
     const results = [];
     for (const q of questions) {
       const result = { q };
       try {
-        const all = await search(db, q.question);
+        const { chunks: all } = await search(db, q.question);
         result.all = topScore(all);
         const expected = [q.upload, ...(q.alsoIn || [])];
         const rank = all.findIndex((chunk) => expected.includes(chunk.fileName));
         result.rank = rank === -1 ? null : rank + 1;
         result.allText = phraseRank(all, q.expect);
-        const one = await search(db, q.question, scoped(q.upload));
+        const { chunks: one } = await search(db, q.question, scoped(q.upload));
         result.one = topScore(one);
         result.oneText = phraseRank(one, q.expect);
         if (q.wrongUpload) {
-          result.wrong = topScore(await search(db, q.question, scoped(q.wrongUpload)));
+          result.wrong = topScore((await search(db, q.question, scoped(q.wrongUpload))).chunks);
         }
       } catch (err) {
         result.error = err.message;
@@ -195,7 +195,7 @@ function printSummary(results, thresholds) {
     ['wrong upload (easy)', answerable, 'wrong'],
   ]);
 
-  console.log(`\nAt the thresholds (All ${thresholds.allUploads}, One ${thresholds.oneUpload})`);
+  console.log(`\nAt the thresholds (All ${thresholds.allUploads}, One ${thresholds.selectedUploads})`);
   for (const line of thresholdRows(ok, thresholds)) {
     console.log(`  ${line.group.padEnd(22)} ${line.text}`);
   }
@@ -261,7 +261,7 @@ function answerText(answerable) {
 // everything else should fall below (rejected).
 function thresholdRows(ok, thresholds) {
   const passAll = (r) => r.all != null && r.all >= thresholds.allUploads;
-  const passOne = (r) => r.one != null && r.one >= thresholds.oneUpload;
+  const passOne = (r) => r.one != null && r.one >= thresholds.selectedUploads;
   const answerable = ok.filter((r) => r.q.answerable);
   const withWrong = answerable.filter((r) => r.wrong != null);
   const count = (rows, test) => rows.filter(test).length;
@@ -272,7 +272,7 @@ function thresholdRows(ok, thresholds) {
     },
     {
       group: 'wrong upload rejected',
-      text: `${count(withWrong, (r) => r.wrong < thresholds.oneUpload)} of ${withWrong.length}`,
+      text: `${count(withWrong, (r) => r.wrong < thresholds.selectedUploads)} of ${withWrong.length}`,
     },
   ];
   for (const kind of unanswerableKinds(ok)) {
@@ -310,7 +310,7 @@ function report({ label, results, thresholds, uploads, index }) {
   const totalChunks = uploads.reduce((sum, upload) => sum + (upload.chunkCount || 0), 0);
   const cell = (text) => String(text).replace(/\|/g, '\\|');
   const tAll = thresholds.allUploads;
-  const tOne = thresholds.oneUpload;
+  const tOne = thresholds.selectedUploads;
   const thresholdText = tAll === tOne ? `${tOne}` : `All ${tAll}, One ${tOne}`;
 
   const lines = [];
@@ -334,7 +334,7 @@ function report({ label, results, thresholds, uploads, index }) {
   add(`| Search | top ${searchConfig.limit}; All uploads approximate (numCandidates `
     + `${searchConfig.limit * searchConfig.candidatesPerResult}), one upload exact |`);
   add(`| Threshold | ${thresholdText}${tAll === config.search.notFoundThreshold.allUploads
-    && tOne === config.search.notFoundThreshold.oneUpload ? ' (config.js)' : ' (--threshold)'} |`, '');
+    && tOne === config.search.notFoundThreshold.selectedUploads ? ' (config.js)' : ' (--threshold)'} |`, '');
 
   add('## How to read the results', '');
   add('Each question runs up to three searches. The score is the top score (cosine, higher is closer).', '');

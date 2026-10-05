@@ -75,11 +75,11 @@ async function main() {
     const uploads = await db.collection(config.collections.uploads)
       .find({ status: 'complete' }).sort({ uploadedAt: 1 }).toArray();
     const idOf = new Map(uploads.map((upload) => [upload.fileName, upload._id]));
-    const uploadIdFor = (q, mode) => {
+    const uploadIdsFor = (q, mode) => {
       if (mode === 'all') return undefined;
       const fileName = mode === 'one' ? q.upload : q.wrongUpload;
       if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
-      return idOf.get(fileName);
+      return [idOf.get(fileName)];
     };
 
     const rows = [];
@@ -87,7 +87,7 @@ async function main() {
       for (const mode of modesFor(q)) {
         const row = { q, mode, expectAnswer: q.answerable && mode !== 'wrong' };
         try {
-          row.result = await answer(db, q.question, { uploadId: uploadIdFor(q, mode), limit });
+          row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit });
           Object.assign(row, judge(row));
         } catch (err) {
           row.error = err.message;
@@ -267,7 +267,7 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
 
   add('## Settings', '', '| Setting | Value |', '|---|---|');
   add(`| Model | \`${answerConfig.model}\` |`);
-  add(`| Threshold | All ${thresholds.allUploads}, One ${thresholds.oneUpload} (config.js) |`);
+  add(`| Threshold | All ${thresholds.allUploads}, One ${thresholds.selectedUploads} (config.js) |`);
   add(`| Search | top ${limit} chunks sent to the LLM (${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Uploads | ${uploads.length} complete, ${totalChunks} chunks |`);

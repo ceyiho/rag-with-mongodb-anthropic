@@ -3,43 +3,62 @@
 // (Auto-Embedding), so the app never handles vectors.
 //
 // Two modes:
-// - One upload (uploadId given): exact search within that upload. Exact search checks
-//   every chunk that passes the filter, so nothing is missed, and it's cheap within one
-//   upload. The caller passes the id of a complete upload.
-// - All uploads (no uploadId): approximate search over searchable uploads only (those
+// - Selected uploads (uploadIds given, one or more): exact search within them. Exact
+//   search checks every chunk that passes the filter, so nothing is missed, and it's
+//   cheap within a few uploads. Above EXACT_MAX_CHUNKS in total it switches to
+//   approximate search, which the Atlas documentation recommends at that size. The
+//   caller passes the ids of complete uploads.
+// - All uploads (no uploadIds): approximate search over searchable uploads only (those
 //   with searchableAt, see src/readiness.js), so chunks left behind by a failed ingest,
 //   and uploads still being embedded, never reach an answer. Approximate search can
 //   miss a few results (see Findings: exact vs approximate search).
 //
-// Returns the chunks best first, each with its score (cosine: higher is closer).
+// Returns { mode, uploadCount, chunksSearched, chunks }: mode is 'exact' or
+// 'approximate', chunksSearched the chunk count of the uploads searched, and chunks the
+// results best first, each with its score (cosine: higher is closer) and its upload's
+// title, fileType and chunkCount, joined from uploads.
 
 const { ObjectId } = require('mongodb');
 const config = require('./config');
 
-const MAX_CANDIDATES = 10000;   // Atlas limit on numCandidates
+const MAX_CANDIDATES = 10000;     // Atlas limit on numCandidates
+const EXACT_MAX_CHUNKS = 10000;   // the Atlas documentation: exact search below 10,000
 
-async function search(db, question, { uploadId, limit = config.search.limit } = {}) {
+async function search(db, question, { uploadIds, limit = config.search.limit } = {}) {
+  let uploads;
+  if (uploadIds) {
+    // A string would silently match nothing (and look like "not found"), and an empty
+    // list mustn't quietly mean "all uploads", so fail loudly. Callers convert at the
+    // edge, e.g. src/api/ids.js in the API.
+    if (!uploadIds.length || !uploadIds.every((id) => id instanceof ObjectId)) {
+      throw new TypeError('uploadIds must be a non-empty array of ObjectIds');
+    }
+    uploads = await findUploads(db, { _id: { $in: uploadIds } });
+  } else {
+    uploads = await findUploads(db, { searchableAt: { $exists: true } });
+  }
+
+  const chunksSearched = uploads.reduce((sum, upload) => sum + upload.chunkCount, 0);
+  const exact = Boolean(uploadIds) && chunksSearched <= EXACT_MAX_CHUNKS;
+  const result = { mode: exact ? 'exact' : 'approximate', uploadCount: uploads.length, chunksSearched };
+  if (!uploads.length) return { ...result, chunks: [] };
+
+  // The filter is always a list of upload ids: $vectorSearch can only filter on fields
+  // in the vector index (uploadId), and searchableAt is on the upload, not the chunks.
   const vectorSearch = {
     index: config.searchIndexes.vector,
     path: 'text',
     query: { text: question },
+    filter: { uploadId: { $in: uploads.map((upload) => upload._id) } },
     limit,
   };
-
-  if (uploadId) {
-    // A string would silently match nothing (and look like "not found"), so fail loudly.
-    // Callers convert at the edge, e.g. new ObjectId(req.query.uploadId) in the API.
-    if (!(uploadId instanceof ObjectId)) throw new TypeError('uploadId must be an ObjectId');
-    vectorSearch.filter = { uploadId };
+  if (exact) {
     vectorSearch.exact = true;
   } else {
-    const uploadIds = await searchableUploadIds(db);
-    if (!uploadIds.length) return [];
-    vectorSearch.filter = { uploadId: { $in: uploadIds } };
     vectorSearch.numCandidates = Math.min(limit * config.search.candidatesPerResult, MAX_CANDIDATES);
   }
 
-  return db.collection(config.collections.chunks).aggregate([
+  const chunks = await db.collection(config.collections.chunks).aggregate([
     { $vectorSearch: vectorSearch },
     {
       $project: {
@@ -51,18 +70,30 @@ async function search(db, question, { uploadId, limit = config.search.limit } = 
         score: { $meta: 'vectorSearchScore' },
       },
     },
+    // Joins each chunk's upload (a join between collections, like SQL's JOIN), for the
+    // fields citations show. Keeps the order of the search results.
+    {
+      $lookup: {
+        from: config.collections.uploads,
+        localField: 'uploadId',
+        foreignField: '_id',
+        pipeline: [{ $project: { _id: 0, title: 1, fileType: 1, chunkCount: 1 } }],
+        as: 'upload',
+      },
+    },
+    { $unwind: '$upload' },
+    { $replaceWith: { $mergeObjects: ['$$ROOT', '$upload'] } },
+    { $unset: 'upload' },
   ]).toArray();
+
+  return { ...result, chunks };
 }
 
-// Ids of the searchable uploads, for the "All uploads" filter. searchableAt is on the
-// upload, not the chunks, and $vectorSearch can only filter on fields in the vector
-// index (uploadId), so the check happens here first, on the uploads collection.
-// searchableAt is only ever set on complete uploads.
-async function searchableUploadIds(db) {
-  const uploads = await db.collection(config.collections.uploads)
-    .find({ searchableAt: { $exists: true } }, { projection: { _id: 1 } })
+// Complete uploads matching the filter, with what the search needs from them.
+function findUploads(db, filter) {
+  return db.collection(config.collections.uploads)
+    .find({ ...filter, status: 'complete' }, { projection: { _id: 1, chunkCount: 1 } })
     .toArray();
-  return uploads.map((upload) => upload._id);
 }
 
 module.exports = { search };
