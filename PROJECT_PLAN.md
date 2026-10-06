@@ -151,7 +151,10 @@ so no logins or usage limits are needed.
    https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/
 
 ### Phase 3
-10. README with architecture diagram, and a demo video.
+10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
+    number 80" (tlsv1 alert internal error) when connecting means your IP address has
+    changed; add it in Atlas Network Access. The driver may label it
+    `SystemOverloadedError`, but it isn't an Atlas outage.
 
 ### Optional (parked)
 11. Analytics: log each question, top score, and cited chunks in a `questions`
