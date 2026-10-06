@@ -60,7 +60,14 @@ const state = {
   // The latest question: { question, scope, askedAt, status, reply | error }. status is
   // 'loading', 'done' (reply is the API's answer) or 'error'. scope is { all: true } or
   // { uploads: [{ id, title }] }, kept as asked. Replaced as a whole on every change.
+  // askedAt (a time in ms) also identifies the question in the saved list.
   latest: null,
+  // Earlier questions: the answers saved in the browser, newest first, each
+  // { question, scope, askedAt, reply }. The latest question's answer is saved too, but
+  // only listed once the next question replaces it.
+  history: [],            // loaded at startup
+  historyOpen: false,     // the "Earlier questions" list is open
+  openEarlier: null,      // askedAt of the earlier question shown in full, if any
 };
 
 const $ = (id) => document.getElementById(id);
@@ -133,6 +140,7 @@ function render() {
   renderFoot();
   renderScope();
   renderWorkspace();
+  renderHistory();
   renderAsk();
 }
 
@@ -234,8 +242,9 @@ function renderScope() {
 
 let shownLatest = null;   // the state.latest whose card is on the page
 
+// The top of the workspace: the latest question's card, or what to do next.
 function renderWorkspace() {
-  const el = $('answers');
+  const el = $('latest');
   if (!isDown() && state.latest) {
     // Redrawn only when the latest question changes (a new state.latest), since a redraw
     // would close the sources and the "How this was found" panel the user opened.
@@ -255,6 +264,65 @@ function renderWorkspace() {
   } else {
     el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.chat}</div>Ask a question about your uploads.</div>`;
   }
+}
+
+let shownHistory = null;   // what renderHistory last drew, to skip redrawing the same
+
+// Earlier questions, below the latest: one line each, opening to the full answer, one
+// at a time. Redrawn only when what it shows changes, like the latest card; the times
+// in it are updated in place (see updateTimes).
+function renderHistory() {
+  const el = $('history');
+  const earlier = isDown() ? [] : state.history.filter((e) => e.askedAt !== state.latest?.askedAt);
+  const drawn = [state.history, earlier.length, state.historyOpen, state.openEarlier];
+  if (shownHistory && drawn.every((value, i) => value === shownHistory[i])) return;
+  shownHistory = drawn;
+  if (!earlier.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const open = state.historyOpen;
+  el.innerHTML = `<div class="history ${open ? 'open' : ''}">
+      <div class="history-bar">
+        <button class="history-head" data-action="toggleHistory" aria-expanded="${open}">
+          <span class="chev">▸</span>Earlier questions<span class="hc">${earlier.length}</span></button>
+        ${open ? '<button class="linkbtn" data-action="clearHistory" title="Remove the earlier questions saved in this browser">Clear</button>' : ''}
+      </div>
+      ${open ? `<div class="hist-list">${earlier.map(earlierRow).join('')}</div>` : ''}
+    </div>`;
+}
+
+// One earlier question; the open one shows its answer below the line.
+function earlierRow(e) {
+  const open = state.openEarlier === e.askedAt;
+  const [kind, mark, label] = e.reply.found
+    ? ['ok', '✓', plural(e.reply.citations.length, 'source')]
+    : ['nf', '?', 'Not found'];
+  return `<div class="hist ${open ? 'open' : ''}" data-hist="${e.askedAt}">
+      <button class="hist-head" data-action="toggleEarlier" aria-expanded="${open}">
+        <span class="chev">▸</span><span class="st ${kind}" title="${label}">${mark}</span>
+        <span class="hq" title="${esc(e.question)}">${esc(e.question)}</span>
+        <span class="hm">${label} · ${agoHtml(e.askedAt)}</span>
+      </button>
+      ${open ? `<div class="hist-body ${e.reply.found ? '' : 'notfound'}" data-entry="${e.askedAt}">${answerBody(e)}</div>` : ''}
+    </div>`;
+}
+
+// "12 min ago", marked so updateTimes can refresh it without redrawing.
+function agoHtml(time) {
+  return `<span class="ago" data-time="${time}">${timeAgo(time)}</span>`;
+}
+
+function updateTimes() {
+  document.querySelectorAll('.ago').forEach((el) => { el.textContent = timeAgo(Number(el.dataset.time)); });
+}
+
+// Scrolls an opened section or row to the middle of the workspace. One taller than the
+// workspace goes to the top instead, so its start stays visible.
+function centerOn(el) {
+  const workspace = document.querySelector('.workspace');
+  const block = el.offsetHeight > workspace.clientHeight * 0.9 ? 'start' : 'center';
+  el.scrollIntoView({ block, behavior: 'smooth' });
 }
 
 // With nothing ticked the box is greyed and read-only, not disabled: a disabled box
@@ -448,12 +516,15 @@ async function ask({ question, all = false } = {}) {
     ? { all: true }
     : { uploads: state.uploads.filter((u) => state.selected.has(u.id)).map(({ id, title }) => ({ id, title })) };
   state.latest = { question: text, scope, askedAt: Date.now(), status: 'loading' };
+  state.historyOpen = false;   // a new question gets the attention
+  state.openEarlier = null;
   render();
   document.querySelector('.workspace').scrollTo({ top: 0, behavior: 'smooth' });
 
   try {
     const reply = await askQuestion(text, scope.all ? null : scope.uploads.map((u) => u.id));
     state.latest = { ...state.latest, status: 'done', reply };
+    addToHistory({ question: text, scope, askedAt: state.latest.askedAt, reply });
     // Cleared only if the box still holds this question, not one typed meanwhile.
     const box = $('question');
     if (box.value.trim() === text) {
@@ -478,6 +549,73 @@ function askErrorText(err) {
   return 'Something went wrong in the page.';   // a bug; the details are in the console
 }
 
+// ---------- Earlier questions, saved in the browser ----------
+// Each finished answer is saved in localStorage as the API returned it, with the
+// question, the uploads it was asked of and when (API_SPEC.md: Page state that never
+// reaches the server). Kept per browser and address, never sent to the server or the
+// LLM. Failed questions aren't saved. If storage is blocked (e.g. a private window),
+// the list just isn't kept.
+
+const HISTORY_KEY = 'kb.history';
+// Saved with the list. A page that finds another version starts an empty list rather
+// than misreading it; change it when the saved format changes.
+const HISTORY_VERSION = 1;
+// localStorage holds about 5 MB per address, and an answer takes a few KB.
+const HISTORY_MAX = 50;
+
+// The saved list, [] when nothing is saved, or null when it can't be read: storage is
+// blocked, or holds something unreadable or of another version.
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw === null) return [];
+    const saved = JSON.parse(raw);
+    return saved?.version === HISTORY_VERSION && Array.isArray(saved.entries) ? saved.entries : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify({ version: HISTORY_VERSION, entries: state.history }));
+  } catch (err) {
+    console.warn('Earlier questions could not be saved:', err.message);
+  }
+}
+
+// Adds an answer at the top, keeping the newest HISTORY_MAX. The saved list is read
+// again first, so answers saved meanwhile by another tab of the page are kept; if it
+// can't be read, the list in page memory is used, so this visit's answers still show.
+function addToHistory(entry) {
+  state.history = [entry, ...(loadHistory() ?? state.history)].slice(0, HISTORY_MAX);
+  saveHistory();
+}
+
+// Clears what "Earlier questions" lists. The latest answer, still on screen, stays
+// saved, so it is still there after a reload.
+function clearHistory() {
+  if (!confirm('Remove the earlier questions saved in this browser?')) return;
+  state.history = state.history.filter((e) => e.askedAt === state.latest?.askedAt);
+  state.historyOpen = false;
+  state.openEarlier = null;
+  if (state.history.length) {
+    saveHistory();
+  } else {
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch {
+      // blocked: there was nothing saved
+    }
+  }
+  render();
+}
+
+// The question with this askedAt: the latest, or a saved one.
+function entryAt(askedAt) {
+  return state.latest?.askedAt === askedAt ? state.latest : state.history.find((e) => e.askedAt === askedAt);
+}
+
 // ---------- Answer card ----------
 
 function scopeLabel(scope) {
@@ -486,12 +624,14 @@ function scopeLabel(scope) {
   return titles.length <= 2 ? titles.join(', ') : `${titles[0]} and ${titles.length - 1} more`;
 }
 
+// data-entry (askedAt) tells the buttons inside which question they belong to.
 function answerCard(a) {
-  const kind = a.status === 'error' ? 'err' : a.status === 'done' && !a.reply.found ? 'notfound' : '';
-  return `<div class="card ${kind}"><div class="q">${esc(a.question)}</div>${answerBody(a)}</div>`;
+  const kind = a.status === 'error' ? 'err' : a.reply && !a.reply.found ? 'notfound' : '';
+  return `<div class="card ${kind}" data-entry="${a.askedAt}"><div class="q">${esc(a.question)}</div>${answerBody(a)}</div>`;
 }
 
-// Everything below the question: waiting, failed, not found, or the answer.
+// Everything below the question: waiting, failed, not found, or the answer. Saved
+// questions have no status, only a reply.
 function answerBody(a) {
   const askedOf = `Asked of: ${esc(scopeLabel(a.scope))}`;
   if (a.status === 'loading') {
@@ -509,7 +649,7 @@ function answerBody(a) {
   }
 
   const r = a.reply;
-  const meta = `<div class="meta">${askedOf} · ${timeAgo(a.askedAt)}</div>`;
+  const meta = `<div class="meta">${askedOf} · ${agoHtml(a.askedAt)}</div>`;
   if (!r.found) {
     // The same message for both reasons; the reason shows in "How this was found".
     const why = r.reason === 'belowThreshold'
@@ -621,22 +761,54 @@ $('question').addEventListener('keydown', (e) => {
 $('askBtn').addEventListener('click', () => ask());
 window.addEventListener('resize', grow);
 
+// Clicks in the latest card and in the earlier questions. A button inside an answer
+// finds its question through the nearest data-entry (the card, or an opened earlier
+// question).
 $('answers').addEventListener('click', (e) => {
-  // A citation marker opens and highlights its source, in the same card.
+  // A citation marker opens and highlights its source, in the same answer.
   const cite = e.target.closest('.cite');
   if (cite) {
-    const card = cite.closest('.card');
-    const src = card.querySelector(`.src[data-src="${cite.dataset.n}"]`);
-    card.querySelectorAll('.src.hl').forEach((s) => s.classList.remove('hl'));
+    const answer = cite.closest('[data-entry]');
+    const src = answer.querySelector(`.src[data-src="${cite.dataset.n}"]`);
+    answer.querySelectorAll('.src.hl').forEach((s) => s.classList.remove('hl'));
     src?.classList.add('open', 'hl');
     src?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return;
   }
-  const action = e.target.closest('[data-action]')?.dataset.action;
-  if (action === 'toggleSource') e.target.closest('.src').classList.toggle('open');
-  else if (action === 'retry') ask({ question: state.latest.question });
-  else if (action === 'askAll') ask({ question: state.latest.question, all: true });
+  const button = e.target.closest('[data-action]');
+  if (!button) return;
+  const entry = () => entryAt(Number(button.closest('[data-entry]').dataset.entry));
+  switch (button.dataset.action) {
+    case 'toggleSource':
+      button.closest('.src').classList.toggle('open');
+      break;
+    case 'retry':
+      ask({ question: entry().question });
+      break;
+    case 'askAll':
+      ask({ question: entry().question, all: true });
+      break;
+    case 'toggleHistory':
+      state.historyOpen = !state.historyOpen;
+      state.openEarlier = null;
+      renderHistory();
+      if (state.historyOpen) centerOn($('history'));
+      break;
+    case 'toggleEarlier': {
+      const askedAt = Number(button.closest('[data-hist]').dataset.hist);
+      state.openEarlier = state.openEarlier === askedAt ? null : askedAt;   // one open at a time
+      renderHistory();
+      centerOn(document.querySelector(`.hist[data-hist="${askedAt}"]`));
+      break;
+    }
+    case 'clearHistory':
+      clearHistory();
+      break;
+  }
 });
+
+// Times like "12 min ago" move on without a redraw.
+setInterval(updateTimes, 30 * 1000);
 
 const search = $('titleSearch');
 search.addEventListener('input', onSearchInput);
@@ -680,5 +852,6 @@ window.addEventListener('focus', () => {
   if (state.connection === 'ok') loadUploads();
 });
 
+state.history = loadHistory() ?? [];
 render();
 checkConnection();

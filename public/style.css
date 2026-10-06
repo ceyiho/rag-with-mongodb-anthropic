@@ -290,8 +290,10 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 /* Earlier questions: one line, opening to one line per question */
 .history { margin-top: 4px; }
 .history.open { margin-bottom: 40vh; }   /* room to scroll the last rows to the middle */
+.history-bar { display: flex; align-items: center; gap: 8px; }
+.history-bar .linkbtn { padding: 8px 4px; }
 .history-head {
-  width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
+  flex: 1; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
   padding: 8px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
 }
 .history-head:hover { color: var(--green); }
