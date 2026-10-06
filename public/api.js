@@ -43,6 +43,16 @@ export function searchTitles(query) {
   return request(`/api/uploads/search?q=${encodeURIComponent(query)}`);
 }
 
+// Answers a question from the given uploads (ids), or from all uploads when uploadIds
+// is null. "Not found in your uploads" is a normal reply (found: false), not an error.
+export function askQuestion(question, uploadIds) {
+  return request('/api/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(uploadIds ? { question, uploadIds } : { question, scope: 'all' }),
+  });
+}
+
 // Which part is reachable: 'ok', 'database' when the server replies but can't reach
 // the database (503), or 'server' when there is no usable reply.
 export async function checkHealth() {

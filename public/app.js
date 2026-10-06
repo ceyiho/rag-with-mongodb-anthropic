@@ -4,8 +4,8 @@
 // Pattern: every change updates `state`, then calls render(), which redraws each area
 // of the page from state. Simple, and fast enough at this size.
 
-import { listUploads, checkHealth, searchTitles, ApiError } from './api.js';
-import { escapeHtml as esc, markWordStarts } from './format.js';
+import { listUploads, checkHealth, searchTitles, askQuestion, ApiError, ServerUnreachable } from './api.js';
+import { escapeHtml as esc, markWordStarts, answerHtml, locationLabel, timeAgo } from './format.js';
 
 // While the server or the database is unreachable, check again this often.
 const RETRY_MS = 5000;
@@ -57,6 +57,10 @@ const state = {
   // The picker's ticks, in page memory only: every page load starts with nothing ticked.
   all: false,             // "All uploads" ticked
   selected: new Set(),    // ids of the individually ticked uploads
+  // The latest question: { question, scope, askedAt, status, reply | error }. status is
+  // 'loading', 'done' (reply is the API's answer) or 'error'. scope is { all: true } or
+  // { uploads: [{ id, title }] }, kept as asked. Replaced as a whole on every change.
+  latest: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -64,9 +68,11 @@ const isDown = () => state.connection === 'server' || state.connection === 'data
 const byId = (id) => state.uploads?.find((u) => u.id === id);
 const ready = () => (state.uploads ?? []).filter((u) => u.searchable);
 const nothingSelected = () => !state.all && !state.selected.size;
+const asking = () => state.latest?.status === 'loading';
 
+// Splitting accents off (NFD) leaves the plain letter first: "É" becomes "E" + accent.
 function groupOf(title) {
-  const first = title.normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase();
+  const first = title.normalize('NFD').charAt(0).toUpperCase();
   return GROUPS.find((g) => g.from && first >= g.from && first <= g.to)?.key ?? '#';
 }
 
@@ -226,8 +232,18 @@ function renderScope() {
   }
 }
 
+let shownLatest = null;   // the state.latest whose card is on the page
+
 function renderWorkspace() {
   const el = $('answers');
+  if (!isDown() && state.latest) {
+    // Redrawn only when the latest question changes (a new state.latest), since a redraw
+    // would close the sources and the "How this was found" panel the user opened.
+    if (shownLatest !== state.latest) el.innerHTML = answerCard(state.latest);
+    shownLatest = state.latest;
+    return;
+  }
+  shownLatest = null;
   if (isDown()) {
     el.innerHTML = `<div class="ws-empty"><div class="big warn">${ICONS.warn}</div>${DOWN[state.connection].workspace}</div>`;
   } else if (!state.uploads) {
@@ -251,8 +267,30 @@ function renderAsk() {
   q.placeholder = off
     ? 'Tick uploads on the left, or All uploads, to ask a question.'
     : 'Ask a question about your uploads…';
-  $('askBtn').disabled = q.disabled || off || !q.value.trim();
+  $('askBtn').disabled = q.disabled || off || asking() || !q.value.trim();
   document.querySelector('.ask').classList.toggle('off', off);
+  const length = q.value.length;
+  $('charCount').textContent = length > 800 ? `${length} / 1000` : '';
+}
+
+// The question box grows with its text up to MAX_BOX_PX, then scrolls.
+const MAX_BOX_PX = 220;
+
+function grow() {
+  const q = $('question');
+  q.style.height = 'auto';
+  q.style.height = `${Math.min(q.scrollHeight, MAX_BOX_PX)}px`;
+  q.style.overflowY = q.scrollHeight > MAX_BOX_PX ? 'auto' : 'hidden';
+  renderAsk();
+}
+
+// Briefly highlights the picker, when a question can't be asked because nothing is
+// ticked.
+function nudgePicker() {
+  const sidebar = $('sidebar');
+  sidebar.classList.remove('nudge');
+  void sidebar.offsetWidth;   // restarts the animation on repeated clicks
+  sidebar.classList.add('nudge');
 }
 
 // ---------- Picker ----------
@@ -383,6 +421,156 @@ async function pickSuggestion(id) {
   renderSuggest();
 }
 
+// ---------- Questions ----------
+
+// Page wording for the errors POST /api/ask can return (API_SPEC.md: Questions). Any
+// other code shows the server's own message.
+const ASK_ERRORS = {
+  llmUnavailable: 'The answer service is busy right now. Try again in a minute.',
+  internal: 'Something went wrong on the server while answering.',
+  uploadNotFound: 'One of the ticked uploads no longer exists, so it has been unticked.',
+  uploadNotReady: 'One of the ticked uploads is still being processed. Try again once it shows as ready.',
+};
+
+// Asks the question in the box (or `question`) of the ticked uploads, or of all uploads
+// when `all` is set ("Ask all uploads instead"). One question at a time: Ask stays
+// disabled until the reply, so a double click can't cost two LLM calls. A failed
+// question stays in the box, for Try again.
+async function ask({ question, all = false } = {}) {
+  const text = (question ?? $('question').value).trim();
+  if (!text || asking() || isDown()) return;
+  if (!all && nothingSelected()) {
+    nudgePicker();
+    return;
+  }
+  // The titles are kept with the question, so its card can name them later.
+  const scope = all || state.all
+    ? { all: true }
+    : { uploads: state.uploads.filter((u) => state.selected.has(u.id)).map(({ id, title }) => ({ id, title })) };
+  state.latest = { question: text, scope, askedAt: Date.now(), status: 'loading' };
+  render();
+  document.querySelector('.workspace').scrollTo({ top: 0, behavior: 'smooth' });
+
+  try {
+    const reply = await askQuestion(text, scope.all ? null : scope.uploads.map((u) => u.id));
+    state.latest = { ...state.latest, status: 'done', reply };
+    // Cleared only if the box still holds this question, not one typed meanwhile.
+    const box = $('question');
+    if (box.value.trim() === text) {
+      box.value = '';
+      grow();
+    }
+  } catch (err) {
+    console.error('Asking failed:', err);
+    state.latest = { ...state.latest, status: 'error', error: err };
+    if (err instanceof ApiError && ['uploadNotFound', 'uploadNotReady'].includes(err.code)) {
+      loadUploads();   // unticks what is gone
+    } else if (!(err instanceof ApiError) || (err.status >= 500 && err.code !== 'llmUnavailable')) {
+      checkConnection();   // the server or the database may be down
+    }
+  }
+  render();
+}
+
+function askErrorText(err) {
+  if (err instanceof ServerUnreachable) return 'The server couldn\'t be reached.';
+  if (err instanceof ApiError) return ASK_ERRORS[err.code] ?? err.message;
+  return 'Something went wrong in the page.';   // a bug; the details are in the console
+}
+
+// ---------- Answer card ----------
+
+function scopeLabel(scope) {
+  if (scope.all) return 'All uploads';
+  const titles = scope.uploads.map((u) => u.title);
+  return titles.length <= 2 ? titles.join(', ') : `${titles[0]} and ${titles.length - 1} more`;
+}
+
+function answerCard(a) {
+  const kind = a.status === 'error' ? 'err' : a.status === 'done' && !a.reply.found ? 'notfound' : '';
+  return `<div class="card ${kind}"><div class="q">${esc(a.question)}</div>${answerBody(a)}</div>`;
+}
+
+// Everything below the question: waiting, failed, not found, or the answer.
+function answerBody(a) {
+  const askedOf = `Asked of: ${esc(scopeLabel(a.scope))}`;
+  if (a.status === 'loading') {
+    const what = a.scope.all ? 'all uploads' : plural(a.scope.uploads.length, 'upload');
+    return `<div class="meta">${askedOf}</div>
+      <div class="loading-row"><div class="spinner"></div>Searching ${what} and writing an answer… usually a few seconds</div>
+      <div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div>`;
+  }
+  if (a.status === 'error') {
+    const inBox = $('question').value.trim() === a.question ? ' Your question is still in the box above.' : '';
+    return `<div class="meta">${askedOf}</div>
+      <div class="nf-title"><span class="nf-icon">!</span>Couldn't get an answer</div>
+      <div class="err-text">${esc(askErrorText(a.error))}${inBox}</div>
+      <div class="card-actions"><button class="btn" data-action="retry">Try again</button></div>`;
+  }
+
+  const r = a.reply;
+  const meta = `<div class="meta">${askedOf} · ${timeAgo(a.askedAt)}</div>`;
+  if (!r.found) {
+    // The same message for both reasons; the reason shows in "How this was found".
+    const why = r.reason === 'belowThreshold'
+      ? `Nothing in ${a.scope.all ? 'your uploads' : 'the selected uploads'} is close to this question.`
+      : 'Passages on this topic were found, but none of them answers the question.';
+    const askAll = a.scope.all ? '' : '<div class="card-actions"><button class="btn" data-action="askAll">Ask all uploads instead</button></div>';
+    return `${meta}<div class="nf-title"><span class="nf-icon">?</span>Not found in your uploads</div>
+      <div class="answer">${why}</div>${askAll}${detailsHtml(r.retrieval)}`;
+  }
+
+  const sources = r.citations.map((c) => {
+    const where = locationLabel(c);
+    return `<div class="src" data-src="${c.n}">
+      <div class="src-head" data-action="toggleSource"><span class="chev">▸</span><span class="n">${c.n}</span>
+        <span class="t">${esc(c.title)}</span>${where ? `<span class="w">· ${esc(where)}</span>` : ''}<span class="f">${esc(c.fileName)}</span></div>
+      <div class="excerpt">${esc(c.excerpt)}</div></div>`;
+  }).join('');
+  return `${meta}<div class="answer">${answerHtml(r.parts)}</div>
+    <div class="sources"><h3>Sources</h3>${sources}</div>${detailsHtml(r.retrieval)}`;
+}
+
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+// The score bar spans these scores; the red line on it marks the threshold.
+const SCORE_BAR = { min: 0.45, max: 0.95 };
+
+// "How this was found", collapsed: how the search ran, what the threshold decided,
+// whether the LLM cited anything, and the passages sent to it (or that would have
+// been), with their scores.
+function detailsHtml(r) {
+  const pct = (score) => Math.max(0, Math.min(100, ((score - SCORE_BAR.min) / (SCORE_BAR.max - SCORE_BAR.min)) * 100));
+  const rows = r.hits.map((h, i) => {
+    const where = locationLabel(h);
+    return `<tr class="${h.score < r.threshold ? 'low' : ''}"><td class="rank">${i + 1}</td>
+      <td class="score">${h.score.toFixed(2)}<span class="scorebar"><span style="width:${pct(h.score)}%"></span><i style="left:${pct(r.threshold)}%"></i></span></td>
+      <td>${esc(h.title)}${where ? ` <span class="where">· ${esc(where)}</span>` : ''}</td>
+      <td>${h.cited ? `<span class="citedtag">cited [${h.cited}]</span>` : ''}</td></tr>`;
+  }).join('');
+
+  const mode = r.mode.charAt(0).toUpperCase() + r.mode.slice(1);
+  const passages = plural(r.hits.length, 'passage');
+  let verdict;
+  if (r.topScore === null) verdict = 'no passages found, so the LLM was not called';
+  else if (r.llmCalled) verdict = `best match ${r.topScore.toFixed(3)} ≥ ${r.threshold}, so the top ${passages} went to the LLM`;
+  else verdict = `best match ${r.topScore.toFixed(3)} < ${r.threshold}, so the LLM was not called`;
+  const cited = r.hits.filter((h) => h.cited).length;
+  const answer = !r.llmCalled ? ''
+    : `<dt>Answer</dt><dd>${cited ? `cites ${cited} of the ${passages}` : 'no passage cited, so it counts as not found'}</dd>`;
+
+  return `<details class="details"><summary>How this was found</summary><div class="box">
+    <dl class="facts">
+      <dt>Search</dt><dd>${esc(mode)} vector search over ${plural(r.uploadCount, 'upload')} (${plural(r.chunksSearched, 'chunk')})</dd>
+      <dt>Threshold</dt><dd>${verdict}</dd>${answer}
+    </dl>
+    ${rows ? `<table class="hits">${rows}</table>` : ''}
+    <div class="modes">Search mode: Vector. Keyword and Hybrid come with milestone 9.</div>
+  </div></details>`;
+}
+
 // ---------- Events ----------
 
 $('tree').addEventListener('click', (e) => {
@@ -418,11 +606,36 @@ $('scope').addEventListener('click', (e) => {
 
 // A click on the greyed question box briefly highlights the picker.
 document.querySelector('.ask').addEventListener('click', () => {
-  if (isDown() || !ready().length || !nothingSelected()) return;
-  const sidebar = $('sidebar');
-  sidebar.classList.remove('nudge');
-  void sidebar.offsetWidth;   // restarts the animation on repeated clicks
-  sidebar.classList.add('nudge');
+  if (!isDown() && ready().length && nothingSelected()) nudgePicker();
+});
+
+$('question').addEventListener('input', grow);
+$('question').addEventListener('keydown', (e) => {
+  // Enter asks, Shift+Enter starts a new line. Not while an input method (e.g. for
+  // Chinese or Japanese) is still composing a character.
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    ask();
+  }
+});
+$('askBtn').addEventListener('click', () => ask());
+window.addEventListener('resize', grow);
+
+$('answers').addEventListener('click', (e) => {
+  // A citation marker opens and highlights its source, in the same card.
+  const cite = e.target.closest('.cite');
+  if (cite) {
+    const card = cite.closest('.card');
+    const src = card.querySelector(`.src[data-src="${cite.dataset.n}"]`);
+    card.querySelectorAll('.src.hl').forEach((s) => s.classList.remove('hl'));
+    src?.classList.add('open', 'hl');
+    src?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action === 'toggleSource') e.target.closest('.src').classList.toggle('open');
+  else if (action === 'retry') ask({ question: state.latest.question });
+  else if (action === 'askAll') ask({ question: state.latest.question, all: true });
 });
 
 const search = $('titleSearch');

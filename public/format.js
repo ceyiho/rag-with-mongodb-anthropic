@@ -9,6 +9,111 @@ export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (c) => ESCAPES[c]);
 }
 
+// ---------- Answers ----------
+
+// Placeholders for citation markers, from Unicode's private use area: escaping and
+// Markdown leave them alone, and any already in the answer are removed first, so a
+// placeholder always comes from a citation.
+const MARK_OPEN = String.fromCharCode(0xe000);
+const MARK_CLOSE = String.fromCharCode(0xe001);
+const MARKER = new RegExp(`${MARK_OPEN}([0-9]+)${MARK_CLOSE}`, 'g');
+const STRAY_MARKS = new RegExp(`[${MARK_OPEN}${MARK_CLOSE}]`, 'g');
+
+// The answer's parts as HTML (API_SPEC.md: Formatting). A Markdown list can be cut
+// across several parts, so the parts are joined into one text with a placeholder where
+// each citation marker goes. Then everything is escaped, a small set of Markdown is
+// turned into formatting, and the placeholders become marker buttons. The page never
+// reads "[1]" out of the text, so a literal "[1]" in an upload can't confuse it.
+export function answerHtml(parts) {
+  const text = parts.map(({ text, cites }) => {
+    const clean = text.replace(STRAY_MARKS, '');
+    const body = clean.trimEnd();   // the marker goes before a trailing line break
+    const markers = cites.map((n) => `${MARK_OPEN}${n}${MARK_CLOSE}`).join('');
+    return body + markers + clean.slice(body.length);
+  }).join('');
+  return markdownHtml(escapeHtml(text)).replace(MARKER,
+    (_, n) => `<button class="cite" data-n="${n}" aria-label="Source ${n}">${n}</button>`);
+}
+
+// A list item: "- ", "* " or "+ " for bullets, "1. " or "1) " for numbers. Its
+// indentation sets how deeply it is nested.
+const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+
+// The Markdown the LLM writes, as HTML: paragraphs, bullet and numbered lists (nested
+// by indentation), `code` and **bold**. Anything else (headings, links, tables) stays
+// as plain text. Takes text that is already escaped.
+function markdownHtml(text) {
+  const out = [];
+  let paragraph = [];   // lines of the paragraph being read; a line break inside one stays
+  const lists = [];     // the lists open around the current line, innermost last
+
+  const endParagraph = () => {
+    if (paragraph.length) out.push(`<p>${paragraph.join('<br>')}</p>`);
+    paragraph = [];
+  };
+  const closeList = () => out.push(`</li></${lists.pop().tag}>`);
+
+  for (const line of text.split('\n')) {
+    const item = LIST_ITEM.exec(line);
+    if (item) {
+      endParagraph();
+      const indent = item[1].length;
+      const tag = /\d/.test(item[2]) ? 'ol' : 'ul';
+      while (lists.length && lists.at(-1).indent > indent) closeList();
+      if (lists.length && lists.at(-1).indent === indent && lists.at(-1).tag !== tag) closeList();
+      if (lists.length && lists.at(-1).indent === indent) {
+        out.push('</li><li>');
+      } else {
+        // A new list, nested in the open item if it is indented further.
+        const start = tag === 'ol' ? parseInt(item[2], 10) : 1;
+        lists.push({ tag, indent });
+        out.push(`<${tag}${start === 1 ? '' : ` start="${start}"`}><li>`);
+      }
+      out.push(inlineHtml(item[3]));
+    } else if (!line.trim()) {
+      endParagraph();   // a blank line ends a paragraph; a list may go on after it
+    } else if (lists.length && /^\s/.test(line)) {
+      out.push(`<br>${inlineHtml(line.trim())}`);   // more text of the open list item
+    } else {
+      while (lists.length) closeList();
+      paragraph.push(inlineHtml(line.trim()));
+    }
+  }
+  endParagraph();
+  while (lists.length) closeList();
+  return out.join('');
+}
+
+// `code` and **bold** in one line of escaped text. Bold isn't looked for inside code.
+function inlineHtml(text) {
+  return text.split(/(`[^`]+`)/).map((piece, i) => (i % 2
+    ? `<code>${piece.slice(1, -1)}</code>`
+    : piece.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'))).join('');
+}
+
+// Where a citation or a search hit points, as shown on the page (API_SPEC.md: where a
+// citation points): "PDF p. 12", "Installation › Windows", "passage 2 of 7", or null
+// when there is no location (Markdown text under the title only).
+export function locationLabel(item) {
+  if (item.fileType === 'pdf') return item.page ? `PDF p. ${item.page}` : null;
+  if (item.fileType === 'txt') return `passage ${item.chunkIndex + 1} of ${item.chunkCount}`;
+  return item.section ? item.section.split(' > ').join(' › ') : null;
+}
+
+// When something happened, for answers: "just now", "12 min ago", "3 h ago", then the
+// date ("3 Oct", with the year if it isn't this year's).
+export function timeAgo(time, now = Date.now()) {
+  const minutes = Math.floor((now - time) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  const date = new Date(time);
+  const year = date.getFullYear() === new Date(now).getFullYear() ? undefined : 'numeric';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year });
+}
+
+// ---------- Title search ----------
+
 // Text as HTML, with the first word start matching each of `words` marked (<mark>),
 // for title search suggestions. Words start at the beginning or after a space, hyphen,
 // underscore or dot, as the server splits them. Matches are found in the plain text
