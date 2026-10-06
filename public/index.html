@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Base</title>
+<!--
+  The web page (milestone 8), built from wireframe/index-green.html and served by
+  server.js from public/. The markup is the page's fixed frame; app.js fills in the
+  parts that change. Routes and formats: API_SPEC.md.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2300ed64'/%3E%3Ctext x='12' y='16.5' text-anchor='middle' font-family='Segoe UI, sans-serif' font-size='11' font-weight='700' fill='%23023430'%3EKB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="logo">KB</div>
+  <h1>Knowledge Base</h1>
+  <span class="sub">Answers from your uploads · MongoDB Atlas Vector Search</span>
+  <span class="spacer"></span>
+  <span class="status" id="connStatus"></span>
+</header>
+<div class="banner" id="banner" role="alert"></div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <h2>Uploads</h2>
+      <button class="btn primary" id="uploadBtn" title="Upload a .txt, .md or text-based PDF">+ Upload</button>
+      <input type="file" id="fileInput" accept=".txt,.md,.pdf" hidden>
+    </div>
+    <div class="drop-hint">.txt, .md or text-based PDF · or drop a file here</div>
+    <div class="upload-msgs" id="uploadMsgs"></div>
+    <div class="search">
+      <input id="titleSearch" type="search" placeholder="Search titles…" autocomplete="off" aria-label="Search upload titles">
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="all-row" id="allRow">
+      <input type="checkbox" id="allBox" tabindex="-1">
+      <span>All uploads</span><span class="count" id="allCount"></span>
+    </div>
+    <div class="tree" id="tree"></div>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+
+  <main class="workspace">
+    <div class="ws-inner">
+      <div class="scope" id="scope"></div>
+      <div class="ask">
+        <textarea id="question" rows="1" maxlength="1000" placeholder="Ask a question about your uploads…"></textarea>
+        <button class="btn primary" id="askBtn">Ask</button>
+      </div>
+      <div class="ask-hint">
+        <span>Enter to ask · Shift+Enter for a new line</span>
+        <span>Each question is answered on its own; follow-ups don't see earlier answers.</span>
+        <span class="count" id="charCount"></span>
+      </div>
+      <div id="answers"></div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
