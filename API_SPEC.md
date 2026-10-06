@@ -82,7 +82,10 @@ fuzzy matching (a typo like "nimbsu" finds Nimbus), complete uploads only, at mo
 
 - `200` `[upload, ...]`; an empty `q` gives `[]`.
 - `503` `titleSearchUnavailable`: the title index is missing (e.g. dropped while being
-  changed). The page then filters its own list in the browser.
+  changed). The page then filters its own list in the browser. Checked until the
+  server first sees the index working, then remembered until it stops, since asking
+  Atlas takes about 1 s per search with no matches. An index dropped while the server
+  runs isn't noticed until it restarts (searches just find nothing).
 
 How it matches (settled in milestone 7 with the real titles; index in
 `src/indexes.js`, query in `src/title-search.js`):

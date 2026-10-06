@@ -6,6 +6,10 @@
 //
 // Returns the uploads, or null if the title index is missing or not queryable yet:
 // $search on a missing index just finds nothing, so an empty result is checked.
+// Asking Atlas takes about 1 s, so once the index has been seen queryable, the server
+// remembers it until it stops and doesn't ask again. "Not queryable" isn't remembered,
+// so an index still being built is picked up once it's ready. An index dropped while
+// the server runs then goes unnoticed (searches find nothing) until it restarts.
 
 const config = require('./config');
 const { titleIndex } = require('./indexes');
@@ -14,6 +18,8 @@ const MAX_WORDS = 6;
 // The index stores word starts up to this many letters, so a longer typed word is cut
 // to it; its first letters still match.
 const MAX_LETTERS = titleIndex.definition.mappings.fields.title.maxGrams;
+
+let knownQueryable = false;   // the title index was seen queryable since the server started
 
 async function searchTitles(db, text) {
   // Split like the index does (spaces, hyphens, underscores, dots). One-letter words
@@ -43,7 +49,8 @@ async function searchTitles(db, text) {
     { $limit: config.titleSearch.limit },
   ]).toArray();
 
-  if (!found.length && !(await titleIndexQueryable(uploads))) return null;
+  if (found.length) knownQueryable = true;   // a result proves the index works
+  else if (!(await titleIndexQueryable(uploads))) return null;
   return found;
 }
 
@@ -54,8 +61,10 @@ function fuzzy(word) {
 }
 
 async function titleIndexQueryable(uploads) {
+  if (knownQueryable) return true;
   const [index] = await uploads.listSearchIndexes(titleIndex.name).toArray();
-  return Boolean(index?.queryable);
+  knownQueryable = Boolean(index?.queryable);
+  return knownQueryable;
 }
 
 module.exports = { searchTitles };
