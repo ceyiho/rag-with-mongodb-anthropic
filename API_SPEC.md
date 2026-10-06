@@ -257,7 +257,8 @@ The page:
   `hits` are the chunks sent to the LLM (or that would have been), best first; `cited`
   is the citation number or null. Each hit has the same location fields as a citation,
   so the page labels it the same way. No chunk text, so it stays small. Milestone 9's
-  optional search mode switch would add `mode` values here.
+  optional search mode switch would add a field here (see Open decisions in
+  PROJECT_PLAN.md).
 
 `200`, "not found in your uploads":
 

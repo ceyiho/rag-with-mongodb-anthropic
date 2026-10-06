@@ -158,7 +158,9 @@ so no logins or usage limits are needed.
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
-- None at the moment.
+- Search kind in answers (milestone 9): how `POST /api/ask` reports vector, keyword
+  or hybrid search. Leaning towards a separate field in `retrieval`, since `mode`
+  (exact or approximate) says how the vector search ran, which is a different thing.
 
 ## Decisions
 - Database: `knowledge_base` (`DB_NAME` in `.env`).
