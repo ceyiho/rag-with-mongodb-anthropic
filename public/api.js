@@ -36,6 +36,13 @@ export function listUploads() {
   return request('/api/uploads');
 }
 
+// Title search for the picker: complete uploads whose title or file name has words
+// starting with what was typed, best match first, at most 8. A 503
+// titleSearchUnavailable means the title index is missing.
+export function searchTitles(query) {
+  return request(`/api/uploads/search?q=${encodeURIComponent(query)}`);
+}
+
 // Which part is reachable: 'ok', 'database' when the server replies but can't reach
 // the database (503), or 'server' when there is no usable reply.
 export async function checkHealth() {

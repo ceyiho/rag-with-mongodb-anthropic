@@ -4,8 +4,8 @@
 // Pattern: every change updates `state`, then calls render(), which redraws each area
 // of the page from state. Simple, and fast enough at this size.
 
-import { listUploads, checkHealth } from './api.js';
-import { escapeHtml as esc } from './format.js';
+import { listUploads, checkHealth, searchTitles, ApiError } from './api.js';
+import { escapeHtml as esc, markWordStarts } from './format.js';
 
 // While the server or the database is unreachable, check again this often.
 const RETRY_MS = 5000;
@@ -61,6 +61,7 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const isDown = () => state.connection === 'server' || state.connection === 'database';
+const byId = (id) => state.uploads?.find((u) => u.id === id);
 const ready = () => (state.uploads ?? []).filter((u) => u.searchable);
 const nothingSelected = () => !state.all && !state.selected.size;
 
@@ -99,6 +100,11 @@ async function loadUploads() {
     if (!state.uploads) openGroupsAtStart(uploads);
     state.uploads = uploads;
     state.listFailed = false;
+    // Ticks only for uploads that are still there and searchable.
+    for (const id of state.selected) {
+      if (!byId(id)?.searchable) state.selected.delete(id);
+    }
+    if (!ready().length) state.all = false;
   } catch (err) {
     console.error('Loading the upload list failed:', err);
     await checkConnection();
@@ -132,6 +138,7 @@ function renderConnection() {
   $('banner').innerHTML = DOWN[state.connection]?.banner ?? '';
   $('banner').classList.toggle('show', isDown());
   $('uploadBtn').disabled = isDown();
+  $('titleSearch').disabled = isDown();
 }
 
 function renderAllRow() {
@@ -196,14 +203,27 @@ function renderFoot() {
   const label = state.all ? 'All uploads selected' : n ? `${n} selected` : 'Nothing selected';
   $('sideFoot').innerHTML = state.uploads?.length && !isDown()
     ? `<span>${label}</span><span class="spacer"></span>
+       ${nothingSelected() ? '' : '<button class="linkbtn" id="clearSel">Clear</button>'}
        <button class="linkbtn" id="collapseAll">Collapse all</button>`
     : '';
 }
 
+// What the next question will be asked of, as chips that can be removed.
 function renderScope() {
-  $('scope').innerHTML = state.uploads?.length && !isDown() && nothingSelected()
-    ? 'Asking: <span class="none-sel">nothing selected yet</span>'
-    : '';
+  const el = $('scope');
+  if (!state.uploads?.length || isDown()) {
+    el.innerHTML = '';
+  } else if (nothingSelected()) {
+    el.innerHTML = 'Asking: <span class="none-sel">nothing selected yet</span>';
+  } else if (state.all) {
+    el.innerHTML = `Asking: <span class="chip all"><span>All uploads (${ready().length})</span>
+      <button data-unselect="all" aria-label="Remove">×</button></span>`;
+  } else {
+    // In list order, so sorted by title.
+    const chips = state.uploads.filter((u) => state.selected.has(u.id)).map((u) =>
+      `<span class="chip" title="${esc(u.fileName)}"><span>${esc(u.title)}</span><button data-unselect="${esc(u.id)}" aria-label="Remove">×</button></span>`);
+    el.innerHTML = `Asking: ${chips.join('')}`;
+  }
 }
 
 function renderWorkspace() {
@@ -235,21 +255,209 @@ function renderAsk() {
   document.querySelector('.ask').classList.toggle('off', off);
 }
 
+// ---------- Picker ----------
+
+// Ticks or unticks one upload. Individual ticks and "All uploads" don't mix, so ticking
+// one unticks "All uploads". Its group opens, so the tick can be seen.
+function toggleUpload(id) {
+  const u = byId(id);
+  if (!u?.searchable) return;
+  state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+  state.all = false;
+  state.open.add(groupOf(u.title));
+  render();
+}
+
+function toggleAll() {
+  if (!ready().length) return;
+  state.all = !state.all;
+  state.selected.clear();
+  render();
+}
+
+function clearSelection() {
+  state.all = false;
+  state.selected.clear();
+  render();
+}
+
+// ---------- Title search ----------
+// Suggestions come from GET /api/uploads/search (Atlas Search autocomplete on titles and
+// file names, typos allowed, best match first), asked once typing pauses. If the title
+// index is missing (503 titleSearchUnavailable) or the request fails, the page filters
+// its own list instead.
+
+const SEARCH_DELAY_MS = 200;
+const MAX_SUGGESTIONS = 8;
+
+let searchTimer = null;
+let searchSeq = 0;          // numbers the requests, so a late reply to an older query is dropped
+let suggestions = null;     // { query, uploads, local } for the dropdown; null when there are none
+let activeSuggestion = -1;  // the row the arrow keys point at
+
+// Words as the server splits them: at spaces, hyphens, underscores and dots.
+function searchWords(text) {
+  return text.toLowerCase().split(/[\s\-_.]+/).filter(Boolean);
+}
+
+// The typed words that count: one letter matches nothing on the server, so suggestions
+// start at two letters, and a one-letter word is skipped while a longer one is there.
+function typedWords(query) {
+  return searchWords(query).filter((w) => w.length > 1);
+}
+
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  activeSuggestion = -1;
+  const query = $('titleSearch').value.trim();
+  if (!typedWords(query).length) {
+    searchSeq++;   // a reply still on its way is no longer wanted
+    suggestions = null;
+    renderSuggest();
+    return;
+  }
+  searchTimer = setTimeout(() => runSearch(query), SEARCH_DELAY_MS);
+}
+
+async function runSearch(query) {
+  const seq = ++searchSeq;
+  let uploads;
+  let local = false;
+  try {
+    uploads = await searchTitles(query);
+  } catch (err) {
+    if (!(err instanceof ApiError && err.code === 'titleSearchUnavailable')) {
+      console.error('Title search failed:', err);
+      checkConnection();
+    }
+    uploads = filterLocally(query);
+    local = true;
+  }
+  if (seq !== searchSeq) return;
+  suggestions = { query, uploads, local };
+  renderSuggest();
+}
+
+// The fallback: every typed word must start a word of the title or the file name, as on
+// the server, but without typos. In list order (by title).
+function filterLocally(query) {
+  const typed = typedWords(query);
+  return (state.uploads ?? []).filter((u) => {
+    const own = searchWords(`${u.title} ${u.fileName}`);
+    return typed.every((t) => own.some((w) => w.startsWith(t)));
+  }).slice(0, MAX_SUGGESTIONS);
+}
+
+function renderSuggest() {
+  const box = $('suggest');
+  if (!suggestions) {
+    box.classList.remove('show');
+    return;
+  }
+  const { query, uploads, local } = suggestions;
+  const words = typedWords(query);
+  const rows = uploads.map((found, i) => {
+    const u = byId(found.id) ?? found;   // the page's copy has the latest searchable
+    return `<div class="row ${i === activeSuggestion ? 'active' : ''}" data-id="${esc(u.id)}">
+        <input type="checkbox" ${state.selected.has(u.id) ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
+        <div><div class="t">${markWordStarts(u.title, words)}${u.searchable ? '' : ' <span class="pill processing">processing…</span>'}</div>
+        <div class="f">${esc(u.fileName)}</div></div></div>`;
+  }).join('');
+  const source = local
+    ? 'Filtered in the browser: title search is unavailable'
+    : 'Atlas Search · autocomplete on title and file name';
+  box.innerHTML = (rows || `<div class="none">No titles or file names match "${esc(query)}".</div>`)
+    + `<div class="foot">${source} · ↑↓ to move, Enter to tick, Esc to close</div>`;
+  box.classList.add('show');
+}
+
+// Ticks a suggestion in the picker, and flashes its row there. An upload added since
+// the list was loaded (e.g. from the command line) needs the list reloaded first.
+async function pickSuggestion(id) {
+  if (!byId(id)) await loadUploads();
+  if (!byId(id)?.searchable) return;
+  toggleUpload(id);
+  const row = document.querySelector(`.item[data-id="${CSS.escape(id)}"]`);
+  row?.classList.add('flash');
+  row?.scrollIntoView({ block: 'nearest' });
+  renderSuggest();
+}
+
 // ---------- Events ----------
 
 $('tree').addEventListener('click', (e) => {
   const head = e.target.closest('.bucket-head[data-group]');
-  if (!head) return;
-  const key = head.dataset.group;
-  state.open.has(key) ? state.open.delete(key) : state.open.add(key);
-  renderTree();
+  if (head) {
+    const key = head.dataset.group;
+    state.open.has(key) ? state.open.delete(key) : state.open.add(key);
+    renderTree();
+    return;
+  }
+  const item = e.target.closest('.item');
+  if (item) toggleUpload(item.dataset.id);
 });
 
+$('allRow').addEventListener('click', toggleAll);
+
 $('sideFoot').addEventListener('click', (e) => {
+  if (e.target.id === 'clearSel') clearSelection();
   if (e.target.id === 'collapseAll') {
     state.open.clear();
     renderTree();
   }
+});
+
+$('scope').addEventListener('click', (e) => {
+  const id = e.target.closest('[data-unselect]')?.dataset.unselect;
+  if (id === 'all') clearSelection();
+  else if (id) {
+    state.selected.delete(id);
+    render();
+  }
+});
+
+// A click on the greyed question box briefly highlights the picker.
+document.querySelector('.ask').addEventListener('click', () => {
+  if (isDown() || !ready().length || !nothingSelected()) return;
+  const sidebar = $('sidebar');
+  sidebar.classList.remove('nudge');
+  void sidebar.offsetWidth;   // restarts the animation on repeated clicks
+  sidebar.classList.add('nudge');
+});
+
+const search = $('titleSearch');
+search.addEventListener('input', onSearchInput);
+search.addEventListener('focus', renderSuggest);
+search.addEventListener('keydown', (e) => {
+  const rows = suggestions?.uploads ?? [];
+  if (e.key === 'ArrowDown' && rows.length) {
+    activeSuggestion = Math.min(rows.length - 1, activeSuggestion + 1);
+    renderSuggest();
+    e.preventDefault();
+  } else if (e.key === 'ArrowUp' && rows.length) {
+    activeSuggestion = Math.max(0, activeSuggestion - 1);
+    renderSuggest();
+    e.preventDefault();
+  } else if (e.key === 'Enter' && rows[activeSuggestion]) {
+    pickSuggestion(rows[activeSuggestion].id);
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    search.value = '';
+    onSearchInput();
+  }
+});
+// Clicks inside the dropdown stay there: ticking redraws the rows, so by the time the
+// page-wide "click outside closes it" check below ran, the clicked row would no longer
+// be in the page and the dropdown would close after every tick. preventDefault keeps
+// the focus in the search box, so typing can continue.
+$('suggest').addEventListener('mousedown', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  const row = e.target.closest('.row');
+  if (row) pickSuggestion(row.dataset.id);
+});
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.search')) $('suggest').classList.remove('show');
 });
 
 // Uploads are shared and can come from the command line, so the list is reloaded when
