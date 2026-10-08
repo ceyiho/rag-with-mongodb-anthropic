@@ -945,7 +945,7 @@ function detailsHtml(r) {
       <dt>Threshold</dt><dd>${verdict}</dd>${answer}
     </dl>
     ${rows ? `<table class="hits">${rows}</table>` : ''}
-    <div class="modes">Search mode: Vector. Keyword and Hybrid come with milestone 9.</div>
+    <div class="modes">Search mode: Vector.</div>
   </div></details>`;
 }
 
