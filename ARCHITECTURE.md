@@ -30,28 +30,35 @@ upload take part in "All uploads" and become selectable on the page.
 
 The API server (`server.js`, Express) offers all of this over HTTP for the web page:
 listing, uploading and title search of uploads, readiness checks, and questions.
-API_SPEC.md describes its routes and formats.
+API_SPEC.md describes its routes and formats. The web page (`public/`) is served by
+the same server at `/` and runs in the browser: it calls the routes, and keeps the
+earlier questions in the browser's `localStorage`.
 
 ## Call chains
 
-Where each part of the app starts, and which `src/` files it calls, in order.
+Where each part of the app starts, and which files it calls, in order. An arrow means
+"calls". A file that calls several lists them with commas, or, when the line would get
+long, with a second arrow on the next line, under the arrow it branches from.
 
 ```
-npm start              → server.js → src/indexes.js (startup check), then the routes:
+npm start              → server.js → src/indexes.js (startup check)
+                                   → the routes below, one per request:
   GET  /api/health          → src/api/health.js
   GET  /api/uploads         → src/api/uploads.js
   GET  /api/uploads/search  → src/api/uploads.js → src/title-search.js
   GET  /api/uploads/:id     → src/api/uploads.js → src/readiness.js
-  POST /api/uploads         → src/api/uploads.js → src/ingest.js → src/extractors/ + src/splitter.js
+  POST /api/uploads         → src/api/uploads.js → src/ingest.js → src/extractors/, src/splitter.js
   POST /api/ask             → src/api/ask.js → src/answer.js → src/search.js
+web page (browser)     → public/index.html (served by npm start at /) → public/app.js → public/api.js (the routes above)
+                                                                                      → public/format.js
 npm run ask            → scripts/ask.js → src/answer.js → src/search.js
-npm run ingest         → scripts/ingest-file.js → src/ingest.js → src/extractors/ + src/splitter.js,
-                         then src/readiness.js (waits until searchable)
+npm run ingest         → scripts/ingest-file.js → src/ingest.js → src/extractors/, src/splitter.js
+                                                → src/readiness.js (waits until searchable)
 npm run setup          → scripts/setup-db.js → src/indexes.js, src/readiness.js
 npm run search         → tools/search.js → src/search.js
 npm run test-questions → tools/run-test-questions.js → src/search.js
 npm run test-answers   → tools/run-test-answers.js → src/answer.js → src/search.js
-npm run chunk          → tools/chunk-file.js → src/extractors/ + src/splitter.js  (no database)
+npm run chunk          → tools/chunk-file.js → src/extractors/, src/splitter.js  (no database)
 npm run cleanup        → tools/cleanup.js → src/ingest.js (removeUploads)
 npm run check-db       → tools/check-db.js
 npm run index-status   → tools/index-status.js → src/indexes.js
@@ -97,9 +104,7 @@ Scripts and tools import from `src/`, never the reverse.
 | `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; joins each chunk's upload (`$lookup`). Returns the chunks with scores, and the mode and counts. |
 | `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format). Holds the system prompt. |
 | `indexes.js` | The Atlas Search index definitions (vector, title autocomplete) and their status. |
-| `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. |
-
-Later: the web page in `public/` (milestone 8).
+| `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. Remembers a working title index until the server stops. |
 
 ### `src/api/`: the API server's routes (used by `server.js`)
 
@@ -113,9 +118,24 @@ Route files handle a request first; helpers are only called by them.
 | `errors.js` | Any other `/api` route (a 404) | Helper: `ApiError`, and the error handler that turns every route's errors into `{ error: { code, message } }`. |
 | `ids.js` | – | Helper: turns upload ids from requests into ObjectIds, or a 400 (for `uploads.js` and `ask.js`). |
 
+### `public/`: the web page (served by `server.js`)
+
+Plain HTML, CSS and JavaScript, run by the browser as it is: no build step and no
+framework. The scripts are browser modules (`import`/`export`), so Node can't load
+them as they are (`package.json` has no `"type": "module"`). Built from
+`wireframe/index-green.html`; how the page uses each route is in API_SPEC.md.
+
+| File | Purpose |
+|---|---|
+| `index.html` | The page's fixed frame: header, sidebar (upload, title search, picker) and workspace (question box, answers). |
+| `style.css` | The page's styles (green scheme), with the phone layout below 760 px. |
+| `app.js` | The page itself: its state, the functions that draw each area from it, and the events. Upload list and connection banners, picker and title search, uploads and readiness checks, questions and answer cards, earlier questions in `localStorage`. |
+| `api.js` | Calls the API routes; turns a failed request into `ServerUnreachable` (no reply) or `ApiError` (a reply with an error code). |
+| `format.js` | Turns untrusted text into HTML: answers (escaping, the Markdown subset, citation markers), citation locations, relative times, and title search highlights. |
+
 ### `scripts/`: needed to make the app work
 
-Setup, and the user-facing command-line commands until the web page exists.
+Setup, and the command-line versions of uploading and asking.
 
 | File | Command | Purpose |
 |---|---|---|
@@ -173,17 +193,18 @@ result.
 `index.html`: one self-contained page with fake data and no backend, opened straight
 from disk. A state menu at the top switches between answers, "not found", errors,
 uploads and rejections, title search, and an empty library; each state names the API
-route behind it. Milestone 8 builds the real page from it. Not part of the app, and
-not updated after milestone 7 (see milestone 8 in PROJECT_PLAN.md).
+route behind it. Not part of the app, and not updated after milestone 7 (see
+milestone 8 in PROJECT_PLAN.md).
 
 `index-green.html`: the same page in a light green scheme modelled on MongoDB's
-palette. Only the colours and the empty-state icons differ.
+palette. Only the colours and the empty-state icons differ. Milestone 8 built the
+real page (`public/`) from this one.
 
 ## Root files
 
 | File | Purpose |
 |---|---|
-| `server.js` | Starts the API server (`npm start`): connects to Atlas, checks the search indexes, mounts the routes in `src/api/`, and listens on `127.0.0.1:3000` unless `HOST` or `PORT` is set. |
+| `server.js` | Starts the API server (`npm start`): connects to Atlas, checks the search indexes, mounts the routes in `src/api/`, serves the web page from `public/`, and listens on `127.0.0.1:3000` unless `HOST` or `PORT` is set. |
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |

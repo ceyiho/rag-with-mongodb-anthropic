@@ -34,10 +34,16 @@ Whether the server can reach the database (a `ping` to Atlas).
 - `503` `dbUnavailable`
 
 The page calls it on load and whenever a request fails, and drives the header's
-connection dot from it. Its banner then says which part is down:
+connection dot from it ("Connecting…" until the first reply). Its banner then says
+which part is down:
 - `fetch()` fails: "Can't reach the server. Is it running (`npm start`)?"
 - `503`: "The server can't reach the database. Check Atlas Network Access; your IP
   address may have changed."
+
+While a part is down, the page checks again every 5 s; once both are back, it hides
+the banner and reloads the upload list, with no page reload needed. Meanwhile the
+question box, Upload, title search and the picker (including "All uploads") are
+disabled; ticks already there are kept. No checks run while everything works.
 
 ## Uploads
 
@@ -71,9 +77,17 @@ however many uploads are processing.
 `200` `[upload, ...]`
 
 Uploads are shared, and the command line can add them too, so the page reloads the
-list when its browser tab regains focus, and after a question fails with
-`uploadNotFound` or `uploadNotReady` (a ticked upload that is gone is unticked, with a
-notice).
+list when its browser tab regains focus. It also reloads it on load, when the
+connection comes back, after its own upload, after a question fails with
+`uploadNotFound` or `uploadNotReady`, when a readiness check gets a 404, and when a
+title search suggests an upload it doesn't know yet. A ticked upload missing from the
+reloaded list (or no longer searchable) is unticked, with a red notice in the sidebar
+naming it: "This upload is no longer available, so it was unticked."
+
+The picker groups uploads by the first letter of the title (accents ignored). Every
+group starts open with 20 uploads or fewer, otherwise only the first. Under "All
+uploads", a row shows what is ticked, a Clear link while something is, and "Collapse
+all", which turns into "Expand all" once every group is closed.
 
 ### `GET /api/uploads/search?q=<text>`
 
@@ -103,6 +117,18 @@ The page sends a request once typing pauses for about 200 ms, not on every key. 
 startup the server warns if the title index is missing; the vector index missing
 stops it.
 
+The page:
+- Keeps the server's order (best match first) and ignores a late reply to an earlier
+  query.
+- Highlights only exact word starts: a typo match ("nimbsu") has no exact text to
+  mark.
+- Falls back to filtering its own list in the browser (word starts, no typos) on any
+  failure, not only the 503.
+- Opens the dropdown on a click into the search box, showing only its footer until
+  2 letters are typed: "Atlas Search · autocomplete on title and file name", or
+  "Filtered in the browser: title search is unavailable". It closes on Esc or when the
+  box loses focus; ticking a suggestion keeps it open, so several can be ticked.
+
 ### `GET /api/uploads/:id`
 
 One upload. If its `searchableAt` is unset, the server first runs the readiness check
@@ -116,10 +142,14 @@ checked again.
 - `400` `invalidId`
 - `404` `uploadNotFound`
 
-The page checks each upload whose `searchable` is false every 3 s for the first minute,
-then every 15 s, with no give-up (embedding beyond the rate limit is queued, so large
-uploads can take a while). After a reload, it resumes for any listed upload that isn't
-searchable.
+The page checks each listed upload whose `searchable` is false every 3 s for the first
+minute (counted from when the page starts checking it), then every 15 s, with no
+give-up (embedding beyond the rate limit is queued, so large uploads can take a
+while). That covers its own uploads, uploads from the command line found by a list
+reload, and, after a page reload, any listed upload that isn't searchable. Once ready,
+the row flashes and shows a "ready" pill for 5 s. A `404` (the upload was removed while
+being checked) stops the checks and reloads the list. No checks run while the server or
+database is down.
 
 Who sets `searchableAt`. Every path runs the same check from `src/readiness.js`:
 - Uploads from the page: the page's checks above.
@@ -164,14 +194,28 @@ command line).
 | 422 | `noText` | No text after extraction. |
 
 The page:
+- Takes a file from the Upload button or dropped on the sidebar. A file dropped
+  anywhere else does nothing (the browser would otherwise open it in place of the
+  page); several files dropped at once are all refused.
 - Uploads one file at a time: while one runs, the button reads "Uploading…" and is
   greyed out, and a file dropped meanwhile is refused with a notice (not queued).
   This holds per page only: two open browsers can still upload at once, which the
   server handles (each request is separate, and the same name is blocked).
+- Checks before sending what it can, to save sending a file the server would refuse:
+  the type, a duplicate name (against its list, in the same Unicode form, NFC), and
+  the size against 50 MB (a constant in the page, which can't read `src/config.js`).
+  The server's checks stay the real ones.
+- Shows a progress card while the server saves the file, then "Saved (N chunks)" until
+  the upload is ready; the new upload's group opens and its row flashes. A new upload
+  isn't ticked: ticks change only when the user ticks.
+- Shows every "this file wasn't uploaded" message in red: its own wording for the
+  codes a user can run into (`duplicate`, `unsupportedType`, `scannedPdf`,
+  `uploadInProgress`, `fileTooLarge`, `unreadablePdf`, `noText`, `fileNameTooLong`,
+  `internal`, and an unreachable server), the server's message for any other code, and
+  its refusals (several files, an upload already running, the server down). A new
+  message replaces the previous one; each can be dismissed.
 - Asks before the page is left or reloaded mid-upload (`beforeunload`). If the user
   leaves anyway, the server still finishes the ingest; only the progress card is lost.
-- May warn about a duplicate name before sending, since it has the list; the server's
-  check is the real one.
 
 ## Questions
 
@@ -296,9 +340,17 @@ all uploads instead".
 
 The page:
 - Greys out the question box while nothing is ticked: no request is sent. A click on
-  it highlights the picker.
+  it highlights the picker. Enter asks, Shift+Enter starts a new line; a character
+  count shows past 800 of the 1,000 allowed.
 - Disables Ask while waiting, so a double click can't cost two LLM calls.
-- Keeps the question in the box after an error, for Retry.
+- Shows a failed question as the latest card, with its own wording for
+  `llmUnavailable`, `internal`, `uploadNotFound`, `uploadNotReady` and an unreachable
+  server (the server's message for any other code) and a "Try again" button. The
+  question stays in the box. The card goes when the next question is asked; failed
+  questions aren't saved.
+- After `uploadNotFound` or `uploadNotReady`, reloads the list (which unticks the
+  upload, with a notice); after a network failure or another 5xx, checks the
+  connection.
 - Escapes all text before showing it (see Formatting above): uploaded text and LLM
   output are untrusted.
 
@@ -320,7 +372,16 @@ The page:
   - Stored with a format version. A page that finds another version starts an empty
     list rather than misreading it.
   - The section is labelled "Earlier questions" (not "in this session") and has a
-    "Clear" link, since anyone using that browser sees the list.
+    "Clear" link, since anyone using that browser sees the list. Clear asks first, then
+    removes only what the list shows: the latest answer, still on screen, stays saved.
+  - The latest answer is saved too, but listed only once the next question replaces
+    it. After a page reload there is no latest card: every saved answer is in the
+    list, which starts collapsed.
+  - Times read "just now", "12 min ago", "3 h ago", then a date ("3 Oct", with the year
+    if it isn't this year), updated without a redraw.
+  - Before saving, the page reads the list again, so answers saved meanwhile by another
+    tab are kept. If what is stored can't be read, the page keeps this visit's answers
+    in memory instead.
   - If storage is blocked (e.g. a private window), the list just isn't kept.
 
 ## `src/` changes made in milestone 7
@@ -354,12 +415,14 @@ The page:
 
 New in milestone 7: `server.js` at the root (`npm start`), its routes in `src/api/`
 (including `GET /api/health`), and the dependencies `express` 5 and `multer` 2.
-Milestone 8 adds the page in `public/`.
+Milestone 8 added the page in `public/` (files in ARCHITECTURE.md) and one server
+change: `src/title-search.js` remembers a working title index until the server stops
+(see `GET /api/uploads/search`).
 
 ## Why it's built this way
 
 The reasons behind PROJECT_PLAN.md's "Web page and API" decisions, settled during the
-wireframe review (2026-10-02).
+wireframe review (2026-10-02) and while building the page (2026-10-06 to 10-08).
 
 - Picker: nothing ticked when the page opens, so asking is a deliberate choice. Not
   chosen: "All uploads" as the default. Ticks aren't kept across reloads, since the
@@ -407,3 +470,28 @@ wireframe review (2026-10-02).
   a demo.
 - `127.0.0.1`: Express otherwise listens on every network the computer is on, so
   anyone on the same Wi-Fi could upload files and spend LLM calls.
+- Page code (milestone 8): plain JavaScript in the browser's own modules
+  (`import`/`export`), so there is no build step. `format.js` holds the code that
+  turns untrusted text into HTML, so it can be checked on its own. Not chosen: a
+  framework, or a front-end test framework (both bigger than the page); the page was
+  checked in a browser against the running server instead.
+- Recovering from "down" by itself: the demo case is a restarted server or a fixed
+  Atlas IP rule. Checking only while down costs nothing in normal use.
+- Failed questions aren't saved: they hold nothing worth revisiting, and their
+  question is still in the box. Keeping them in memory only would make the list
+  differ after a reload.
+- Error wording only for the codes a user can hit: the rest (`noFile`,
+  `invalidJson`…) only come from a page bug or curl, and the server's messages read
+  fine.
+- Red for every upload that didn't happen, including the page's own refusals and an
+  unticked upload: the user needs to notice. Not chosen: white notices for refusals.
+- Few hints: no keyboard hints (they read as nagging); the search footer stays, since
+  it names the Atlas feature behind the results. The selection row sits under "All
+  uploads", where it is seen, not at the bottom of the sidebar.
+- Icons: line icons (inline SVG) for the empty states; chevrons, close buttons and
+  status marks stay characters (▸ ▾ × ✓ ? !), which take the page's colours, unlike
+  emoji.
+- "How this was found" ends with "Search mode: Vector.": milestone 9 builds on the
+  panel, where its optional mode switch would go. Not chosen: naming milestone 9 on
+  the page (the wireframe's "Keyword and Hybrid come with milestone 9."), which
+  advertises unfinished work in a demo.

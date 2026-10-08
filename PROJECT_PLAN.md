@@ -241,6 +241,8 @@ so no logins or usage limits are needed.
   - Questions are standalone; no follow-ups.
   - Earlier questions are kept in the browser (`localStorage`), not in Atlas.
   - The server listens on `127.0.0.1` unless `HOST` is set.
+  - The page (milestone 8): plain browser modules, no build step or framework; green
+    scheme; recovers by itself when the server or database comes back.
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
   user-facing commands ingest and ask until the web page); `tools/` is maintenance and
@@ -372,5 +374,12 @@ milestones run.
   questions for several uploads or all. Answers come as parts, citations and
   "How this was found" details. The threshold holds for several uploads (Findings:
   Several ticked uploads); a full answer run passed 203 of 203.
-- Next: milestone 8 (web page).
+- Milestone 8 is completed: the web page in `public/` (`npm start`, then
+  `http://127.0.0.1:3000`), built from the green wireframe: uploads by button or drag
+  and drop with "processing… → ready", the picker with title search, questions with
+  cited answers and "How this was found", earlier questions saved in the browser, and
+  banners that clear by themselves when the server or database comes back. Checked in
+  the browser against the running server (no front-end tests); the page's behaviours
+  are in API_SPEC.md.
+- Next: milestone 9 (hybrid search).
 - Files and commands: see ARCHITECTURE.md.
