@@ -43,6 +43,20 @@ export function searchTitles(query) {
   return request(`/api/uploads/search?q=${encodeURIComponent(query)}`);
 }
 
+// Uploads one file (multipart/form-data, field "file"). The reply comes once the file
+// is saved: the new upload, with searchable false until its chunks are embedded.
+export function uploadFile(file) {
+  const body = new FormData();
+  body.append('file', file);
+  return request('/api/uploads', { method: 'POST', body });
+}
+
+// One upload. If it isn't searchable yet, the server first checks whether it has
+// become so; the page asks this every few seconds after an upload.
+export function getUpload(id) {
+  return request(`/api/uploads/${encodeURIComponent(id)}`, { cache: 'no-store' });
+}
+
 // Answers a question from the given uploads (ids), or from all uploads when uploadIds
 // is null. "Not found in your uploads" is a normal reply (found: false), not an error.
 export function askQuestion(question, uploadIds) {

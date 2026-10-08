@@ -4,7 +4,7 @@
 // Pattern: every change updates `state`, then calls render(), which redraws each area
 // of the page from state. Simple, and fast enough at this size.
 
-import { listUploads, checkHealth, searchTitles, askQuestion, ApiError, ServerUnreachable } from './api.js';
+import { listUploads, checkHealth, searchTitles, askQuestion, uploadFile, getUpload, ApiError, ServerUnreachable } from './api.js';
 import { escapeHtml as esc, markWordStarts, answerHtml, locationLabel, timeAgo } from './format.js';
 
 // While the server or the database is unreachable, check again this often.
@@ -68,6 +68,12 @@ const state = {
   history: [],            // loaded at startup
   historyOpen: false,     // the "Earlier questions" list is open
   openEarlier: null,      // askedAt of the earlier question shown in full, if any
+  // The sidebar's upload messages, each { kind, name, text, hint, uploadId }. kind is
+  // 'progress' (an upload running, always first), 'ok' (saved, until it is ready),
+  // or 'error' (a file that wasn't uploaded). Replaced as a whole on every change.
+  messages: [],
+  justReady: new Set(),   // ids of uploads showing the "ready" pill for a few seconds
+  flashing: new Set(),    // ids of picker rows to flash on the next drawing
 };
 
 const $ = (id) => document.getElementById(id);
@@ -76,6 +82,7 @@ const byId = (id) => state.uploads?.find((u) => u.id === id);
 const ready = () => (state.uploads ?? []).filter((u) => u.searchable);
 const nothingSelected = () => !state.all && !state.selected.size;
 const asking = () => state.latest?.status === 'loading';
+const uploading = () => state.messages.some((m) => m.kind === 'progress');
 
 // Splitting accents off (NFD) leaves the plain letter first: "É" becomes "E" + accent.
 function groupOf(title) {
@@ -118,6 +125,7 @@ async function loadUploads() {
       if (!byId(id)?.searchable) state.selected.delete(id);
     }
     if (!ready().length) state.all = false;
+    syncReadinessChecks();
   } catch (err) {
     console.error('Loading the upload list failed:', err);
     await checkConnection();
@@ -135,6 +143,7 @@ function openGroupsAtStart(uploads) {
 
 function render() {
   renderConnection();
+  renderMessages();
   renderAllRow();
   renderTree();
   renderFoot();
@@ -151,8 +160,29 @@ function renderConnection() {
   $('connStatus').innerHTML = `<span class="dot ${dot}"></span>${label}`;
   $('banner').innerHTML = DOWN[state.connection]?.banner ?? '';
   $('banner').classList.toggle('show', isDown());
-  $('uploadBtn').disabled = isDown();
+  $('uploadBtn').disabled = isDown() || uploading();
+  $('uploadBtn').textContent = uploading() ? 'Uploading…' : '+ Upload';
   $('titleSearch').disabled = isDown();
+}
+
+let shownMessages = null;   // the state.messages on the page
+
+// The upload messages under the Upload button. Redrawn only when they change, so the
+// progress bar's animation isn't restarted by every redraw.
+function renderMessages() {
+  if (shownMessages === state.messages) return;
+  shownMessages = state.messages;
+  const el = $('uploadMsgs');
+  el.innerHTML = state.messages.map((m, i) => {
+    if (m.kind === 'progress') {
+      return `<div class="msg"><div>Uploading <span class="name">${esc(m.name)}</span></div>
+        <div class="hint">${esc(m.hint)}</div><div class="bar"><span></span></div></div>`;
+    }
+    return `<div class="msg ${m.kind}"><button class="close" data-msg="${i}" aria-label="Dismiss">×</button>
+      <div><span class="name">${esc(m.name)}</span></div><div>${esc(m.text)}</div>
+      ${m.hint ? `<div class="hint">${esc(m.hint)}</div>` : ''}</div>`;
+  }).join('');
+  el.style.marginBottom = state.messages.length ? '4px' : '0';
 }
 
 function renderAllRow() {
@@ -198,17 +228,21 @@ function renderTree() {
         <span class="n">${items.length}</span></button>`;
     return open ? `${head}<ul class="items">${items.map(itemRow).join('')}</ul>` : head;
   }).join('');
+  state.flashing.clear();   // flashed once
 }
 
 // One upload in the picker. Until it is searchable it can't be ticked.
 function itemRow(u) {
   const sel = state.selected.has(u.id);
   const tip = `${u.title}\n${u.fileName}\n${u.searchable ? `${u.chunkCount} chunks` : 'Being indexed for search'}`;
-  return `<li class="item ${sel ? 'sel' : ''} ${u.searchable ? '' : 'disabled'}" data-id="${esc(u.id)}" title="${esc(tip)}">
+  const pill = !u.searchable ? '<span class="pill processing">processing…</span>'
+    : state.justReady.has(u.id) ? '<span class="pill ready">ready</span>'
+    : '';
+  return `<li class="item ${sel ? 'sel' : ''} ${u.searchable ? '' : 'disabled'} ${state.flashing.has(u.id) ? 'flash' : ''}" data-id="${esc(u.id)}" title="${esc(tip)}">
       <input type="checkbox" ${sel ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
       <span class="type ${esc(u.fileType)}">${esc(u.fileType.toUpperCase())}</span>
       <span class="title">${esc(u.title)}</span>
-      ${u.searchable ? '' : '<span class="pill processing">processing…</span>'}
+      ${pill}
     </li>`;
 }
 
@@ -487,6 +521,179 @@ async function pickSuggestion(id) {
   row?.classList.add('flash');
   row?.scrollIntoView({ block: 'nearest' });
   renderSuggest();
+}
+
+// ---------- Uploads ----------
+// One file at a time, from the Upload button or dropped on the sidebar. The page checks
+// what it can before sending (type, duplicate name, size), to save sending a file the
+// server would refuse; the server's checks stay the real ones. The request stays open
+// until the file is saved (API_SPEC.md: POST /api/uploads).
+
+const UPLOAD_TYPES = ['.txt', '.md', '.pdf'];
+// The same limit as upload.maxMegabytes in src/config.js, which the browser can't read.
+const MAX_UPLOAD_MB = 50;
+
+// Page wording for the upload errors a user can run into. Any other code shows the
+// server's own message.
+const UPLOAD_ERRORS = {
+  duplicate: { text: 'This file name has already been uploaded.', hint: 'Uploads can\'t be replaced in the app. Rename the file to upload it as a new one.' },
+  unsupportedType: { text: 'This file type isn\'t supported.', hint: 'Upload a .txt, .md or text-based PDF.' },
+  scannedPdf: { text: 'This PDF has almost no text: it looks scanned.', hint: 'Scanned PDFs and images aren\'t supported (no OCR). Nothing was saved.' },
+  uploadInProgress: { text: 'A file with this name is being uploaded right now.', hint: 'Try again in a few minutes.' },
+  fileTooLarge: { text: `This file is too large (limit ${MAX_UPLOAD_MB} MB).`, hint: '' },
+  unreadablePdf: { text: 'This PDF can\'t be read: it may be damaged or protected.', hint: 'Nothing was saved.' },
+  noText: { text: 'No text was found in this file.', hint: 'Nothing was saved.' },
+  fileNameTooLong: { text: 'This file name is too long (limit 255 characters).', hint: 'Rename the file to upload it.' },
+  internal: { text: 'Something went wrong on the server.', hint: 'Try again.' },
+};
+
+// Adds a message below the running upload, if any. A new error replaces the previous
+// one; "Saved" messages stay until their upload is ready.
+function addMessage(message) {
+  const progress = state.messages.filter((m) => m.kind === 'progress');
+  const saved = state.messages.filter((m) => m.kind === 'ok');
+  state.messages = [...progress, message, ...saved];
+}
+
+function uploadError(name, code) {
+  addMessage({ kind: 'error', name, ...UPLOAD_ERRORS[code] });
+  render();
+}
+
+// A file the page didn't send, for a reason other than the file itself. Red like the
+// errors: the user needs to notice that their file wasn't uploaded.
+function notice(name, text, hint = '') {
+  addMessage({ kind: 'error', name, text, hint });
+  render();
+}
+
+// Uploads one file: the checks, the progress card while the server saves it, then
+// "Saved" and the new upload in the picker, "processing…" until it is ready.
+async function startUpload(file) {
+  if (uploading()) return notice(file.name, 'Wait for the current upload to finish.', 'Files upload one at a time.');
+  if (isDown()) return notice(file.name, 'The server can\'t be reached, so the file wasn\'t uploaded.', 'Try again once the page reconnects.');
+  // The name as the server will store it: composed Unicode form (NFC), so "é" typed
+  // two ways is one name, as in the server's duplicate check.
+  const name = file.name.normalize('NFC').trim();
+  const ext = (name.match(/\.[^.]+$/)?.[0] ?? '').toLowerCase();
+  if (!UPLOAD_TYPES.includes(ext)) return uploadError(name, 'unsupportedType');
+  if (state.uploads?.some((u) => u.fileName === name)) return uploadError(name, 'duplicate');
+  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) return uploadError(name, 'fileTooLarge');
+
+  const hint = ext === '.pdf' ? 'Reading pages and saving chunks. A long PDF can take a minute.' : 'Saving chunks…';
+  // Errors from earlier go; "Saved" messages stay.
+  state.messages = [{ kind: 'progress', name, hint }, ...state.messages.filter((m) => m.kind === 'ok')];
+  render();
+
+  let upload;
+  try {
+    upload = await uploadFile(file);
+  } catch (err) {
+    console.error('Uploading failed:', err);
+    state.messages = state.messages.filter((m) => m.kind !== 'progress');
+    if (err instanceof ServerUnreachable) {
+      addMessage({ kind: 'error', name, text: 'The upload didn\'t finish: the server can\'t be reached.', hint: 'Once it\'s back, check the list; if the file isn\'t there, upload it again.' });
+    } else {
+      addMessage({ kind: 'error', name, ...(UPLOAD_ERRORS[err.code] ?? { text: err.message, hint: '' }) });
+    }
+    if (!(err instanceof ApiError) || err.status >= 500) checkConnection();
+    render();
+    return;
+  }
+
+  state.messages = [
+    { kind: 'ok', name, uploadId: upload.id, text: `Saved (${plural(upload.chunkCount, 'chunk')}).`, hint: 'It can be searched in a few seconds; until then it shows "processing…".' },
+    ...state.messages.filter((m) => m.kind !== 'progress'),
+  ];
+  state.open.add(groupOf(upload.title));
+  state.flashing.add(upload.id);
+  await loadUploads();   // shows it in the picker, sorted, and starts its readiness checks
+}
+
+// ---------- Readiness ----------
+// A new upload can't be searched until Atlas has embedded its chunks, a few seconds
+// after it is saved. For each listed upload that isn't searchable, the page asks
+// GET /api/uploads/:id, which runs the server's readiness check: every 3 s for the
+// first minute, then every 15 s (very large uploads can take a while), with no limit.
+// This covers uploads from this page, from the command line, and those still
+// processing when the page was reloaded.
+
+const READY_FAST_MS = 3000;
+const READY_FAST_FOR_MS = 60 * 1000;   // counted from when this page starts checking
+const READY_SLOW_MS = 15 * 1000;
+const READY_PILL_MS = 5000;            // how long the "ready" pill shows
+
+const readinessChecks = new Map();     // upload id → { since, timer }
+
+// After the list is (re)loaded: starts checks for unready uploads, and stops those for
+// uploads that are gone or became searchable meanwhile (e.g. set by npm run ingest).
+function syncReadinessChecks() {
+  for (const id of readinessChecks.keys()) {
+    const u = byId(id);
+    if (u && !u.searchable) continue;
+    stopReadinessCheck(id);
+    if (u) showReady(u);
+    else dropSavedMessage(id);
+  }
+  for (const u of state.uploads) {
+    if (u.searchable || readinessChecks.has(u.id)) continue;
+    readinessChecks.set(u.id, { since: Date.now(), timer: setTimeout(() => checkReady(u.id), READY_FAST_MS) });
+  }
+}
+
+function stopReadinessCheck(id) {
+  clearTimeout(readinessChecks.get(id)?.timer);
+  readinessChecks.delete(id);
+}
+
+async function checkReady(id) {
+  const check = readinessChecks.get(id);
+  if (!check) return;
+  // While a part is down, the health checks run instead; checking resumes after.
+  if (!isDown()) {
+    try {
+      const upload = await getUpload(id);
+      if (!readinessChecks.has(id)) return;   // stopped meanwhile by a list reload
+      if (upload.searchable) {
+        stopReadinessCheck(id);
+        state.uploads = state.uploads.map((u) => (u.id === id ? upload : u));
+        showReady(upload);
+        render();
+        return;
+      }
+    } catch (err) {
+      if (!readinessChecks.has(id)) return;
+      // Removed while being checked (e.g. by npm run cleanup): stop, and reload the list.
+      if (err instanceof ApiError && err.code === 'uploadNotFound') {
+        stopReadinessCheck(id);
+        dropSavedMessage(id);
+        loadUploads();
+        return;
+      }
+      console.error('Checking whether an upload is ready failed:', err);
+      if (!(err instanceof ApiError) || err.status >= 500) checkConnection();
+    }
+  }
+  const fast = Date.now() - check.since < READY_FAST_FOR_MS;
+  check.timer = setTimeout(() => checkReady(id), fast ? READY_FAST_MS : READY_SLOW_MS);
+}
+
+// An upload just became searchable: its "Saved" message goes, its row flashes and shows
+// "ready" for a few seconds. The caller redraws.
+function showReady(u) {
+  dropSavedMessage(u.id);
+  state.flashing.add(u.id);
+  state.justReady.add(u.id);
+  setTimeout(() => {
+    state.justReady.delete(u.id);
+    renderTree();
+  }, READY_PILL_MS);
+}
+
+function dropSavedMessage(id) {
+  if (state.messages.some((m) => m.uploadId === id)) {
+    state.messages = state.messages.filter((m) => m.uploadId !== id);
+  }
 }
 
 // ---------- Questions ----------
@@ -843,6 +1050,50 @@ $('suggest').addEventListener('mousedown', (e) => {
 });
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.search')) $('suggest').classList.remove('show');
+});
+
+$('uploadBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';   // so choosing the same file again still fires "change"
+  if (file) startUpload(file);
+});
+
+// Drag and drop: the sidebar takes a dropped file. A file dropped anywhere else does
+// nothing; by default the browser would open it in the tab, replacing the page.
+const sidebar = $('sidebar');
+const draggingFiles = (e) => e.dataTransfer?.types.includes('Files');
+window.addEventListener('dragover', (e) => {
+  if (!draggingFiles(e)) return;
+  e.preventDefault();
+  const onSidebar = sidebar.contains(e.target);
+  e.dataTransfer.dropEffect = onSidebar ? 'copy' : 'none';
+  sidebar.classList.toggle('dragover', onSidebar);
+});
+window.addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget || !sidebar.contains(e.relatedTarget)) sidebar.classList.remove('dragover');
+});
+window.addEventListener('drop', (e) => {
+  if (!draggingFiles(e)) return;
+  e.preventDefault();
+  sidebar.classList.remove('dragover');
+  if (!sidebar.contains(e.target)) return;
+  const files = e.dataTransfer.files;
+  if (files.length > 1) notice(`${files.length} files`, 'Drop one file at a time.', 'Files upload one at a time.');
+  else if (files.length) startUpload(files[0]);
+});
+
+$('uploadMsgs').addEventListener('click', (e) => {
+  const i = e.target.closest('[data-msg]')?.dataset.msg;
+  if (i === undefined) return;
+  state.messages = state.messages.filter((m, j) => j !== Number(i));
+  renderMessages();
+});
+
+// Leaving or reloading mid-upload: the browser asks first. The server finishes the
+// ingest anyway; only the progress card would be lost.
+window.addEventListener('beforeunload', (e) => {
+  if (uploading()) e.preventDefault();
 });
 
 // Uploads are shared and can come from the command line, so the list is reloaded when
