@@ -118,12 +118,14 @@ async function loadUploads() {
   try {
     const uploads = await listUploads();
     if (!state.uploads) openGroupsAtStart(uploads);
+    const before = state.uploads;
     state.uploads = uploads;
     state.listFailed = false;
-    // Ticks only for uploads that are still there and searchable.
-    for (const id of state.selected) {
-      if (!byId(id)?.searchable) state.selected.delete(id);
-    }
+    // Ticks only for uploads that are still there and searchable, with a notice naming
+    // the ones unticked (e.g. removed with npm run cleanup).
+    const unticked = [...state.selected].filter((id) => !byId(id)?.searchable);
+    for (const id of unticked) state.selected.delete(id);
+    noticeUnticked(unticked.map((id) => before?.find((u) => u.id === id)).filter(Boolean));
     if (!ready().length) state.all = false;
     syncReadinessChecks();
   } catch (err) {
@@ -134,9 +136,14 @@ async function loadUploads() {
   render();
 }
 
+// The keys of the groups that hold at least one upload.
+function usedGroups(uploads = state.uploads ?? []) {
+  return GROUPS.filter((g) => uploads.some((u) => groupOf(u.title) === g.key)).map((g) => g.key);
+}
+
 function openGroupsAtStart(uploads) {
-  const used = GROUPS.filter((g) => uploads.some((u) => groupOf(u.title) === g.key));
-  for (const g of uploads.length <= OPEN_ALL_UP_TO ? used : used.slice(0, 1)) state.open.add(g.key);
+  const used = usedGroups(uploads);
+  for (const key of uploads.length <= OPEN_ALL_UP_TO ? used : used.slice(0, 1)) state.open.add(key);
 }
 
 // ---------- Drawing ----------
@@ -146,7 +153,7 @@ function render() {
   renderMessages();
   renderAllRow();
   renderTree();
-  renderFoot();
+  renderSelBar();
   renderScope();
   renderWorkspace();
   renderHistory();
@@ -188,8 +195,12 @@ function renderMessages() {
 function renderAllRow() {
   const n = ready().length;
   const processing = (state.uploads?.length ?? 0) - n;
+  // Like the rest of the picker, it can't be changed while a part is down; a tick
+  // already there stays for when the connection is back.
+  const off = !n || isDown();
   $('allBox').checked = state.all;
-  $('allBox').disabled = !n;
+  $('allBox').disabled = off;
+  $('allRow').classList.toggle('disabled', off);
   $('allCount').textContent = isDown() || !state.uploads ? '' : `${n}${processing ? ` ready, ${processing} processing` : ''}`;
   $('allRow').style.display = state.uploads?.length || isDown() ? '' : 'none';
 }
@@ -246,14 +257,20 @@ function itemRow(u) {
     </li>`;
 }
 
-function renderFoot() {
+// Under "All uploads": what is selected, with Clear while something is, and a toggle
+// that collapses every group while any is open, or else expands them all.
+function renderSelBar() {
   const n = state.selected.size;
   const label = state.all ? 'All uploads selected' : n ? `${n} selected` : 'Nothing selected';
-  $('sideFoot').innerHTML = state.uploads?.length && !isDown()
+  $('selBar').innerHTML = state.uploads?.length && !isDown()
     ? `<span>${label}</span><span class="spacer"></span>
        ${nothingSelected() ? '' : '<button class="linkbtn" id="clearSel">Clear</button>'}
-       <button class="linkbtn" id="collapseAll">Collapse all</button>`
+       <button class="linkbtn" id="toggleGroups">${anyGroupOpen() ? 'Collapse all' : 'Expand all'}</button>`
     : '';
+}
+
+function anyGroupOpen() {
+  return usedGroups().some((key) => state.open.has(key));
 }
 
 // What the next question will be asked of, as chips that can be removed.
@@ -289,14 +306,14 @@ function renderWorkspace() {
   shownLatest = null;
   if (isDown()) {
     el.innerHTML = `<div class="ws-empty"><div class="big warn">${ICONS.warn}</div>${DOWN[state.connection].workspace}</div>`;
-  } else if (!state.uploads) {
-    el.innerHTML = '';
-  } else if (!state.uploads.length) {
-    el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.chat}</div>Upload a file on the left, then ask questions about it here.<br>Answers come only from your uploads, with sources.</div>`;
-  } else if (nothingSelected()) {
-    el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.tick}</div>Choose what to ask about: tick uploads on the left, or All uploads.<br>Answers come only from the uploads you choose, with sources.</div>`;
+  } else if (state.uploads?.length === 0) {
+    el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.chat}</div>Upload a file, then ask questions about it here.<br>Answers come only from your uploads, with sources.</div>`;
+  } else if (state.uploads) {
+    // Until the first answer, whatever is ticked: it stays put while ticking, rather than
+    // changing under the user. The question box's placeholder says what to do next.
+    el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.tick}</div>Answers come only from the uploads you choose, with sources.</div>`;
   } else {
-    el.innerHTML = `<div class="ws-empty"><div class="big">${ICONS.chat}</div>Ask a question about your uploads.</div>`;
+    el.innerHTML = '';   // while the list loads
   }
 }
 
@@ -367,7 +384,7 @@ function renderAsk() {
   q.disabled = isDown() || !ready().length;
   q.readOnly = off;
   q.placeholder = off
-    ? 'Tick uploads on the left, or All uploads, to ask a question.'
+    ? 'Tick uploads in the list, or All uploads, to ask a question.'
     : 'Ask a question about your uploads…';
   $('askBtn').disabled = q.disabled || off || asking() || !q.value.trim();
   document.querySelector('.ask').classList.toggle('off', off);
@@ -409,7 +426,7 @@ function toggleUpload(id) {
 }
 
 function toggleAll() {
-  if (!ready().length) return;
+  if (!ready().length || isDown()) return;
   state.all = !state.all;
   state.selected.clear();
   render();
@@ -434,6 +451,9 @@ let searchTimer = null;
 let searchSeq = 0;          // numbers the requests, so a late reply to an older query is dropped
 let suggestions = null;     // { query, uploads, local } for the dropdown; null when there are none
 let activeSuggestion = -1;  // the row the arrow keys point at
+// The dropdown is open: from a click into the search box (or typing) until Esc or a
+// click elsewhere. Before anything is typed, it shows only the footer.
+let suggestOpen = false;
 
 // Words as the server splits them: at spaces, hyphens, underscores and dots.
 function searchWords(text) {
@@ -490,11 +510,11 @@ function filterLocally(query) {
 
 function renderSuggest() {
   const box = $('suggest');
-  if (!suggestions) {
+  if (!suggestOpen) {
     box.classList.remove('show');
     return;
   }
-  const { query, uploads, local } = suggestions;
+  const { query = '', uploads = [], local = false } = suggestions ?? {};
   const words = typedWords(query);
   const rows = uploads.map((found, i) => {
     const u = byId(found.id) ?? found;   // the page's copy has the latest searchable
@@ -506,8 +526,8 @@ function renderSuggest() {
   const source = local
     ? 'Filtered in the browser: title search is unavailable'
     : 'Atlas Search · autocomplete on title and file name';
-  box.innerHTML = (rows || `<div class="none">No titles or file names match "${esc(query)}".</div>`)
-    + `<div class="foot">${source} · ↑↓ to move, Enter to tick, Esc to close</div>`;
+  const none = suggestions && !rows ? `<div class="none">No titles or file names match "${esc(query)}".</div>` : '';
+  box.innerHTML = `${rows}${none}<div class="foot">${source}</div>`;
   box.classList.add('show');
 }
 
@@ -565,6 +585,17 @@ function uploadError(name, code) {
 function notice(name, text, hint = '') {
   addMessage({ kind: 'error', name, text, hint });
   render();
+}
+
+// Ticked uploads that were removed (or, set by hand, aren't searchable any more) have
+// just been unticked. Red too: what the next question is asked of has changed. The
+// caller redraws.
+function noticeUnticked(uploads) {
+  if (uploads.length === 1) {
+    addMessage({ kind: 'error', name: uploads[0].fileName, text: 'This upload is no longer available, so it was unticked.', hint: '' });
+  } else if (uploads.length) {
+    addMessage({ kind: 'error', name: `${uploads.length} uploads`, text: 'These ticked uploads are no longer available, so they were unticked.', hint: uploads.map((u) => u.title).join(', ') });
+  }
 }
 
 // Uploads one file: the checks, the progress card while the server saves it, then
@@ -871,7 +902,7 @@ function answerBody(a) {
     const where = locationLabel(c);
     return `<div class="src" data-src="${c.n}">
       <div class="src-head" data-action="toggleSource"><span class="chev">▸</span><span class="n">${c.n}</span>
-        <span class="t">${esc(c.title)}</span>${where ? `<span class="w">· ${esc(where)}</span>` : ''}<span class="f">${esc(c.fileName)}</span></div>
+        <span class="t">${esc(c.title)}${where ? ` <span class="w">· ${esc(where)}</span>` : ''}</span><span class="f">${esc(c.fileName)}</span></div>
       <div class="excerpt">${esc(c.excerpt)}</div></div>`;
   }).join('');
   return `${meta}<div class="answer">${answerHtml(r.parts)}</div>
@@ -926,6 +957,7 @@ $('tree').addEventListener('click', (e) => {
     const key = head.dataset.group;
     state.open.has(key) ? state.open.delete(key) : state.open.add(key);
     renderTree();
+    renderSelBar();   // "Collapse all" or "Expand all"
     return;
   }
   const item = e.target.closest('.item');
@@ -934,11 +966,13 @@ $('tree').addEventListener('click', (e) => {
 
 $('allRow').addEventListener('click', toggleAll);
 
-$('sideFoot').addEventListener('click', (e) => {
+$('selBar').addEventListener('click', (e) => {
   if (e.target.id === 'clearSel') clearSelection();
-  if (e.target.id === 'collapseAll') {
-    state.open.clear();
+  if (e.target.id === 'toggleGroups') {
+    if (anyGroupOpen()) state.open.clear();
+    else usedGroups().forEach((key) => state.open.add(key));
     renderTree();
+    renderSelBar();
   }
 });
 
@@ -1018,8 +1052,23 @@ $('answers').addEventListener('click', (e) => {
 setInterval(updateTimes, 30 * 1000);
 
 const search = $('titleSearch');
-search.addEventListener('input', onSearchInput);
-search.addEventListener('focus', renderSuggest);
+// Opens the dropdown; a click is needed besides focus for a box still focused after Esc.
+function openSuggest() {
+  suggestOpen = true;
+  renderSuggest();
+}
+search.addEventListener('focus', openSuggest);
+search.addEventListener('click', openSuggest);
+search.addEventListener('input', () => {
+  suggestOpen = true;
+  onSearchInput();
+});
+// Leaving the box closes the dropdown. Clicks in the dropdown keep the focus in the box
+// (see below), so ticking a suggestion doesn't close it.
+search.addEventListener('blur', () => {
+  suggestOpen = false;
+  renderSuggest();
+});
 search.addEventListener('keydown', (e) => {
   const rows = suggestions?.uploads ?? [];
   if (e.key === 'ArrowDown' && rows.length) {
@@ -1035,21 +1084,16 @@ search.addEventListener('keydown', (e) => {
     e.preventDefault();
   } else if (e.key === 'Escape') {
     search.value = '';
+    suggestOpen = false;
     onSearchInput();
   }
 });
-// Clicks inside the dropdown stay there: ticking redraws the rows, so by the time the
-// page-wide "click outside closes it" check below ran, the clicked row would no longer
-// be in the page and the dropdown would close after every tick. preventDefault keeps
-// the focus in the search box, so typing can continue.
+// preventDefault keeps the focus in the search box, so the dropdown stays open for
+// ticking several suggestions, and typing can continue.
 $('suggest').addEventListener('mousedown', (e) => {
-  e.stopPropagation();
   e.preventDefault();
   const row = e.target.closest('.row');
   if (row) pickSuggestion(row.dataset.id);
-});
-document.addEventListener('mousedown', (e) => {
-  if (!e.target.closest('.search')) $('suggest').classList.remove('show');
 });
 
 $('uploadBtn').addEventListener('click', () => $('fileInput').click());

@@ -130,12 +130,14 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 .suggest mark { background: var(--green-100); color: inherit; border-radius: 2px; }
 .suggest .foot { border-top: 1px solid var(--border); padding: 5px 10px; font-size: 11.5px; color: var(--faint); background: #f9fbfa; }
 .suggest .none { padding: 10px; color: var(--muted); font-size: 13px; }
+.suggest .foot:first-child { border-top: 0; }   /* alone, before anything is typed */
 
 .all-row {
   margin: 2px 12px 6px; padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; gap: 8px;
   background: var(--surface); border: 1px solid var(--border); cursor: pointer; font-weight: 600; font-size: 13px;
 }
 .all-row .count { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 12px; }
+.all-row.disabled { cursor: default; color: var(--faint); }
 
 .tree { flex: 1; overflow-y: auto; padding: 0 6px 12px; }
 .bucket-head {
@@ -170,11 +172,12 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 .pill { font-size: 11px; border-radius: 9px; padding: 0 7px; flex-shrink: 0; white-space: nowrap; }
 .pill.processing { background: var(--amber-bg); color: var(--amber); }
 .pill.ready { background: var(--ok-bg); color: var(--ok); }
-.side-foot {
-  border-top: 1px solid var(--border); padding: 8px 12px; font-size: 12.5px; color: var(--muted);
+/* Under "All uploads": what is selected, Clear, and Collapse all / Expand all. */
+.sel-bar {
+  padding: 0 12px 6px 20px; font-size: 12.5px; color: var(--muted);
   display: flex; align-items: center; gap: 8px;
 }
-.side-foot .spacer { flex: 1; }
+.sel-bar .spacer { flex: 1; }
 .drop-hint { font-size: 11.5px; color: var(--faint); padding: 0 12px 6px; }
 .sidebar.dragover { outline: 2px dashed var(--green); outline-offset: -6px; background: var(--green-50); }
 .empty-lib { padding: 20px 16px; text-align: center; color: var(--muted); font-size: 13px; }
@@ -188,7 +191,9 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 
 /* ---------- Workspace ---------- */
 .ws-inner { max-width: 860px; margin: 0 auto; padding: 18px 24px 40px; }
-.scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+/* min-height: a chip's height, so the question box doesn't move when the first chip
+   replaces "nothing selected yet". */
+.scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--muted); min-height: 23px; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; background: var(--green-50); border: 1px solid var(--green-200);
   color: var(--green-dark); border-radius: 12px; padding: 1px 4px 1px 9px; font-size: 12.5px; max-width: 260px;
@@ -245,8 +250,10 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 .src-head { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; cursor: pointer; }
 .src-head .n { background: var(--green-100); color: var(--green-dark); font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 5px; flex-shrink: 0; }
 .src-head .t { font-weight: 600; font-size: 13px; }
-.src-head .w { font-size: 12.5px; color: var(--muted); }
-.src-head .f { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: auto; white-space: nowrap; }
+.src-head .w { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+/* A long file name wraps (anywhere: it has no spaces) instead of leaving the card, and
+   takes at most 40% of the row, so the title keeps its room. */
+.src-head .f { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: auto; text-align: right; max-width: 40%; overflow-wrap: anywhere; }
 .src-head .chev { color: var(--faint); font-size: 11px; width: 10px; flex-shrink: 0; display: inline-block; transition: transform 0.12s; }
 .src.open .src-head .chev { transform: rotate(90deg); }
 .excerpt {
@@ -317,10 +324,13 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
 .hist-body { padding: 8px 16px 14px 48px; border-top: 1px solid var(--border); }
 
 @media (max-width: 760px) {
+  .appbar .sub { display: none; }   /* wraps to three lines and overflows the header */
   .app { flex-direction: column; }
   .sidebar { width: auto; max-height: 45vh; border-right: 0; border-bottom: 1px solid var(--border); }
   .ws-inner { padding: 14px 16px 30px; }
   .src-head { flex-wrap: wrap; }
-  .src-head .f { margin-left: 26px; }
+  /* The title and location wrap beside the number; the file name gets its own line. */
+  .src-head .t { flex: 1 1 0; min-width: 0; }
+  .src-head .f { flex-basis: 100%; max-width: none; margin-left: 0; padding-left: 26px; text-align: left; }
   .hist-body { padding-left: 16px; }
 }

@@ -28,7 +28,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="side-head">
       <h2>Uploads</h2>
-      <button class="btn primary" id="uploadBtn" title="Upload a .txt, .md or text-based PDF">+ Upload</button>
+      <button class="btn primary" id="uploadBtn">+ Upload</button>
       <input type="file" id="fileInput" accept=".txt,.md,.pdf" hidden>
     </div>
     <div class="drop-hint">.txt, .md or text-based PDF · or drop a file here</div>
@@ -41,8 +41,8 @@
       <input type="checkbox" id="allBox" tabindex="-1">
       <span>All uploads</span><span class="count" id="allCount"></span>
     </div>
+    <div class="sel-bar" id="selBar"></div>
     <div class="tree" id="tree"></div>
-    <div class="side-foot" id="sideFoot"></div>
   </aside>
 
   <main class="workspace">
@@ -53,7 +53,6 @@
         <button class="btn primary" id="askBtn">Ask</button>
       </div>
       <div class="ask-hint">
-        <span>Enter to ask · Shift+Enter for a new line</span>
         <span>Each question is answered on its own; follow-ups don't see earlier answers.</span>
         <span class="count" id="charCount"></span>
       </div>
