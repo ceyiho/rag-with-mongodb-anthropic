@@ -17,6 +17,12 @@ const MAX_QUESTION_LENGTH = 1000;
 // (429), unavailable (503), overloaded (529). The SDK has already retried twice.
 const LLM_BUSY = [429, 503, 529];
 
+// HTTP statuses from the Anthropic API (or a gateway in front of it, see
+// ANTHROPIC_BASE_URL in .env.example) that mean "this server isn't allowed in": a wrong
+// or missing key (401), or access denied (403), e.g. a company gateway reached from
+// outside its network. Retrying won't help; the server's settings need fixing.
+const LLM_REFUSED = [401, 403];
+
 module.exports = function askRoutes(db) {
   const router = express.Router();
   const uploads = db.collection(config.collections.uploads);
@@ -32,6 +38,11 @@ module.exports = function askRoutes(db) {
       if (llmBusy(err)) {
         console.error('Ask: answer service unavailable:', err.message);
         throw new ApiError(503, 'llmUnavailable', 'The answer service is busy right now. Try again in a minute.');
+      }
+      if (err instanceof Anthropic.APIError && LLM_REFUSED.includes(err.status)) {
+        console.error('Ask: answer service refused access:', err.message);
+        throw new ApiError(502, 'llmAccessDenied',
+          'The answer service refused this server\'s access. Check the API key settings.');
       }
       throw err;   // anything else, including a cut-off reply: 500
     }

@@ -352,6 +352,7 @@ all uploads instead".
 | 404 | `uploadNotFound` | An id that isn't a complete upload. |
 | 409 | `uploadNotReady` | An upload that isn't searchable yet. |
 | 503 | `llmUnavailable` | The Anthropic API is overloaded or rate-limited. |
+| 502 | `llmAccessDenied` | The Anthropic API, or a gateway in front of it (`ANTHROPIC_BASE_URL`), refused the server's key (401) or access (403). The server's settings need fixing; retrying won't help. |
 | 500 | `internal` | Anything else, including an LLM reply that was cut off. |
 
 The page:
