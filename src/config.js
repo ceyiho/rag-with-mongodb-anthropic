@@ -22,8 +22,9 @@ module.exports = {
   },
 
   // Vector search (src/search.js). numCandidates applies to "All uploads" (approximate
-  // search) only: how many nearest chunks Atlas considers before keeping the top `limit`.
-  // The Atlas documentation suggests at least 20× the limit; Atlas caps it at 10,000.
+  // search) only: how many nearest chunks Atlas considers before keeping the top results
+  // (`limit`, or rerank.candidates when reranking). The Atlas documentation suggests at
+  // least 20× the results; Atlas caps it at 10,000.
   search: {
     // How many chunks go to the LLM. 10, not 5: broad questions (summaries, overviews)
     // then cover a small or medium upload fully. See Findings in PROJECT_PLAN.md
@@ -31,17 +32,27 @@ module.exports = {
     limit: 10,
     candidatesPerResult: 20,
     // "Not found" thresholds on the top score, one per search mode: below it, the app
-    // replies "not found in your uploads" without calling the LLM. See Findings in
-    // PROJECT_PLAN.md ("Not found" score threshold), re-checked with the PDFs and with
-    // several selected uploads (Findings: Several ticked uploads).
+    // replies "not found in your uploads" without calling the LLM. These are for
+    // vector-only searches (cosine scores): answers asked without reranking, and the
+    // test tools' --no-rerank. Reranked answers use rerank.notFoundThreshold below.
+    // See Findings in PROJECT_PLAN.md ("Not found" score threshold), re-checked with the
+    // PDFs and with several selected uploads (Findings: Several ticked uploads).
     notFoundThreshold: {
       selectedUploads: 0.62,
       allUploads: 0.62,
     },
-    // Reranking (milestone 9, being measured): the Voyage AI model `$rerank` uses when a
-    // search asks for it. Only the test tools ask for it so far.
+    // Reranking (milestone 9), the default for answers: vector search fetches the top
+    // `candidates` chunks, a Voyage AI model re-sorts them, and the top `limit` are kept.
+    // The thresholds are on the top rerank score, which has its own scale. Chosen from
+    // the runs of 2026-10-09 (test/results/2026-10-09-rerank-50.md): 0.58 keeps every
+    // answerable question with room to spare and rejects most unanswerable ones.
     rerank: {
       model: 'rerank-3',
+      candidates: 50,
+      notFoundThreshold: {
+        selectedUploads: 0.58,
+        allUploads: 0.58,
+      },
     },
   },
 

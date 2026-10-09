@@ -1,5 +1,6 @@
 // POST /api/ask: answers a question from the ticked uploads or all uploads (see
-// API_SPEC.md: Questions). Body: { question, uploadIds } or { question, scope: "all" }.
+// API_SPEC.md: Questions). Body: { question, uploadIds } or { question, scope: "all" },
+// plus rerank: false for an answer from vector search alone (reranked by default).
 // Checks the request, then calls src/answer.js, and sends only the fields the spec
 // lists: the answer's extra fields (text, chunks, rawText, usage) stay on the server.
 
@@ -22,11 +23,11 @@ module.exports = function askRoutes(db) {
 
   // express.json() reads the JSON body into req.body (only for this route).
   router.post('/ask', express.json(), async (req, res) => {
-    const { question, uploadIds } = await readRequest(req.body ?? {}, uploads);
+    const { question, uploadIds, rerank } = await readRequest(req.body ?? {}, uploads);
 
     let result;
     try {
-      result = await answer(db, question, { uploadIds });
+      result = await answer(db, question, { uploadIds, rerank });
     } catch (err) {
       if (llmBusy(err)) {
         console.error('Ask: answer service unavailable:', err.message);
@@ -40,14 +41,17 @@ module.exports = function askRoutes(db) {
   return router;
 };
 
-// Checks the body and returns the question and the uploadIds (undefined for all
-// uploads). Throws an ApiError for anything the spec rejects.
+// Checks the body and returns the question, the uploadIds (undefined for all uploads)
+// and whether to rerank. Throws an ApiError for anything the spec rejects.
 async function readRequest(body, uploads) {
   const question = typeof body.question === 'string' ? body.question.trim() : '';
   if (!question) throw new ApiError(400, 'missingQuestion', 'Type a question first.');
   if (question.length > MAX_QUESTION_LENGTH) {
     throw new ApiError(400, 'questionTooLong', `Questions can be up to ${MAX_QUESTION_LENGTH} characters.`);
   }
+  // Only a real boolean: a string "false" would otherwise count as true.
+  const rerank = body.rerank ?? true;
+  if (typeof rerank !== 'boolean') throw new ApiError(400, 'invalidRerank', 'rerank must be true or false.');
 
   // Exactly one of uploadIds (one or more) or scope "all". An empty list is refused,
   // so a bug that sends one can't quietly search everything.
@@ -60,7 +64,7 @@ async function readRequest(body, uploads) {
   }
   if (scope !== undefined) {
     if (scope !== 'all') throw invalid('scope can only be "all".');
-    return { question, uploadIds: undefined };
+    return { question, uploadIds: undefined, rerank };
   }
   if (!Array.isArray(uploadIds)) throw invalid('uploadIds must be a list of upload ids.');
   if (!uploadIds.length) throw missing();
@@ -76,7 +80,7 @@ async function readRequest(body, uploads) {
   if (found.some((upload) => !upload.searchableAt)) {
     throw new ApiError(409, 'uploadNotReady', 'One of the ticked uploads is still being processed.');
   }
-  return { question, uploadIds: ids };
+  return { question, uploadIds: ids, rerank };
 }
 
 function llmBusy(err) {

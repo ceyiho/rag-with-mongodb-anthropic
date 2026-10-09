@@ -224,6 +224,7 @@ The page:
 ```json
 { "question": "How long is an invitation valid?", "uploadIds": ["66f1...", "66f2..."] }
 { "question": "How long is an invitation valid?", "scope": "all" }
+{ "question": "How long is an invitation valid?", "scope": "all", "rerank": false }
 ```
 
 - Exactly one of `uploadIds` (one or more) or `scope: "all"`. Neither is a 400, so a
@@ -235,6 +236,12 @@ The page:
   that never happens.
 - `scope: "all"`: approximate search over every searchable upload (`searchableAt` set);
   the "All uploads" threshold. It includes uploads added later.
+- `rerank` (optional, milestone 9): by default the answer is reranked. Vector search
+  fetches the top 50 chunks (`search.rerank.candidates` in `config.js`), the `$rerank`
+  stage re-sorts them, and the top 10 go on, checked against the rerank thresholds
+  (0.58). `false` answers from vector search alone, checked against the cosine
+  thresholds (0.62), as before milestone 9. It's for the page's "compare without
+  rerank" option, which sends the question twice, once each way (two LLM calls).
 - Stateless: no conversation history. Each question is answered on its own.
 
 `200`, an answer:
@@ -262,16 +269,18 @@ The page:
     }
   ],
   "retrieval": {
+    "search": "vector",
     "mode": "exact",
+    "rerank": { "model": "rerank-3", "candidates": 50 },
     "uploadCount": 2,
     "chunksSearched": 18,
-    "threshold": 0.62,
-    "topScore": 0.81,
+    "threshold": 0.58,
+    "topScore": 0.91,
     "llmCalled": true,
     "hits": [
-      { "score": 0.81, "uploadId": "66f1...", "title": "Nimbus Admin Handbook",
-        "fileType": "txt", "section": null, "page": null, "chunkIndex": 1,
-        "chunkCount": 7, "cited": 2 }
+      { "score": 0.91, "vectorScore": 0.81, "uploadId": "66f1...",
+        "title": "Nimbus Admin Handbook", "fileType": "txt", "section": null,
+        "page": null, "chunkIndex": 1, "chunkCount": 7, "cited": 2 }
     ]
   }
 }
@@ -303,9 +312,15 @@ The page:
 - `retrieval`: for the "How this was found" panel, shown on every answer, collapsed.
   `hits` are the chunks sent to the LLM (or that would have been), best first; `cited`
   is the citation number or null. Each hit has the same location fields as a citation,
-  so the page labels it the same way. No chunk text, so it stays small. Milestone 9's
-  optional search mode switch would add a field here (see Open decisions in
-  PROJECT_PLAN.md).
+  so the page labels it the same way. No chunk text, so it stays small.
+  - `search`: the kind of search that found the chunks: `"vector"` for now
+    (milestone 9 adds hybrid search). `mode` is how the vector search ran: `"exact"`
+    or `"approximate"`.
+  - `rerank`: the model and candidate count, or `null` when asked with
+    `rerank: false`.
+  - `score` (each hit), `topScore` and `threshold` are on the same scale: rerank
+    scores when reranked, cosine otherwise. `vectorScore` is always the cosine score,
+    so a comparison can show it either way.
 
 `200`, "not found in your uploads":
 
@@ -330,6 +345,7 @@ all uploads instead".
 | 400 | `questionTooLong` | Over 1,000 characters. |
 | 400 | `missingScope` | Neither `uploadIds` nor `scope: "all"`, or an empty `uploadIds`. |
 | 400 | `invalidScope` | Both, a `scope` other than `"all"`, or `uploadIds` not a list. |
+| 400 | `invalidRerank` | `rerank` other than `true` or `false` (e.g. the string `"false"`). |
 | 400 | `invalidId` | A malformed id. |
 | 400 | `invalidJson` | The body isn't valid JSON. |
 | 413 | `requestTooLarge` | The body is over 100 KB (Express's default limit). |

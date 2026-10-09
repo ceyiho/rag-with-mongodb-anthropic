@@ -16,15 +16,19 @@
 //   cites the citation numbers; [] when not found. Joined, the texts are the answer.
 // - citations: the cited chunks, numbered n in order of first citation, each with where
 //   it points (see location below), its upload's title, and the excerpt.
-// - retrieval: how the answer was found (search mode, threshold, top score, whether the
-//   LLM was called) and the chunks sent to it (hits), for "How this was found".
+// - retrieval: how the answer was found (search kind and mode, reranking, threshold, top
+//   score, whether the LLM was called) and the chunks sent to it (hits, each with the
+//   score the threshold checks and the cosine vectorScore), for "How this was found".
 // - text: the answer with [n] markers after cited parts, or the "not found" reply
 //   (for npm run ask).
 // - chunks: every chunk searched, with its text, for diagnosing wrong replies. rawText
 //   is the LLM's own reply, kept even when it counts as "not found". usage is the LLM's
 //   token count (null when it wasn't called).
 // Options: uploadIds searches those uploads (ObjectIds) instead of all; limit overrides
-// config.search.limit (how many chunks go to the LLM), for testing other values.
+// config.search.limit (how many chunks go to the LLM), for testing other values;
+// rerank: false answers from vector search alone, at the cosine thresholds (for the
+// page's comparison and the vector-only baseline). By default answers are reranked
+// (config.search.rerank), with the rerank thresholds.
 
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
@@ -42,14 +46,19 @@ const SYSTEM_PROMPT = `You answer questions using only the search results sent w
 
 let anthropic;   // created on first use, so importing this file needs no API key
 
-async function answer(db, question, { uploadIds, limit } = {}) {
-  const { mode, uploadCount, chunksSearched, chunks } = await search(db, question, { uploadIds, limit });
-  const threshold = uploadIds
-    ? config.search.notFoundThreshold.selectedUploads
-    : config.search.notFoundThreshold.allUploads;
+async function answer(db, question, { uploadIds, limit, rerank = true } = {}) {
+  const searched = await search(db, question, {
+    uploadIds, limit, rerank: rerank ? config.search.rerank.candidates : 0,
+  });
+  const { mode, uploadCount, chunksSearched, chunks } = searched;
+  const thresholds = rerank ? config.search.rerank.notFoundThreshold : config.search.notFoundThreshold;
+  const threshold = uploadIds ? thresholds.selectedUploads : thresholds.allUploads;
   const topScore = chunks.length ? chunks[0].score : null;
   const retrieval = (llmCalled, citations = []) => ({
-    mode, uploadCount, chunksSearched, threshold, topScore, llmCalled,
+    search: 'vector',   // the kind of search; 'hybrid' once hybrid search is added
+    mode,
+    rerank: searched.rerank,
+    uploadCount, chunksSearched, threshold, topScore, llmCalled,
     hits: chunks.map((chunk) => toHit(chunk, citations)),
   });
 
@@ -131,6 +140,7 @@ function toHit(chunk, citations) {
   const citation = citations.find((c) => c.uploadId.equals(chunk.uploadId) && c.chunkIndex === chunk.chunkIndex);
   return {
     score: chunk.score,
+    vectorScore: chunk.vectorScore,
     uploadId: chunk.uploadId,
     title: chunk.title,
     fileType: chunk.fileType,

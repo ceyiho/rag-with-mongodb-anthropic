@@ -1,11 +1,14 @@
 // Runs every question in test/questions.json and prints the scores, to choose the
 // "not found" threshold for each search mode (and later to compare hybrid search).
-// Usage: npm run test-questions [-- --save <label>] [--threshold <score>] [--rerank <n>]
+// Usage: npm run test-questions [-- --save <label>] [--threshold <score>]
+//        [--rerank <n> | --no-rerank]
 // --save writes a report to test/results/<date>-<label>.md, e.g. --save chunk-800.
 // --threshold tries another threshold for both modes instead of the ones in config.js.
-// --rerank reranks the top n vector results of every search (model in config.js); the
-//          scores are then rerank scores, so --threshold is required with it (the ones
-//          in config.js are cosine). About 20,000 tokens per search at 50 candidates.
+// Like answers, every search is reranked by default (config.search.rerank), and the
+// scores and thresholds are rerank ones. About 20,000 tokens per search at 50
+// candidates, about 4 million for a full run.
+// --rerank reranks the top n vector results instead of config.js's count.
+// --no-rerank tests vector search alone, at the cosine thresholds (the baseline).
 //
 // Each question runs up to three searches:
 // - all:   All uploads (approximate). Also reports the rank of the first chunk from an
@@ -21,7 +24,7 @@
 // Answer text: for answerable questions, the position of the first chunk that contains
 // one of the question's `expect` phrases (copied from the samples), in all and one. It
 // shows whether the passage with the answer was retrieved, whole, not just the right upload.
-// About 90 searches, each embedding a short question (a few tokens each).
+// About 200 searches, each embedding a short question (a few tokens each).
 //
 // test/questions.json (also read by tools/run-test-answers.js). Fields:
 // - id, question, answerable: a short name, the question text, and whether the uploads
@@ -60,7 +63,8 @@ const { answeringUploads, expectsAnswer } = require('./test-modes');
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test', 'results');
-const USAGE = 'Usage: npm run test-questions [-- --save <label>] [--threshold <score>] [--rerank <n>]';
+const USAGE = 'Usage: npm run test-questions [-- --save <label>] [--threshold <score>] '
+  + '[--rerank <n> | --no-rerank]';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -68,19 +72,25 @@ async function main() {
   const label = takeFlag(args, '--save');
   const thresholdArg = takeFlag(args, '--threshold');
   const rerankArg = takeFlag(args, '--rerank');
-  const rerank = rerankArg === undefined ? 0 : Number(rerankArg);
+  const noRerankAt = args.indexOf('--no-rerank');   // a flag without a value
+  if (noRerankAt !== -1) args.splice(noRerankAt, 1);
+  const rerank = noRerankAt !== -1 ? 0
+    : rerankArg === undefined ? config.search.rerank.candidates : Number(rerankArg);
+  const defaultThresholds = defaultThresholdsFor(rerank);
   const thresholds = thresholdArg === undefined
-    ? config.search.notFoundThreshold
+    ? defaultThresholds
     : { selectedUploads: Number(thresholdArg), allUploads: Number(thresholdArg) };
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
-  const badRerank = !Number.isInteger(rerank) || rerank < 0 || (rerank && thresholdArg === undefined);
+  // Fewer candidates than results would be raised to the limit by src/search.js, and the
+  // report would name the wrong count, so refuse it.
+  const tooFew = rerank > 0 && rerank < config.search.limit;
+  const badRerank = !Number.isInteger(rerank) || rerank < 0 || tooFew
+    || (noRerankAt !== -1 && rerankArg !== undefined);
   if (args.length || badLabel || badRerank || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
-    if (rerank && thresholdArg === undefined) {
-      console.error('--rerank needs --threshold: the thresholds in config.js are for cosine scores.');
-    }
+    if (tooFew) console.error(`--rerank needs at least ${config.search.limit} candidates (the results kept).`);
     process.exit(1);
   }
   const reportFile = label && path.join(RESULTS_DIR, `${today()}-${label}.md`);
@@ -143,7 +153,9 @@ async function main() {
     if (reportFile) {
       const index = await vectorIndexSettings(db);
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
-      fs.writeFileSync(reportFile, report({ label, command, results, thresholds, rerank, uploads, index }));
+      fs.writeFileSync(reportFile, report({
+        label, command, results, thresholds, defaultThresholds, rerank, uploads, index,
+      }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
   } finally {
@@ -183,6 +195,11 @@ function phraseRank(chunks, phrases) {
 const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ');
 
 const position = (rank) => (rank ? `#${rank}` : '-');
+
+// The thresholds in config.js for this kind of score: rerank or cosine.
+function defaultThresholdsFor(rerank) {
+  return rerank ? config.search.rerank.notFoundThreshold : config.search.notFoundThreshold;
+}
 
 // What the scores are, for the console and the report.
 function scoreKind(rerank) {
@@ -242,9 +259,9 @@ function printSummary(results, thresholds, rerank) {
   const many = severalSummary(ok, thresholds);
   if (many.total) {
     console.log(`\nSeveral uploads ticked (exact, threshold ${thresholds.selectedUploads}), ${many.total} questions`);
-    console.log(`  answer expected: kept ${many.kept} of ${many.answering.length}, `
+    console.log(`  one answers it:   kept ${many.kept} of ${many.answering.length}, `
       + `answering upload ranked #1 for ${many.first}, answer text found for ${many.textFound} of ${many.textChecked}`);
-    console.log(`  no answer:       rejected ${many.rejected} of ${many.other.length} (the rest go to the LLM)`);
+    console.log(`  none answers it:  rejected ${many.rejected} of ${many.other.length} (the rest go to the LLM)`);
   }
 }
 
@@ -368,7 +385,7 @@ async function vectorIndexSettings(db) {
     + `${field.quantization || 'no'} quantization, ${field.similarity}`;
 }
 
-function report({ label, command, results, thresholds, rerank, uploads, index }) {
+function report({ label, command, results, thresholds, defaultThresholds, rerank, uploads, index }) {
   const ok = results.filter((r) => !r.error);
   const failed = results.filter((r) => r.error);
   const answerable = ok.filter((r) => r.q.answerable);
@@ -407,8 +424,8 @@ function report({ label, command, results, thresholds, rerank, uploads, index })
     add(`| Rerank | \`${searchConfig.rerank.model}\`: vector search fetches ${rerank} chunks, `
       + `\`$rerank\` keeps the top ${searchConfig.limit} |`);
   }
-  add(`| Threshold | ${thresholdText}${tAll === config.search.notFoundThreshold.allUploads
-    && tOne === config.search.notFoundThreshold.selectedUploads ? ' (config.js)' : ' (--threshold)'} |`, '');
+  add(`| Threshold | ${thresholdText}${tAll === defaultThresholds.allUploads
+    && tOne === defaultThresholds.selectedUploads ? ' (config.js)' : ' (--threshold)'} |`, '');
 
   add('## How to read the results', '');
   add(`Each question runs up to three searches. The score is the top score (${scoreKind(rerank)}).`, '');
@@ -494,8 +511,8 @@ function report({ label, command, results, thresholds, rerank, uploads, index })
   for (const line of thresholdRows(ok, thresholds)) add(`| ${line.group} | ${line.text} |`);
   const many = severalSummary(ok, thresholds);
   if (many.total) {
-    add(`| several, answer expected: kept | ${many.kept} of ${many.answering.length} |`);
-    add(`| several, no answer: rejected | ${many.rejected} of ${many.other.length} |`);
+    add(`| several ticked, one answers it: kept | ${many.kept} of ${many.answering.length} |`);
+    add(`| several ticked, none answers it: rejected | ${many.rejected} of ${many.other.length} |`);
   }
   add('');
 

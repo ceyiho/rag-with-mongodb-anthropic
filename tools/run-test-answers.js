@@ -3,10 +3,13 @@
 // problem is. tools/run-test-questions.js tests search only; this tests the answers.
 // The question fields and kinds are described in tools/run-test-questions.js.
 // Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>]
+//        [--no-rerank]
 // --save writes a report to test/results/<date>-answers-<label>.md, with every answer
 // text, the settings and the system prompt.
 // --only runs just these question ids, e.g. to recheck failures after a prompt change.
 // --limit sends the top n chunks to the LLM instead of config.search.limit.
+// --no-rerank answers from vector search alone, at the cosine thresholds; by default
+// answers are reranked, as in the app (config.search.rerank).
 //
 // Each question runs in up to four modes (see tools/test-modes.js):
 // - all:     All uploads.
@@ -31,6 +34,7 @@
 //
 // Cost: every mode above the threshold calls the LLM, about 70-80 calls for a full run
 // (a few thousand input tokens each). The token totals are printed at the end.
+// Reranking adds about 20,000 rerank tokens per question and mode.
 
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +46,7 @@ const { uploadsFor, answeringUploads, expectsAnswer } = require('./test-modes');
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test', 'results');
-const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>]';
+const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>] [--no-rerank]';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -50,6 +54,9 @@ async function main() {
   const only = takeFlag(args, '--only');
   const limitArg = takeFlag(args, '--limit');
   const limit = limitArg === undefined ? config.search.limit : Number(limitArg);
+  const noRerankAt = args.indexOf('--no-rerank');   // a flag without a value
+  if (noRerankAt !== -1) args.splice(noRerankAt, 1);
+  const rerank = noRerankAt === -1;
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
   if (args.length || badLabel || only === '' || !(Number.isInteger(limit) && limit > 0)) {
@@ -94,7 +101,7 @@ async function main() {
       for (const mode of modesFor(q)) {
         const row = { q, mode, expectAnswer: expectsAnswer(q, mode) };
         try {
-          row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit });
+          row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit, rerank });
           Object.assign(row, judge(row));
         } catch (err) {
           row.error = err.message;
@@ -109,7 +116,7 @@ async function main() {
 
     if (reportFile) {
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
-      fs.writeFileSync(reportFile, report({ label, only, limitArg, limit, rows, summary, uploads }));
+      fs.writeFileSync(reportFile, report({ label, only, limitArg, limit, rerank, rows, summary, uploads }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
   } finally {
@@ -210,7 +217,7 @@ function printRow(row) {
 
 function groupOf(row) {
   if (row.mode === 'wrong') return 'wrong upload';
-  if (row.mode === 'several') return row.expectAnswer ? 'answerable (several)' : 'several, no answer';
+  if (row.mode === 'several') return row.expectAnswer ? 'several, one answers' : 'several, none answers';
   return row.q.answerable ? `answerable (${row.mode})` : row.q.kind;
 }
 
@@ -254,13 +261,13 @@ function printSummary(s) {
 
 // --- Saved report (Markdown) ---
 
-function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
+function report({ label, only, limitArg, limit, rerank, rows, summary: s, uploads }) {
   const { chunking, search: searchConfig, answer: answerConfig } = config;
-  const thresholds = searchConfig.notFoundThreshold;
+  const thresholds = rerank ? searchConfig.rerank.notFoundThreshold : searchConfig.notFoundThreshold;
   const totalChunks = uploads.reduce((sum, upload) => sum + (upload.chunkCount || 0), 0);
   const cell = (text) => String(text).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
   const command = `npm run test-answers -- --save ${label}${only ? ` --only ${only}` : ''}`
-    + `${limitArg !== undefined ? ` --limit ${limitArg}` : ''}`;
+    + `${limitArg !== undefined ? ` --limit ${limitArg}` : ''}${rerank ? '' : ' --no-rerank'}`;
 
   const lines = [];
   const add = (...more) => lines.push(...more);
@@ -276,8 +283,13 @@ function report({ label, only, limitArg, limit, rows, summary: s, uploads }) {
 
   add('## Settings', '', '| Setting | Value |', '|---|---|');
   add(`| Model | \`${answerConfig.model}\` |`);
-  add(`| Threshold | All ${thresholds.allUploads}, selected uploads ${thresholds.selectedUploads} (config.js) |`);
+  add(`| Threshold | All ${thresholds.allUploads}, selected uploads ${thresholds.selectedUploads} `
+    + `(config.js, ${rerank ? 'rerank' : 'cosine'} scores) |`);
   add(`| Search | top ${limit} chunks sent to the LLM (${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
+  add(`| Rerank | ${rerank
+    ? `\`${searchConfig.rerank.model}\`: vector search fetches ${Math.max(searchConfig.rerank.candidates, limit)} chunks, `
+      + `\`$rerank\` keeps the top ${limit}`
+    : 'none (--no-rerank)'} |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Uploads | ${uploads.length} complete, ${totalChunks} chunks |`);
   add(`| LLM calls | ${s.llmCalls}; tokens in ${s.inputTokens}, out ${s.outputTokens} |`, '');

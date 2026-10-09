@@ -1,9 +1,11 @@
 // Asks a question from the command line and prints the answer with its sources.
-// Usage: npm run ask -- "<question>" [--upload <fileName>]...
+// Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank]
 // --upload asks that complete upload; repeat it to ask several. Without it, all
 // searchable uploads.
-// Each run embeds the question, and calls the LLM unless the top score is below the
-// "not found" threshold. To see the raw chunks and scores, use npm run search.
+// --no-rerank answers from vector search alone (by default the chunks are reranked).
+// Each run embeds the question, reranks (about 20,000 tokens), and calls the LLM unless
+// the top score is below the "not found" threshold. To see the raw chunks and scores,
+// use npm run search.
 
 const { connect } = require('../src/db');
 const { answer, locationLabel } = require('../src/answer');
@@ -27,10 +29,13 @@ async function main() {
   // is left is the question (joined, in case it wasn't quoted).
   const args = process.argv.slice(2);
   const fileNames = takeFlags(args, '--upload');
+  // --no-rerank has no value, so remove just the flag itself.
+  const noRerankAt = args.indexOf('--no-rerank');
+  if (noRerankAt !== -1) args.splice(noRerankAt, 1);
   const question = args.join(' ').trim();
 
   if (!question || fileNames.includes(undefined)) {
-    console.error('Usage: npm run ask -- "<question>" [--upload <fileName>]...');
+    console.error('Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank]');
     process.exit(1);
   }
 
@@ -57,8 +62,9 @@ async function main() {
     // All the work happens here: search, the threshold check, then the LLM
     // (src/answer.js). result.text is the answer with [n] markers after cited
     // passages, or "not found in your uploads".
-    const result = await answer(db, question, { uploadIds });
-    console.log(`"${question}" in ${fileNames.join(', ') || 'All uploads'}\n`);
+    const result = await answer(db, question, { uploadIds, rerank: noRerankAt === -1 });
+    console.log(`"${question}" in ${fileNames.join(', ') || 'All uploads'}`
+      + `${noRerankAt === -1 ? '' : ' (without reranking)'}\n`);
     console.log(result.text);
 
     // Sources: one line per [n] marker in the answer, with where it points ("page 12",

@@ -13,19 +13,19 @@
 //   and uploads still being embedded, never reach an answer. Approximate search can
 //   miss a few results (see Findings: exact vs approximate search).
 //
-// Reranking (option `rerank`: a number of candidates; milestone 9, being measured):
-// vector search fetches that many chunks, and the $rerank stage (a Voyage AI reranker,
-// run by Atlas outside the cluster) reads each one's text against the question and
-// re-sorts them; the top `limit` are kept. It replaces the score, so the cosine score is
-// kept as vectorScore first. Billed per token: the question once per candidate plus
-// every candidate's text.
+// Reranking (option `rerank`: a number of candidates; 0 or absent: none): vector search
+// fetches that many chunks, and the $rerank stage (a Voyage AI reranker, run by Atlas
+// outside the cluster) reads each one's text against the question and re-sorts them;
+// the top `limit` are kept. Billed per token: the question once per candidate plus every
+// candidate's text. src/answer.js reranks by default (config.search.rerank).
 //
 // Returns { mode, uploadCount, chunksSearched, rerank, chunks }: mode is 'exact' or
 // 'approximate', chunksSearched the chunk count of the uploads searched, rerank
-// { model, candidates } or null, and chunks the results best first, each with its score
-// (cosine: higher is closer; when reranked, the rerank score: higher is more relevant,
-// with vectorScore the cosine one) and its upload's title, fileType and chunkCount,
-// joined from uploads.
+// { model, candidates } or null, and chunks the results best first, each with its
+// upload's title, fileType and chunkCount, joined from uploads, and two scores:
+// - score: what the threshold checks. The rerank score when reranked (higher is more
+//   relevant), otherwise the cosine one.
+// - vectorScore: the cosine score (higher is closer), always.
 
 const { ObjectId } = require('mongodb');
 const config = require('./config');
@@ -45,6 +45,11 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
     uploads = await findUploads(db, { _id: { $in: uploadIds } });
   } else {
     uploads = await findUploads(db, { searchableAt: { $exists: true } });
+  }
+  // A count, not a yes/no (that's src/answer.js's option): `true` would quietly rerank
+  // only `limit` candidates.
+  if (rerank !== undefined && !(Number.isInteger(rerank) && rerank >= 0)) {
+    throw new TypeError('rerank must be a number of candidates (0 for none)');
   }
 
   const chunksSearched = uploads.reduce((sum, upload) => sum + upload.chunkCount, 0);
@@ -84,7 +89,11 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
         model: config.search.rerank.model,
       },
     },
-    { $set: { vectorScore: '$score', score: { $meta: 'score' } } },
+    { $set: { score: { $meta: 'score' } } },   // $rerank replaced the search score
+    // Rerank scores keep about 3 significant digits, so ties are common, and $rerank
+    // returns tied chunks in no useful order. The cosine score breaks ties, so the cut
+    // at `limit` keeps the closer chunks and runs repeat.
+    { $sort: { score: -1, vectorScore: -1 } },
     { $limit: limit },
   ] : [];
 
@@ -98,6 +107,7 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
         chunkIndex: 1,
         text: 1,
         score: { $meta: 'vectorSearchScore' },
+        vectorScore: { $meta: 'vectorSearchScore' },
       },
     },
     ...reranking,
