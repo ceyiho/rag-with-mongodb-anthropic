@@ -43,7 +43,7 @@ The threshold check reads the top rerank score; the cosine score is kept next to
 
 - 7 uploads, 360 chunks: five small samples (Markdown, plain text), a 10-page sewing
   pattern PDF and a 280-page book PDF (313 chunks).
-- 71 test questions (`test/questions.json`): 50 answerable (direct, paraphrase, typo,
+- 71 test questions ([questions.json](questions.json)): 50 answerable (direct, paraphrase, typo,
   mixed-chunk, partial, broad) and 21 not (12 near-misses: on topic, answer absent;
   9 off-topic).
 - Each question is searched in All uploads, in its own upload, in a wrong upload
@@ -53,7 +53,7 @@ The threshold check reads the top rerank score; the cosine score is kept next to
 
 ## Results
 
-![Bar chart: share of test questions that come out right per check, vector search alone vs reranked. Ranking: answer first 33 vs 40 of 43 (All uploads), 36 vs 40 (one upload), expected upload first 48 vs 50 of 50. Threshold: answerable questions sent on to the LLM 50 of 50 both; stopped before the LLM: wrong upload 38 vs 50 of 50, near-miss 0 vs 10 of 12, off-topic 3 vs 9 of 9, several uploads without the answer 0 vs 4 of 4.](docs/rerank-before-after.svg)
+![Bar chart: share of test questions that come out right per check, vector search alone vs reranked. Ranking: answer first 33 vs 40 of 43 (All uploads), 36 vs 40 (one upload), expected upload first 48 vs 50 of 50. Threshold: answerable questions sent on to the LLM 50 of 50 both; stopped before the LLM: wrong upload 38 vs 50 of 50, near-miss 0 vs 10 of 12, off-topic 3 vs 9 of 9, several uploads without the answer 0 vs 4 of 4.](charts/rerank-before-after.svg)
 
 "Stopped" means the app replies "not found in your uploads" without calling the LLM;
 "sent on" means the question passes the threshold and the LLM answers it.
@@ -77,7 +77,7 @@ times with vector search alone and 4 times reranked.
 
 ## Score scales
 
-![Dot chart: each test question's best score in one upload, vector search alone on the left (cosine) and reranked on the right. With cosine scores, answerable questions (0.65 to 0.90) overlap near-misses, off-topic questions and wrong uploads (0.51 to 0.81) around the 0.62 threshold. Reranked, answerable questions score 0.64 to 0.94, while wrong uploads and off-topic questions fall to 0.24 to 0.51, below the 0.58 threshold; only 2 near-misses stay above it.](docs/rerank-score-spread.svg)
+![Dot chart: each test question's best score in one upload, vector search alone on the left (cosine) and reranked on the right. With cosine scores, answerable questions (0.65 to 0.90) overlap near-misses, off-topic questions and wrong uploads (0.51 to 0.81) around the 0.62 threshold. Reranked, answerable questions score 0.64 to 0.94, while wrong uploads and off-topic questions fall to 0.24 to 0.51, below the 0.58 threshold; only 2 near-misses stay above it.](charts/rerank-score-spread.svg)
 
 The two panels use different scores (cosine and rerank), so compare where the dots
 sit against each panel's own threshold, not across panels.
@@ -175,13 +175,13 @@ A targeted answer run (LLM) covered the 7 questions whose top 10 changed most: 1
 
 ## Sources
 
-The charts (`docs/*.svg`) are drawn from the first and fourth reports below.
+The charts (`charts/*.svg`) are drawn from the first and fourth reports below.
 
-- Vector search alone: `test/results/2026-10-09-m10-baseline.md`
-- Reranked, 20 and 50 candidates: `test/results/2026-10-09-rerank-20.md`,
-  `test/results/2026-10-09-rerank-50.md`
-- Reranked, final settings: `test/results/2026-10-09-rerank-reference.md`
-- Targeted answer run: `test/results/2026-10-09-answers-rerank-targeted.md`
+- Vector search alone: [results/2026-10-09-m10-baseline.md](results/2026-10-09-m10-baseline.md)
+- Reranked, 20 and 50 candidates: [results/2026-10-09-rerank-20.md](results/2026-10-09-rerank-20.md),
+  [results/2026-10-09-rerank-50.md](results/2026-10-09-rerank-50.md)
+- Reranked, final settings: [results/2026-10-09-rerank-reference.md](results/2026-10-09-rerank-reference.md)
+- Targeted answer run: [results/2026-10-09-answers-rerank-targeted.md](results/2026-10-09-answers-rerank-targeted.md)
 - Atlas documentation: the `$rerank` stage
   (https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/) and
   Native Reranking billing
