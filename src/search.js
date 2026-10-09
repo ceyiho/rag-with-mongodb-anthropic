@@ -13,10 +13,19 @@
 //   and uploads still being embedded, never reach an answer. Approximate search can
 //   miss a few results (see Findings: exact vs approximate search).
 //
-// Returns { mode, uploadCount, chunksSearched, chunks }: mode is 'exact' or
-// 'approximate', chunksSearched the chunk count of the uploads searched, and chunks the
-// results best first, each with its score (cosine: higher is closer) and its upload's
-// title, fileType and chunkCount, joined from uploads.
+// Reranking (option `rerank`: a number of candidates; milestone 9, being measured):
+// vector search fetches that many chunks, and the $rerank stage (a Voyage AI reranker,
+// run by Atlas outside the cluster) reads each one's text against the question and
+// re-sorts them; the top `limit` are kept. It replaces the score, so the cosine score is
+// kept as vectorScore first. Billed per token: the question once per candidate plus
+// every candidate's text.
+//
+// Returns { mode, uploadCount, chunksSearched, rerank, chunks }: mode is 'exact' or
+// 'approximate', chunksSearched the chunk count of the uploads searched, rerank
+// { model, candidates } or null, and chunks the results best first, each with its score
+// (cosine: higher is closer; when reranked, the rerank score: higher is more relevant,
+// with vectorScore the cosine one) and its upload's title, fileType and chunkCount,
+// joined from uploads.
 
 const { ObjectId } = require('mongodb');
 const config = require('./config');
@@ -24,7 +33,7 @@ const config = require('./config');
 const MAX_CANDIDATES = 10000;     // Atlas limit on numCandidates
 const EXACT_MAX_CHUNKS = 10000;   // the Atlas documentation: exact search below 10,000
 
-async function search(db, question, { uploadIds, limit = config.search.limit } = {}) {
+async function search(db, question, { uploadIds, limit = config.search.limit, rerank } = {}) {
   let uploads;
   if (uploadIds) {
     // A string would silently match nothing (and look like "not found"), and an empty
@@ -40,7 +49,14 @@ async function search(db, question, { uploadIds, limit = config.search.limit } =
 
   const chunksSearched = uploads.reduce((sum, upload) => sum + upload.chunkCount, 0);
   const exact = Boolean(uploadIds) && chunksSearched <= EXACT_MAX_CHUNKS;
-  const result = { mode: exact ? 'exact' : 'approximate', uploadCount: uploads.length, chunksSearched };
+  // Reranking needs at least `limit` candidates to keep `limit` results.
+  const candidates = rerank ? Math.max(rerank, limit) : limit;
+  const result = {
+    mode: exact ? 'exact' : 'approximate',
+    uploadCount: uploads.length,
+    chunksSearched,
+    rerank: rerank ? { model: config.search.rerank.model, candidates } : null,
+  };
   if (!uploads.length) return { ...result, chunks: [] };
 
   // The filter is always a list of upload ids: $vectorSearch can only filter on fields
@@ -50,13 +66,27 @@ async function search(db, question, { uploadIds, limit = config.search.limit } =
     path: 'text',
     query: { text: question },
     filter: { uploadId: { $in: uploads.map((upload) => upload._id) } },
-    limit,
+    limit: candidates,
   };
   if (exact) {
     vectorSearch.exact = true;
   } else {
-    vectorSearch.numCandidates = Math.min(limit * config.search.candidatesPerResult, MAX_CANDIDATES);
+    vectorSearch.numCandidates = Math.min(candidates * config.search.candidatesPerResult, MAX_CANDIDATES);
   }
+
+  // $rerank takes the candidates in pipeline order; $vectorSearch returns them best first.
+  const reranking = rerank ? [
+    {
+      $rerank: {
+        query: { text: question },
+        path: 'text',
+        numDocsToRerank: candidates,
+        model: config.search.rerank.model,
+      },
+    },
+    { $set: { vectorScore: '$score', score: { $meta: 'score' } } },
+    { $limit: limit },
+  ] : [];
 
   const chunks = await db.collection(config.collections.chunks).aggregate([
     { $vectorSearch: vectorSearch },
@@ -70,6 +100,7 @@ async function search(db, question, { uploadIds, limit = config.search.limit } =
         score: { $meta: 'vectorSearchScore' },
       },
     },
+    ...reranking,
     // Joins each chunk's upload (a join between collections, like SQL's JOIN), for the
     // fields citations show. Keeps the order of the search results.
     {

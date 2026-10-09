@@ -38,6 +38,11 @@ module.exports = {
       selectedUploads: 0.62,
       allUploads: 0.62,
     },
+    // Reranking (milestone 9, being measured): the Voyage AI model `$rerank` uses when a
+    // search asks for it. Only the test tools ask for it so far.
+    rerank: {
+      model: 'rerank-3',
+    },
   },
 
   // Answers (src/answer.js). The API key is in .env (ANTHROPIC_API_KEY).

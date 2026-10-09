@@ -1,8 +1,11 @@
 // Runs every question in test/questions.json and prints the scores, to choose the
 // "not found" threshold for each search mode (and later to compare hybrid search).
-// Usage: npm run test-questions [-- --save <label>] [--threshold <score>]
+// Usage: npm run test-questions [-- --save <label>] [--threshold <score>] [--rerank <n>]
 // --save writes a report to test/results/<date>-<label>.md, e.g. --save chunk-800.
 // --threshold tries another threshold for both modes instead of the ones in config.js.
+// --rerank reranks the top n vector results of every search (model in config.js); the
+//          scores are then rerank scores, so --threshold is required with it (the ones
+//          in config.js are cosine). About 20,000 tokens per search at 50 candidates.
 //
 // Each question runs up to three searches:
 // - all:   All uploads (approximate). Also reports the rank of the first chunk from an
@@ -57,20 +60,27 @@ const { answeringUploads, expectsAnswer } = require('./test-modes');
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test', 'results');
-const USAGE = 'Usage: npm run test-questions [-- --save <label>] [--threshold <score>]';
+const USAGE = 'Usage: npm run test-questions [-- --save <label>] [--threshold <score>] [--rerank <n>]';
 
 async function main() {
   const args = process.argv.slice(2);
+  const command = ['npm run test-questions', ...(args.length ? ['--', ...args] : [])].join(' ');
   const label = takeFlag(args, '--save');
   const thresholdArg = takeFlag(args, '--threshold');
+  const rerankArg = takeFlag(args, '--rerank');
+  const rerank = rerankArg === undefined ? 0 : Number(rerankArg);
   const thresholds = thresholdArg === undefined
     ? config.search.notFoundThreshold
     : { selectedUploads: Number(thresholdArg), allUploads: Number(thresholdArg) };
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
-  if (args.length || badLabel || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
+  const badRerank = !Number.isInteger(rerank) || rerank < 0 || (rerank && thresholdArg === undefined);
+  if (args.length || badLabel || badRerank || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
+    if (rerank && thresholdArg === undefined) {
+      console.error('--rerank needs --threshold: the thresholds in config.js are for cosine scores.');
+    }
     process.exit(1);
   }
   const reportFile = label && path.join(RESULTS_DIR, `${today()}-${label}.md`);
@@ -91,13 +101,14 @@ async function main() {
         if (!idOf.has(fileName)) throw new Error(`no complete upload named "${fileName}"`);
         return idOf.get(fileName);
       }),
+      rerank,
     });
 
     const results = [];
     for (const q of questions) {
       const result = { q };
       try {
-        const { chunks: all } = await search(db, q.question);
+        const { chunks: all } = await search(db, q.question, { rerank });
         result.all = topScore(all);
         const expected = [q.upload, ...(q.alsoIn || [])];
         const rank = all.findIndex((chunk) => expected.includes(chunk.fileName));
@@ -127,12 +138,12 @@ async function main() {
       printRow(result);
     }
 
-    printSummary(results, thresholds);
+    printSummary(results, thresholds, rerank);
 
     if (reportFile) {
       const index = await vectorIndexSettings(db);
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
-      fs.writeFileSync(reportFile, report({ label, results, thresholds, uploads, index }));
+      fs.writeFileSync(reportFile, report({ label, command, results, thresholds, rerank, uploads, index }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
   } finally {
@@ -173,6 +184,13 @@ const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ');
 
 const position = (rank) => (rank ? `#${rank}` : '-');
 
+// What the scores are, for the console and the report.
+function scoreKind(rerank) {
+  return rerank
+    ? `rerank score (${config.search.rerank.model}, higher is more relevant)`
+    : 'cosine, higher is closer';
+}
+
 // --- Console output ---
 
 function printRow({ q, all, rank, one, wrong, several, allText, oneText, error }) {
@@ -187,14 +205,15 @@ function printRow({ q, all, rank, one, wrong, several, allText, oneText, error }
   console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}${many}`);
 }
 
-function printSummary(results, thresholds) {
+function printSummary(results, thresholds, rerank) {
   const ok = results.filter((r) => !r.error);
   const failed = results.length - ok.length;
   const answerable = ok.filter((r) => r.q.answerable);
   const unanswerable = ok.filter((r) => !r.q.answerable);
 
   console.log(`\n${ok.length} of ${results.length} questions ran${failed ? `, ${failed} failed` : ''}.`);
-  console.log('Y = answerable, N = not answerable. Scores are the top score (cosine, higher is closer).');
+  console.log(`Y = answerable, N = not answerable. Scores are the top score (${scoreKind(rerank)}).`);
+  if (rerank) console.log(`Each search reranked the top ${rerank} vector results.`);
   console.log('answer #a/#b = position of the first chunk with the answer text, in all/one ("-" = not in the results).');
 
   const text = answerText(answerable);
@@ -349,7 +368,7 @@ async function vectorIndexSettings(db) {
     + `${field.quantization || 'no'} quantization, ${field.similarity}`;
 }
 
-function report({ label, results, thresholds, uploads, index }) {
+function report({ label, command, results, thresholds, rerank, uploads, index }) {
   const ok = results.filter((r) => !r.error);
   const failed = results.filter((r) => r.error);
   const answerable = ok.filter((r) => r.q.answerable);
@@ -365,9 +384,12 @@ function report({ label, results, thresholds, uploads, index }) {
   const add = (...more) => lines.push(...more);
 
   add(`# Test run: ${label}`, '');
-  add(`Run of \`npm run test-questions -- --save ${label}\` on ${today()}, over the `
+  add(`Run of \`${command}\` on ${today()}, over the `
     + `${results.length} questions in \`test/questions.json\`. Generated by the runner. `
-    + 'Scores vary by up to ~0.001 between runs, so smaller changes are noise.', '');
+    + (rerank
+      ? 'Rerank scores keep about 3 significant digits (steps of 1/256 from 0.5 up, 1/512 '
+        + 'from 0.25), so ties are common.'
+      : 'Scores vary by up to ~0.001 between runs, so smaller changes are noise.'), '');
   if (failed.length) {
     add(`**${failed.length} question(s) failed** and are left out of the tables and summary:`, '');
     for (const r of failed) add(`- ${r.q.id}: ${r.error}`);
@@ -380,12 +402,16 @@ function report({ label, results, thresholds, uploads, index }) {
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Vector index | ${index} |`);
   add(`| Search | top ${searchConfig.limit}; All uploads approximate (numCandidates `
-    + `${searchConfig.limit * searchConfig.candidatesPerResult}), one upload exact |`);
+    + `${Math.max(rerank, searchConfig.limit) * searchConfig.candidatesPerResult}), one upload exact |`);
+  if (rerank) {
+    add(`| Rerank | \`${searchConfig.rerank.model}\`: vector search fetches ${rerank} chunks, `
+      + `\`$rerank\` keeps the top ${searchConfig.limit} |`);
+  }
   add(`| Threshold | ${thresholdText}${tAll === config.search.notFoundThreshold.allUploads
     && tOne === config.search.notFoundThreshold.selectedUploads ? ' (config.js)' : ' (--threshold)'} |`, '');
 
   add('## How to read the results', '');
-  add('Each question runs up to three searches. The score is the top score (cosine, higher is closer).', '');
+  add(`Each question runs up to three searches. The score is the top score (${scoreKind(rerank)}).`, '');
   add('- **All**: All uploads. The rank is the position of the first chunk from an expected');
   add(`  upload (\`upload\` or \`alsoIn\`) in the top ${searchConfig.limit}.`);
   add('- **One**: scoped to the question\'s `upload`.');
