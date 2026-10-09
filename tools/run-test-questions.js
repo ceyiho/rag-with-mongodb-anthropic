@@ -19,8 +19,11 @@
 // - several: scoped to the uploads in `several` (exact), if the question has the field:
 //          several uploads ticked together. An answer is expected if one of them
 //          answers the question (tools/test-modes.js).
-// The threshold check uses the top score, so that's what is compared. A question that
-// fails is reported and the run carries on.
+// The threshold check uses the top score, so that's what is compared. Two outcomes,
+// named the same everywhere: "sent to the LLM" (at or above the threshold) and
+// "stopped" (below it: "not found" without calling the LLM). Answerable questions
+// should be sent to the LLM, everything else stopped; a wrong outcome is in bold. A
+// question that fails is reported and the run carries on.
 // Answer text: for answerable questions, the position of the first chunk that contains
 // one of the question's `expect` phrases (copied from the samples), in all and one. It
 // shows whether the passage with the answer was retrieved, whole, not just the right upload.
@@ -90,7 +93,7 @@ async function main() {
   if (args.length || badLabel || badRerank || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
-    if (tooFew) console.error(`--rerank needs at least ${config.search.limit} candidates (the results kept).`);
+    if (tooFew) console.error(`--rerank needs at least ${config.search.limit} candidates (the results sent to the LLM).`);
     process.exit(1);
   }
   const reportFile = label && path.join(RESULTS_DIR, `${today()}-${label}.md`);
@@ -253,20 +256,20 @@ function printSummary(results, thresholds, rerank) {
 
   console.log(`\nAt the thresholds (All ${thresholds.allUploads}, One ${thresholds.selectedUploads})`);
   for (const line of thresholdRows(ok, thresholds)) {
-    console.log(`  ${line.group.padEnd(22)} ${line.text}`);
+    console.log(`  ${line.group.padEnd(28)} ${line.text}`);
   }
 
   const many = severalSummary(ok, thresholds);
   if (many.total) {
     console.log(`\nSeveral uploads ticked (exact, threshold ${thresholds.selectedUploads}), ${many.total} questions`);
-    console.log(`  one answers it:   kept ${many.kept} of ${many.answering.length}, `
+    console.log(`  one has the answer:   sent to the LLM ${many.sent} of ${many.answering.length}, `
       + `answering upload ranked #1 for ${many.first}, answer text found for ${many.textFound} of ${many.textChecked}`);
-    console.log(`  none answers it:  rejected ${many.rejected} of ${many.other.length} (the rest go to the LLM)`);
+    console.log(`  none has the answer:  stopped ${many.stopped} of ${many.other.length} (the rest are sent to the LLM)`);
   }
 }
 
 // The several-uploads mode at the selected-uploads threshold: questions expecting an
-// answer should be kept, the others rejected (or left to the LLM).
+// answer should be sent to the LLM, the others stopped.
 function severalSummary(ok, thresholds) {
   const rows = ok.filter((r) => r.several);
   const answering = rows.filter((r) => r.several.expectAnswer);
@@ -277,11 +280,11 @@ function severalSummary(ok, thresholds) {
     total: rows.length,
     answering,
     other,
-    kept: answering.filter(above).length,
+    sent: answering.filter(above).length,
     first: answering.filter((r) => r.several.rank === 1).length,
     textChecked: withText.length,
     textFound: withText.filter((r) => r.several.text).length,
-    rejected: other.filter((r) => !above(r)).length,
+    stopped: other.filter((r) => !above(r)).length,
   };
 }
 
@@ -341,8 +344,8 @@ function answerText(answerable) {
   return { checked: rows.length, all: count('allText'), one: count('oneText'), missing };
 }
 
-// How each group fares at the thresholds: answerable questions should pass (kept),
-// everything else should fall below (rejected).
+// How each group fares at the thresholds: answerable questions should be sent to the
+// LLM, everything else stopped.
 function thresholdRows(ok, thresholds) {
   const passAll = (r) => r.all != null && r.all >= thresholds.allUploads;
   const passOne = (r) => r.one != null && r.one >= thresholds.selectedUploads;
@@ -351,18 +354,18 @@ function thresholdRows(ok, thresholds) {
   const count = (rows, test) => rows.filter(test).length;
   const rows = [
     {
-      group: 'answerable kept',
+      group: 'answerable sent to the LLM',
       text: `All ${count(answerable, passAll)} of ${answerable.length}, One ${count(answerable, passOne)} of ${answerable.length}`,
     },
     {
-      group: 'wrong upload rejected',
+      group: 'wrong upload stopped',
       text: `${count(withWrong, (r) => r.wrong < thresholds.selectedUploads)} of ${withWrong.length}`,
     },
   ];
   for (const kind of unanswerableKinds(ok)) {
     const group = ok.filter((r) => !r.q.answerable && r.q.kind === kind);
     rows.push({
-      group: `${kind} rejected`,
+      group: `${kind} stopped`,
       text: `All ${count(group, (r) => !passAll(r))} of ${group.length}, One ${count(group, (r) => !passOne(r))} of ${group.length}`,
     });
   }
@@ -437,29 +440,31 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
   add('  It checks that the passage with the answer came back whole, not just the right upload.');
   add('- **Wrong**: scoped to the question\'s `wrongUpload` (answerable questions only). The');
   add('  right result is "not found".');
-  add(`- **At ${thresholdText}**: what the threshold does. For answerable questions: whether All and One`);
-  add('  are kept (at or above it), and whether the wrong-upload search is rejected (below it). For the');
-  add('  others: rejected, or passed on to the LLM.', '');
+  add(`- **At ${thresholdText}**: what the threshold does with the top score. At or above it, the`);
+  add('  question is **sent to the LLM**; below it, it\'s **stopped**: "not found" without calling the');
+  add('  LLM. Answerable questions should be sent to the LLM in All and One, and stopped in Wrong;');
+  add('  the others should be stopped. A wrong outcome is in bold.', '');
 
   add(`## Answerable questions (${answerable.length})`, '');
   add(`| id | Kind | Question | All | Rank | Answer | One | Answer | Wrong | At ${thresholdText} |`);
   add('|---|---|---|---|---|---|---|---|---|---|');
   const answerCell = (rank) => (rank === undefined ? '' : rank ? `#${rank}` : '**missing**');
   for (const r of answerable) {
-    const refused = [r.all < tAll && 'All', r.one < tOne && 'One'].filter(Boolean);
-    const kept = refused.length ? `**refused (${refused.join(', ')})**` : 'kept';
-    const wrong = r.wrong == null ? '' : (r.wrong < tOne ? '; wrong rejected' : '; **wrong passes**');
+    const stopped = [r.all < tAll && 'All', r.one < tOne && 'One'].filter(Boolean);
+    const sent = stopped.length ? `**stopped (${stopped.join(', ')})**` : 'sent to the LLM';
+    const wrong = r.wrong == null ? '' : (r.wrong < tOne ? '; wrong stopped' : '; **wrong sent to the LLM**');
     add(`| ${r.q.id} | ${r.q.kind} | ${cell(r.q.question)} | ${fmt(r.all)} | `
       + `${r.rank ? `#${r.rank}` : '**miss**'} | ${answerCell(r.allText)} | ${fmt(r.one)} | `
-      + `${answerCell(r.oneText)} | ${fmt(r.wrong)} | ${kept}${wrong} |`);
+      + `${answerCell(r.oneText)} | ${fmt(r.wrong)} | ${sent}${wrong} |`);
   }
   add('');
 
   add(`## Not answerable (${unanswerable.length})`, '');
   add(`| id | Kind | Question | All | One | At ${thresholdText} |`, '|---|---|---|---|---|---|');
   for (const r of unanswerable) {
-    const passes = [r.all >= tAll && 'All', r.one >= tOne && 'One'].filter(Boolean);
-    const verdict = !passes.length ? 'rejected' : passes.length === 2 ? 'passes' : `passes (${passes[0]} only)`;
+    const sent = [r.all >= tAll && 'All', r.one >= tOne && 'One'].filter(Boolean);
+    const verdict = !sent.length ? 'stopped'
+      : sent.length === 2 ? '**sent to the LLM**' : `**sent to the LLM (${sent[0]} only)**`;
     add(`| ${r.q.id} | ${r.q.kind} | ${cell(r.q.question)} | ${fmt(r.all)} | ${fmt(r.one)} | ${verdict} |`);
   }
   add('');
@@ -474,7 +479,9 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
     for (const r of severalRows) {
       const s = r.several;
       const above = s.score != null && s.score >= tOne;
-      const verdict = s.expectAnswer ? (above ? 'kept' : '**refused**') : (above ? 'passes' : 'rejected');
+      const verdict = s.expectAnswer
+        ? (above ? 'sent to the LLM' : '**stopped**')
+        : (above ? '**sent to the LLM**' : 'stopped');
       add(`| ${r.q.id} | ${r.q.kind} | ${cell(r.q.several.join(', '))} | ${fmt(s.score)} | `
         + `${s.expectAnswer ? 'answer' : 'not found'} | ${s.expectAnswer ? (s.rank ? `#${s.rank}` : '**miss**') : ''} | `
         + `${s.expectAnswer ? answerCell(s.text) : ''} | ${verdict} |`);
@@ -511,8 +518,8 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
   for (const line of thresholdRows(ok, thresholds)) add(`| ${line.group} | ${line.text} |`);
   const many = severalSummary(ok, thresholds);
   if (many.total) {
-    add(`| several ticked, one answers it: kept | ${many.kept} of ${many.answering.length} |`);
-    add(`| several ticked, none answers it: rejected | ${many.rejected} of ${many.other.length} |`);
+    add(`| several ticked, one has the answer: sent to the LLM | ${many.sent} of ${many.answering.length} |`);
+    add(`| several ticked, none has the answer: stopped | ${many.stopped} of ${many.other.length} |`);
   }
   add('');
 
