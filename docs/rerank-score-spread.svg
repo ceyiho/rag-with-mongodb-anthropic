@@ -1,0 +1,324 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-labelledby="t1 d1">
+<title id="t1">Top scores per question: vector search alone vs reranked</title>
+<desc id="d1">Each dot is one question's best score, searching one upload. With cosine scores, answerable and unanswerable questions overlap between about 0.5 and 0.9. Reranked, answerable questions score 0.64 to 0.94, while wrong uploads and off-topic questions fall to 0.24 to 0.51, below the 0.58 threshold; 2 near-misses stay above it.</desc>
+
+<style>
+  .surface { fill: #fcfcfb; }
+  .ink { fill: #0b0b0b; }
+  .ink2 { fill: #52514e; }
+  .muted { fill: #898781; }
+  .grid { stroke: #e1e0d9; stroke-width: 1; }
+  .axis { stroke: #c3c2b7; stroke-width: 1; }
+  .thr { stroke: #52514e; stroke-width: 1.5; }
+  .zone { fill: #f0efec; }
+  .s1 { fill: #2a78d6; }
+  .s2 { fill: #eb6834; }
+  .ring { stroke: #fcfcfb; stroke-width: 1.5; }
+  text { font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, sans-serif; }
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19; }
+    .ink { fill: #ffffff; }
+    .ink2 { fill: #c3c2b7; }
+    .grid { stroke: #2c2c2a; }
+    .axis { stroke: #383835; }
+    .thr { stroke: #c3c2b7; }
+    .zone { fill: #242423; }
+    .s1 { fill: #3987e5; }
+    .s2 { fill: #d95926; }
+    .ring { stroke: #1a1a19; }
+  }
+</style>
+<rect class="surface" width="960" height="420" rx="8"/>
+<text class="ink" x="24" y="34" font-size="18" font-weight="600">Reranking separates answers from non-answers</text>
+<text class="ink2" x="24" y="56" font-size="13">Each dot is one test question's best score, searching one upload. Left of the line, the app replies "not found" without calling the LLM.</text>
+<rect class="zone" x="180" y="92" width="181.64999999999998" height="232"/>
+<line class="grid" x1="180" y1="92" x2="180" y2="324"/>
+<text class="muted" x="180" y="342" font-size="12" text-anchor="middle">0.20</text>
+<line class="grid" x1="266.5" y1="92" x2="266.5" y2="324"/>
+<text class="muted" x="266.5" y="342" font-size="12" text-anchor="middle">0.40</text>
+<line class="grid" x1="353" y1="92" x2="353" y2="324"/>
+<text class="muted" x="353" y="342" font-size="12" text-anchor="middle">0.60</text>
+<line class="grid" x1="439.50000000000006" y1="92" x2="439.50000000000006" y2="324"/>
+<text class="muted" x="439.50000000000006" y="342" font-size="12" text-anchor="middle">0.80</text>
+<line class="grid" x1="526" y1="92" x2="526" y2="324"/>
+<text class="muted" x="526" y="342" font-size="12" text-anchor="middle">1.00</text>
+<line class="axis" x1="180" y1="324" x2="526" y2="324"/>
+<text class="ink2" x="353" y="362" font-size="12" text-anchor="middle">cosine score</text>
+<circle class="s1" cx="186" cy="78" r="5"/>
+<text class="ink" x="198" y="83" font-size="14" font-weight="600">Vector search alone</text>
+<circle class="s1 ring" cx="448.9" cy="114.9" r="4.5"><title>guide-proxy: 0.8218</title></circle>
+<circle class="s1 ring" cx="425.8" cy="111.8" r="4.5"><title>guide-battery: 0.7683</title></circle>
+<circle class="s1 ring" cx="402.2" cy="107.9" r="4.5"><title>guide-error-1001: 0.7137</title></circle>
+<circle class="s1 ring" cx="410.8" cy="110.1" r="4.5"><title>guide-rename-history: 0.7336</title></circle>
+<circle class="s1 ring" cx="427.0" cy="119.2" r="4.5"><title>handbook-invite-valid: 0.7712</title></circle>
+<circle class="s1 ring" cx="427.1" cy="119.7" r="4.5"><title>handbook-changes-not-seen: 0.7713</title></circle>
+<circle class="s1 ring" cx="426.8" cy="121.6" r="4.5"><title>handbook-storage-full: 0.7707</title></circle>
+<circle class="s1 ring" cx="408.4" cy="116.7" r="4.5"><title>handbook-subfolder-access: 0.7281</title></circle>
+<circle class="s1 ring" cx="379.8" cy="135.8" r="4.5"><title>notes-both-sides: 0.6620</title></circle>
+<circle class="s1 ring" cx="414.3" cy="132.8" r="4.5"><title>notes-admin-rights: 0.7418</title></circle>
+<circle class="s1 ring" cx="443.7" cy="119.1" r="4.5"><title>mongodb-doc-size: 0.8097</title></circle>
+<circle class="s1 ring" cx="396.6" cy="108.9" r="4.5"><title>mongodb-order-lines: 0.7007</title></circle>
+<circle class="s1 ring" cx="464.7" cy="115.0" r="4.5"><title>mongodb-advantages: 0.8583</title></circle>
+<circle class="s1 ring" cx="407.6" cy="124.8" r="4.5"><title>mongodb-explain: 0.7262</title></circle>
+<circle class="s1 ring" cx="460.1" cy="111.2" r="4.5"><title>claude-install-windows: 0.8477</title></circle>
+<circle class="s1 ring" cx="439.6" cy="135.8" r="4.5"><title>claude-plan-first: 0.8003</title></circle>
+<circle class="s1 ring" cx="436.5" cy="111.3" r="4.5"><title>claude-remember-instructions: 0.7931</title></circle>
+<circle class="s1 ring" cx="381.9" cy="115.2" r="4.5"><title>claude-settings-files: 0.6669</title></circle>
+<circle class="s1 ring" cx="447.0" cy="128.6" r="4.5"><title>typo-proxy: 0.8174</title></circle>
+<circle class="s1 ring" cx="376.5" cy="129.6" r="4.5"><title>typo-error-code: 0.6544</title></circle>
+<circle class="s1 ring" cx="435.8" cy="122.0" r="4.5"><title>typo-doc-size: 0.7915</title></circle>
+<circle class="s1 ring" cx="445.0" cy="119.6" r="4.5"><title>typo-install-windows: 0.8127</title></circle>
+<circle class="s1 ring" cx="413.1" cy="108.1" r="4.5"><title>partial-invite-price: 0.7389</title></circle>
+<circle class="s1 ring" cx="434.7" cy="106.9" r="4.5"><title>partial-doc-size-atlas: 0.7888</title></circle>
+<circle class="s1 ring" cx="442.1" cy="119.1" r="4.5"><title>partial-claude-mac-uninstall: 0.8061</title></circle>
+<circle class="s1 ring" cx="450.4" cy="119.0" r="4.5"><title>broad-handbook-summary: 0.8251</title></circle>
+<circle class="s1 ring" cx="456.2" cy="118.8" r="4.5"><title>broad-mongodb-schema-design: 0.8385</title></circle>
+<circle class="s1 ring" cx="458.8" cy="120.7" r="4.5"><title>broad-claude-getting-started: 0.8446</title></circle>
+<circle class="s1 ring" cx="441.9" cy="129.9" r="4.5"><title>book-blocking-stages: 0.8055</title></circle>
+<circle class="s1 ring" cx="430.5" cy="109.9" r="4.5"><title>book-memory-limit: 0.7793</title></circle>
+<circle class="s1 ring" cx="450.8" cy="133.5" r="4.5"><title>book-sort-spill: 0.8262</title></circle>
+<circle class="s1 ring" cx="442.0" cy="129.7" r="4.5"><title>book-set-vs-project: 0.8058</title></circle>
+<circle class="s1 ring" cx="456.1" cy="120.3" r="4.5"><title>book-mapreduce-deprecated: 0.8383</title></circle>
+<circle class="s1 ring" cx="421.6" cy="106.7" r="4.5"><title>book-framework-introduced: 0.7585</title></circle>
+<circle class="s1 ring" cx="400.7" cy="114.0" r="4.5"><title>book-expr-compare-fields: 0.7103</title></circle>
+<circle class="s1 ring" cx="419.6" cy="119.9" r="4.5"><title>book-filter-array: 0.7541</title></circle>
+<circle class="s1 ring" cx="444.1" cy="131.7" r="4.5"><title>book-lookup-sharded: 0.8107</title></circle>
+<circle class="s1 ring" cx="450.2" cy="124.7" r="4.5"><title>book-integral: 0.8247</title></circle>
+<circle class="s1 ring" cx="460.6" cy="113.5" r="4.5"><title>book-atlas-search-index: 0.8489</title></circle>
+<circle class="s1 ring" cx="386.8" cy="117.9" r="4.5"><title>typo-memory-limit: 0.6781</title></circle>
+<circle class="s1 ring" cx="396.0" cy="129.0" r="4.5"><title>partial-memory-limit-price: 0.6994</title></circle>
+<circle class="s1 ring" cx="452.9" cy="117.2" r="4.5"><title>book-mapreduce-removed: 0.8309</title></circle>
+<circle class="s1 ring" cx="464.6" cy="112.0" r="4.5"><title>broad-book-performance: 0.8580</title></circle>
+<circle class="s1 ring" cx="415.4" cy="134.0" r="4.5"><title>broad-book-examples: 0.7443</title></circle>
+<circle class="s1 ring" cx="484.4" cy="126.4" r="4.5"><title>broad-book-summary: 0.9037</title></circle>
+<circle class="s1 ring" cx="456.5" cy="112.3" r="4.5"><title>pouch-seam-allowance: 0.8392</title></circle>
+<circle class="s1 ring" cx="438.9" cy="133.1" r="4.5"><title>pouch-zipper: 0.7985</title></circle>
+<circle class="s1 ring" cx="419.4" cy="114.3" r="4.5"><title>pouch-turning-hole: 0.7536</title></circle>
+<circle class="s1 ring" cx="437.1" cy="114.3" r="4.5"><title>partial-pouch-size-fabric: 0.7945</title></circle>
+<circle class="s1 ring" cx="476.2" cy="118.8" r="4.5"><title>broad-pouch-steps: 0.8849</title></circle>
+<line class="grid" x1="180" y1="150" x2="526" y2="150"/>
+<circle class="s1 ring" cx="437.8" cy="173.0" r="4.5"><title>guide-uninstall-mac: 0.7960</title></circle>
+<circle class="s1 ring" cx="387.6" cy="176.3" r="4.5"><title>guide-error-6001: 0.6799</title></circle>
+<circle class="s1 ring" cx="411.9" cy="176.6" r="4.5"><title>handbook-price: 0.7362</title></circle>
+<circle class="s1 ring" cx="390.9" cy="185.2" r="4.5"><title>handbook-sso-setup: 0.6876</title></circle>
+<circle class="s1 ring" cx="413.2" cy="184.3" r="4.5"><title>mongodb-backup: 0.7392</title></circle>
+<circle class="s1 ring" cx="418.8" cy="190.0" r="4.5"><title>mongodb-sql: 0.7521</title></circle>
+<circle class="s1 ring" cx="405.8" cy="192.1" r="4.5"><title>claude-pro-price: 0.7221</title></circle>
+<circle class="s1 ring" cx="441.7" cy="181.9" r="4.5"><title>book-vector-search: 0.8051</title></circle>
+<circle class="s1 ring" cx="399.0" cy="165.3" r="4.5"><title>book-change-streams: 0.7064</title></circle>
+<circle class="s1 ring" cx="435.1" cy="169.6" r="4.5"><title>book-max-stages: 0.7898</title></circle>
+<circle class="s1 ring" cx="423.8" cy="182.3" r="4.5"><title>pouch-washing: 0.7636</title></circle>
+<circle class="s1 ring" cx="419.9" cy="171.2" r="4.5"><title>pouch-larger: 0.7547</title></circle>
+<line class="grid" x1="180" y1="208" x2="526" y2="208"/>
+<circle class="s1 ring" cx="352.5" cy="234.0" r="4.5"><title>offtopic-france: 0.5988</title></circle>
+<circle class="s1 ring" cx="343.7" cy="243.9" r="4.5"><title>offtopic-banana-bread: 0.5784</title></circle>
+<circle class="s1 ring" cx="341.8" cy="240.6" r="4.5"><title>offtopic-css-center: 0.5742</title></circle>
+<circle class="s1 ring" cx="390.9" cy="226.9" r="4.5"><title>offtopic-git-undo: 0.6877</title></circle>
+<circle class="s1 ring" cx="369.9" cy="244.3" r="4.5"><title>offtopic-tcp-udp: 0.6391</title></circle>
+<circle class="s1 ring" cx="363.0" cy="250.1" r="4.5"><title>offtopic-postgres-key: 0.6232</title></circle>
+<circle class="s1 ring" cx="427.8" cy="240.7" r="4.5"><title>offtopic-python-windows: 0.7730</title></circle>
+<circle class="s1 ring" cx="388.4" cy="232.9" r="4.5"><title>offtopic-mysql-group-by: 0.6819</title></circle>
+<circle class="s1 ring" cx="437.3" cy="240.2" r="4.5"><title>offtopic-buttonhole: 0.7949</title></circle>
+<line class="grid" x1="180" y1="266" x2="526" y2="266"/>
+<circle class="s1 ring" cx="331.5" cy="294.9" r="4.5"><title>guide-proxy: 0.5504</title></circle>
+<circle class="s1 ring" cx="372.0" cy="288.7" r="4.5"><title>guide-battery: 0.6440</title></circle>
+<circle class="s1 ring" cx="347.0" cy="308.8" r="4.5"><title>guide-error-1001: 0.5861</title></circle>
+<circle class="s1 ring" cx="351.1" cy="304.9" r="4.5"><title>guide-rename-history: 0.5957</title></circle>
+<circle class="s1 ring" cx="353.3" cy="298.2" r="4.5"><title>handbook-invite-valid: 0.6008</title></circle>
+<circle class="s1 ring" cx="354.4" cy="285.1" r="4.5"><title>handbook-changes-not-seen: 0.6033</title></circle>
+<circle class="s1 ring" cx="368.0" cy="305.2" r="4.5"><title>handbook-storage-full: 0.6347</title></circle>
+<circle class="s1 ring" cx="327.9" cy="306.6" r="4.5"><title>handbook-subfolder-access: 0.5420</title></circle>
+<circle class="s1 ring" cx="348.5" cy="287.2" r="4.5"><title>notes-both-sides: 0.5895</title></circle>
+<circle class="s1 ring" cx="334.6" cy="293.1" r="4.5"><title>notes-admin-rights: 0.5575</title></circle>
+<circle class="s1 ring" cx="364.5" cy="290.7" r="4.5"><title>mongodb-doc-size: 0.6266</title></circle>
+<circle class="s1 ring" cx="347.8" cy="287.7" r="4.5"><title>mongodb-order-lines: 0.5879</title></circle>
+<circle class="s1 ring" cx="352.1" cy="302.6" r="4.5"><title>mongodb-advantages: 0.5980</title></circle>
+<circle class="s1 ring" cx="335.3" cy="291.1" r="4.5"><title>mongodb-explain: 0.5590</title></circle>
+<circle class="s1 ring" cx="335.4" cy="299.5" r="4.5"><title>claude-install-windows: 0.5592</title></circle>
+<circle class="s1 ring" cx="375.1" cy="289.9" r="4.5"><title>claude-plan-first: 0.6510</title></circle>
+<circle class="s1 ring" cx="390.8" cy="292.0" r="4.5"><title>claude-remember-instructions: 0.6874</title></circle>
+<circle class="s1 ring" cx="343.1" cy="299.5" r="4.5"><title>claude-settings-files: 0.5770</title></circle>
+<circle class="s1 ring" cx="361.0" cy="290.8" r="4.5"><title>typo-proxy: 0.6184</title></circle>
+<circle class="s1 ring" cx="323.6" cy="303.8" r="4.5"><title>typo-error-code: 0.5320</title></circle>
+<circle class="s1 ring" cx="347.9" cy="295.5" r="4.5"><title>typo-doc-size: 0.5883</title></circle>
+<circle class="s1 ring" cx="323.1" cy="286.9" r="4.5"><title>typo-install-windows: 0.5308</title></circle>
+<circle class="s1 ring" cx="334.1" cy="282.8" r="4.5"><title>partial-invite-price: 0.5564</title></circle>
+<circle class="s1 ring" cx="371.6" cy="304.6" r="4.5"><title>partial-doc-size-atlas: 0.6431</title></circle>
+<circle class="s1 ring" cx="338.9" cy="290.0" r="4.5"><title>partial-claude-mac-uninstall: 0.5675</title></circle>
+<circle class="s1 ring" cx="352.5" cy="291.8" r="4.5"><title>broad-handbook-summary: 0.5989</title></circle>
+<circle class="s1 ring" cx="355.6" cy="287.0" r="4.5"><title>broad-mongodb-schema-design: 0.6059</title></circle>
+<circle class="s1 ring" cx="366.9" cy="302.4" r="4.5"><title>broad-claude-getting-started: 0.6322</title></circle>
+<circle class="s1 ring" cx="329.7" cy="295.5" r="4.5"><title>book-blocking-stages: 0.5461</title></circle>
+<circle class="s1 ring" cx="350.6" cy="303.6" r="4.5"><title>book-memory-limit: 0.5944</title></circle>
+<circle class="s1 ring" cx="370.3" cy="304.6" r="4.5"><title>book-sort-spill: 0.6401</title></circle>
+<circle class="s1 ring" cx="336.0" cy="302.5" r="4.5"><title>book-set-vs-project: 0.5608</title></circle>
+<circle class="s1 ring" cx="340.5" cy="291.1" r="4.5"><title>book-mapreduce-deprecated: 0.5712</title></circle>
+<circle class="s1 ring" cx="339.5" cy="289.0" r="4.5"><title>book-framework-introduced: 0.5687</title></circle>
+<circle class="s1 ring" cx="342.8" cy="307.4" r="4.5"><title>book-expr-compare-fields: 0.5764</title></circle>
+<circle class="s1 ring" cx="313.2" cy="294.1" r="4.5"><title>book-filter-array: 0.5080</title></circle>
+<circle class="s1 ring" cx="334.1" cy="289.3" r="4.5"><title>book-lookup-sharded: 0.5563</title></circle>
+<circle class="s1 ring" cx="339.2" cy="291.4" r="4.5"><title>book-integral: 0.5680</title></circle>
+<circle class="s1 ring" cx="362.8" cy="286.3" r="4.5"><title>book-atlas-search-index: 0.6226</title></circle>
+<circle class="s1 ring" cx="343.0" cy="300.1" r="4.5"><title>typo-memory-limit: 0.5768</title></circle>
+<circle class="s1 ring" cx="350.7" cy="300.6" r="4.5"><title>partial-memory-limit-price: 0.5947</title></circle>
+<circle class="s1 ring" cx="362.3" cy="295.2" r="4.5"><title>book-mapreduce-removed: 0.6215</title></circle>
+<circle class="s1 ring" cx="364.0" cy="287.1" r="4.5"><title>broad-book-performance: 0.6255</title></circle>
+<circle class="s1 ring" cx="363.2" cy="309.6" r="4.5"><title>broad-book-examples: 0.6236</title></circle>
+<circle class="s1 ring" cx="348.9" cy="289.4" r="4.5"><title>broad-book-summary: 0.5905</title></circle>
+<circle class="s1 ring" cx="338.5" cy="291.8" r="4.5"><title>pouch-seam-allowance: 0.5665</title></circle>
+<circle class="s1 ring" cx="351.7" cy="290.5" r="4.5"><title>pouch-zipper: 0.5971</title></circle>
+<circle class="s1 ring" cx="346.6" cy="286.3" r="4.5"><title>pouch-turning-hole: 0.5851</title></circle>
+<circle class="s1 ring" cx="338.2" cy="298.8" r="4.5"><title>partial-pouch-size-fabric: 0.5657</title></circle>
+<circle class="s1 ring" cx="326.7" cy="306.0" r="4.5"><title>broad-pouch-steps: 0.5392</title></circle>
+<line class="thr" x1="361.65" y1="70" x2="361.65" y2="324"/>
+<text class="ink2" x="367.65" y="83" font-size="11">threshold 0.62</text>
+<rect class="zone" x="590" y="92" width="164.3499999999999" height="232"/>
+<line class="grid" x1="590" y1="92" x2="590" y2="324"/>
+<text class="muted" x="590" y="342" font-size="12" text-anchor="middle">0.20</text>
+<line class="grid" x1="676.5" y1="92" x2="676.5" y2="324"/>
+<text class="muted" x="676.5" y="342" font-size="12" text-anchor="middle">0.40</text>
+<line class="grid" x1="763" y1="92" x2="763" y2="324"/>
+<text class="muted" x="763" y="342" font-size="12" text-anchor="middle">0.60</text>
+<line class="grid" x1="849.5" y1="92" x2="849.5" y2="324"/>
+<text class="muted" x="849.5" y="342" font-size="12" text-anchor="middle">0.80</text>
+<line class="grid" x1="936" y1="92" x2="936" y2="324"/>
+<text class="muted" x="936" y="342" font-size="12" text-anchor="middle">1.00</text>
+<line class="axis" x1="590" y1="324" x2="936" y2="324"/>
+<text class="ink2" x="763" y="362" font-size="12" text-anchor="middle">rerank score</text>
+<circle class="s2" cx="596" cy="78" r="5"/>
+<text class="ink" x="608" y="83" font-size="14" font-weight="600">Reranked</text>
+<circle class="s2 ring" cx="873.5" cy="114.9" r="4.5"><title>guide-proxy: 0.8555</title></circle>
+<circle class="s2 ring" cx="878.6" cy="111.8" r="4.5"><title>guide-battery: 0.8672</title></circle>
+<circle class="s2 ring" cx="893.7" cy="107.9" r="4.5"><title>guide-error-1001: 0.9023</title></circle>
+<circle class="s2 ring" cx="883.6" cy="110.1" r="4.5"><title>guide-rename-history: 0.8789</title></circle>
+<circle class="s2 ring" cx="897.2" cy="119.2" r="4.5"><title>handbook-invite-valid: 0.9102</title></circle>
+<circle class="s2 ring" cx="887.0" cy="119.7" r="4.5"><title>handbook-changes-not-seen: 0.8867</title></circle>
+<circle class="s2 ring" cx="856.6" cy="121.6" r="4.5"><title>handbook-storage-full: 0.8164</title></circle>
+<circle class="s2 ring" cx="890.4" cy="116.7" r="4.5"><title>handbook-subfolder-access: 0.8945</title></circle>
+<circle class="s2 ring" cx="895.5" cy="135.8" r="4.5"><title>notes-both-sides: 0.9063</title></circle>
+<circle class="s2 ring" cx="905.6" cy="132.8" r="4.5"><title>notes-admin-rights: 0.9297</title></circle>
+<circle class="s2 ring" cx="883.6" cy="119.1" r="4.5"><title>mongodb-doc-size: 0.8789</title></circle>
+<circle class="s2 ring" cx="843.1" cy="108.9" r="4.5"><title>mongodb-order-lines: 0.7852</title></circle>
+<circle class="s2 ring" cx="890.4" cy="115.0" r="4.5"><title>mongodb-advantages: 0.8945</title></circle>
+<circle class="s2 ring" cx="865.0" cy="124.8" r="4.5"><title>mongodb-explain: 0.8359</title></circle>
+<circle class="s2 ring" cx="895.5" cy="111.2" r="4.5"><title>claude-install-windows: 0.9063</title></circle>
+<circle class="s2 ring" cx="871.8" cy="135.8" r="4.5"><title>claude-plan-first: 0.8516</title></circle>
+<circle class="s2 ring" cx="887.0" cy="111.3" r="4.5"><title>claude-remember-instructions: 0.8867</title></circle>
+<circle class="s2 ring" cx="853.2" cy="115.2" r="4.5"><title>claude-settings-files: 0.8086</title></circle>
+<circle class="s2 ring" cx="865.0" cy="128.6" r="4.5"><title>typo-proxy: 0.8359</title></circle>
+<circle class="s2 ring" cx="870.1" cy="129.6" r="4.5"><title>typo-error-code: 0.8477</title></circle>
+<circle class="s2 ring" cx="876.9" cy="122.0" r="4.5"><title>typo-doc-size: 0.8633</title></circle>
+<circle class="s2 ring" cx="898.8" cy="119.6" r="4.5"><title>typo-install-windows: 0.9141</title></circle>
+<circle class="s2 ring" cx="844.8" cy="108.1" r="4.5"><title>partial-invite-price: 0.7891</title></circle>
+<circle class="s2 ring" cx="814.4" cy="106.9" r="4.5"><title>partial-doc-size-atlas: 0.7188</title></circle>
+<circle class="s2 ring" cx="846.5" cy="119.1" r="4.5"><title>partial-claude-mac-uninstall: 0.7930</title></circle>
+<circle class="s2 ring" cx="905.6" cy="119.0" r="4.5"><title>broad-handbook-summary: 0.9297</title></circle>
+<circle class="s2 ring" cx="873.5" cy="118.8" r="4.5"><title>broad-mongodb-schema-design: 0.8555</title></circle>
+<circle class="s2 ring" cx="909.0" cy="120.7" r="4.5"><title>broad-claude-getting-started: 0.9375</title></circle>
+<circle class="s2 ring" cx="907.3" cy="129.9" r="4.5"><title>book-blocking-stages: 0.9336</title></circle>
+<circle class="s2 ring" cx="890.4" cy="109.9" r="4.5"><title>book-memory-limit: 0.8945</title></circle>
+<circle class="s2 ring" cx="890.4" cy="133.5" r="4.5"><title>book-sort-spill: 0.8945</title></circle>
+<circle class="s2 ring" cx="861.7" cy="129.7" r="4.5"><title>book-set-vs-project: 0.8281</title></circle>
+<circle class="s2 ring" cx="898.8" cy="120.3" r="4.5"><title>book-mapreduce-deprecated: 0.9141</title></circle>
+<circle class="s2 ring" cx="909.0" cy="106.7" r="4.5"><title>book-framework-introduced: 0.9375</title></circle>
+<circle class="s2 ring" cx="832.9" cy="114.0" r="4.5"><title>book-expr-compare-fields: 0.7617</title></circle>
+<circle class="s2 ring" cx="795.8" cy="119.9" r="4.5"><title>book-filter-array: 0.6758</title></circle>
+<circle class="s2 ring" cx="863.3" cy="131.7" r="4.5"><title>book-lookup-sharded: 0.8320</title></circle>
+<circle class="s2 ring" cx="880.3" cy="124.7" r="4.5"><title>book-integral: 0.8711</title></circle>
+<circle class="s2 ring" cx="900.5" cy="113.5" r="4.5"><title>book-atlas-search-index: 0.9180</title></circle>
+<circle class="s2 ring" cx="878.6" cy="117.9" r="4.5"><title>typo-memory-limit: 0.8672</title></circle>
+<circle class="s2 ring" cx="778.9" cy="129.0" r="4.5"><title>partial-memory-limit-price: 0.6367</title></circle>
+<circle class="s2 ring" cx="881.9" cy="117.2" r="4.5"><title>book-mapreduce-removed: 0.8750</title></circle>
+<circle class="s2 ring" cx="881.9" cy="112.0" r="4.5"><title>broad-book-performance: 0.8750</title></circle>
+<circle class="s2 ring" cx="783.9" cy="134.0" r="4.5"><title>broad-book-examples: 0.6484</title></circle>
+<circle class="s2 ring" cx="885.3" cy="126.4" r="4.5"><title>broad-book-summary: 0.8828</title></circle>
+<circle class="s2 ring" cx="910.7" cy="112.3" r="4.5"><title>pouch-seam-allowance: 0.9414</title></circle>
+<circle class="s2 ring" cx="865.0" cy="133.1" r="4.5"><title>pouch-zipper: 0.8359</title></circle>
+<circle class="s2 ring" cx="831.2" cy="114.3" r="4.5"><title>pouch-turning-hole: 0.7578</title></circle>
+<circle class="s2 ring" cx="843.1" cy="114.3" r="4.5"><title>partial-pouch-size-fabric: 0.7852</title></circle>
+<circle class="s2 ring" cx="909.0" cy="118.8" r="4.5"><title>broad-pouch-steps: 0.9375</title></circle>
+<line class="grid" x1="590" y1="150" x2="936" y2="150"/>
+<circle class="s2 ring" cx="731.6" cy="173.0" r="4.5"><title>guide-uninstall-mac: 0.5273</title></circle>
+<circle class="s2 ring" cx="750.2" cy="176.3" r="4.5"><title>guide-error-6001: 0.5703</title></circle>
+<circle class="s2 ring" cx="687.7" cy="176.6" r="4.5"><title>handbook-price: 0.4258</title></circle>
+<circle class="s2 ring" cx="708.8" cy="185.2" r="4.5"><title>handbook-sso-setup: 0.4746</title></circle>
+<circle class="s2 ring" cx="702.8" cy="184.3" r="4.5"><title>mongodb-backup: 0.4609</title></circle>
+<circle class="s2 ring" cx="709.6" cy="190.0" r="4.5"><title>mongodb-sql: 0.4766</title></circle>
+<circle class="s2 ring" cx="704.5" cy="192.1" r="4.5"><title>claude-pro-price: 0.4648</title></circle>
+<circle class="s2 ring" cx="718.9" cy="181.9" r="4.5"><title>book-vector-search: 0.4980</title></circle>
+<circle class="s2 ring" cx="683.4" cy="165.3" r="4.5"><title>book-change-streams: 0.4160</title></circle>
+<circle class="s2 ring" cx="783.9" cy="169.6" r="4.5"><title>book-max-stages: 0.6484</title></circle>
+<circle class="s2 ring" cx="731.6" cy="182.3" r="4.5"><title>pouch-washing: 0.5273</title></circle>
+<circle class="s2 ring" cx="821.1" cy="171.2" r="4.5"><title>pouch-larger: 0.7344</title></circle>
+<line class="grid" x1="590" y1="208" x2="936" y2="208"/>
+<circle class="s2 ring" cx="617.6" cy="234.0" r="4.5"><title>offtopic-france: 0.2637</title></circle>
+<circle class="s2 ring" cx="614.2" cy="243.9" r="4.5"><title>offtopic-banana-bread: 0.2559</title></circle>
+<circle class="s2 ring" cx="624.3" cy="240.6" r="4.5"><title>offtopic-css-center: 0.2793</title></circle>
+<circle class="s2 ring" cx="697.8" cy="226.9" r="4.5"><title>offtopic-git-undo: 0.4492</title></circle>
+<circle class="s2 ring" cx="621.7" cy="244.3" r="4.5"><title>offtopic-tcp-udp: 0.2734</title></circle>
+<circle class="s2 ring" cx="643.7" cy="250.1" r="4.5"><title>offtopic-postgres-key: 0.3242</title></circle>
+<circle class="s2 ring" cx="724.8" cy="240.7" r="4.5"><title>offtopic-python-windows: 0.5117</title></circle>
+<circle class="s2 ring" cx="666.6" cy="232.9" r="4.5"><title>offtopic-mysql-group-by: 0.3770</title></circle>
+<circle class="s2 ring" cx="718.1" cy="240.2" r="4.5"><title>offtopic-buttonhole: 0.4961</title></circle>
+<line class="grid" x1="590" y1="266" x2="936" y2="266"/>
+<circle class="s2 ring" cx="611.6" cy="294.9" r="4.5"><title>guide-proxy: 0.2500</title></circle>
+<circle class="s2 ring" cx="626.0" cy="288.7" r="4.5"><title>guide-battery: 0.2832</title></circle>
+<circle class="s2 ring" cx="641.2" cy="308.8" r="4.5"><title>guide-error-1001: 0.3184</title></circle>
+<circle class="s2 ring" cx="627.7" cy="304.9" r="4.5"><title>guide-rename-history: 0.2871</title></circle>
+<circle class="s2 ring" cx="626.8" cy="298.2" r="4.5"><title>handbook-invite-valid: 0.2852</title></circle>
+<circle class="s2 ring" cx="670.7" cy="285.1" r="4.5"><title>handbook-changes-not-seen: 0.3867</title></circle>
+<circle class="s2 ring" cx="646.3" cy="305.2" r="4.5"><title>handbook-storage-full: 0.3301</title></circle>
+<circle class="s2 ring" cx="615.9" cy="306.6" r="4.5"><title>handbook-subfolder-access: 0.2598</title></circle>
+<circle class="s2 ring" cx="658.1" cy="287.2" r="4.5"><title>notes-both-sides: 0.3574</title></circle>
+<circle class="s2 ring" cx="617.6" cy="293.1" r="4.5"><title>notes-admin-rights: 0.2637</title></circle>
+<circle class="s2 ring" cx="609.9" cy="290.7" r="4.5"><title>mongodb-doc-size: 0.2461</title></circle>
+<circle class="s2 ring" cx="609.9" cy="287.7" r="4.5"><title>mongodb-order-lines: 0.2461</title></circle>
+<circle class="s2 ring" cx="617.6" cy="302.6" r="4.5"><title>mongodb-advantages: 0.2637</title></circle>
+<circle class="s2 ring" cx="620.1" cy="291.1" r="4.5"><title>mongodb-explain: 0.2695</title></circle>
+<circle class="s2 ring" cx="612.5" cy="299.5" r="4.5"><title>claude-install-windows: 0.2520</title></circle>
+<circle class="s2 ring" cx="626.8" cy="289.9" r="4.5"><title>claude-plan-first: 0.2852</title></circle>
+<circle class="s2 ring" cx="654.7" cy="292.0" r="4.5"><title>claude-remember-instructions: 0.3496</title></circle>
+<circle class="s2 ring" cx="643.7" cy="299.5" r="4.5"><title>claude-settings-files: 0.3242</title></circle>
+<circle class="s2 ring" cx="617.6" cy="290.8" r="4.5"><title>typo-proxy: 0.2637</title></circle>
+<circle class="s2 ring" cx="622.6" cy="303.8" r="4.5"><title>typo-error-code: 0.2754</title></circle>
+<circle class="s2 ring" cx="609.5" cy="295.5" r="4.5"><title>typo-doc-size: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.5" cy="286.9" r="4.5"><title>typo-install-windows: 0.2451</title></circle>
+<circle class="s2 ring" cx="621.7" cy="282.8" r="4.5"><title>partial-invite-price: 0.2734</title></circle>
+<circle class="s2 ring" cx="609.5" cy="304.6" r="4.5"><title>partial-doc-size-atlas: 0.2451</title></circle>
+<circle class="s2 ring" cx="611.6" cy="290.0" r="4.5"><title>partial-claude-mac-uninstall: 0.2500</title></circle>
+<circle class="s2 ring" cx="623.4" cy="291.8" r="4.5"><title>broad-handbook-summary: 0.2773</title></circle>
+<circle class="s2 ring" cx="622.6" cy="287.0" r="4.5"><title>broad-mongodb-schema-design: 0.2754</title></circle>
+<circle class="s2 ring" cx="627.7" cy="302.4" r="4.5"><title>broad-claude-getting-started: 0.2871</title></circle>
+<circle class="s2 ring" cx="609.9" cy="295.5" r="4.5"><title>book-blocking-stages: 0.2461</title></circle>
+<circle class="s2 ring" cx="609.5" cy="303.6" r="4.5"><title>book-memory-limit: 0.2451</title></circle>
+<circle class="s2 ring" cx="622.6" cy="304.6" r="4.5"><title>book-sort-spill: 0.2754</title></circle>
+<circle class="s2 ring" cx="626.0" cy="302.5" r="4.5"><title>book-set-vs-project: 0.2832</title></circle>
+<circle class="s2 ring" cx="608.3" cy="291.1" r="4.5"><title>book-mapreduce-deprecated: 0.2422</title></circle>
+<circle class="s2 ring" cx="621.7" cy="289.0" r="4.5"><title>book-framework-introduced: 0.2734</title></circle>
+<circle class="s2 ring" cx="624.3" cy="307.4" r="4.5"><title>book-expr-compare-fields: 0.2793</title></circle>
+<circle class="s2 ring" cx="609.5" cy="294.1" r="4.5"><title>book-filter-array: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.5" cy="289.3" r="4.5"><title>book-lookup-sharded: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.5" cy="291.4" r="4.5"><title>book-integral: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.9" cy="286.3" r="4.5"><title>book-atlas-search-index: 0.2461</title></circle>
+<circle class="s2 ring" cx="609.9" cy="300.1" r="4.5"><title>typo-memory-limit: 0.2461</title></circle>
+<circle class="s2 ring" cx="609.5" cy="300.6" r="4.5"><title>partial-memory-limit-price: 0.2451</title></circle>
+<circle class="s2 ring" cx="614.2" cy="295.2" r="4.5"><title>book-mapreduce-removed: 0.2559</title></circle>
+<circle class="s2 ring" cx="650.5" cy="287.1" r="4.5"><title>broad-book-performance: 0.3398</title></circle>
+<circle class="s2 ring" cx="628.5" cy="309.6" r="4.5"><title>broad-book-examples: 0.2891</title></circle>
+<circle class="s2 ring" cx="614.2" cy="289.4" r="4.5"><title>broad-book-summary: 0.2559</title></circle>
+<circle class="s2 ring" cx="609.5" cy="291.8" r="4.5"><title>pouch-seam-allowance: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.5" cy="290.5" r="4.5"><title>pouch-zipper: 0.2451</title></circle>
+<circle class="s2 ring" cx="608.3" cy="286.3" r="4.5"><title>pouch-turning-hole: 0.2422</title></circle>
+<circle class="s2 ring" cx="609.5" cy="298.8" r="4.5"><title>partial-pouch-size-fabric: 0.2451</title></circle>
+<circle class="s2 ring" cx="609.5" cy="306.0" r="4.5"><title>broad-pouch-steps: 0.2451</title></circle>
+<line class="thr" x1="754.3499999999999" y1="70" x2="754.3499999999999" y2="324"/>
+<text class="ink2" x="760.3499999999999" y="83" font-size="11">threshold 0.58</text>
+<text class="ink" x="24" y="119" font-size="13" font-weight="600">Answerable</text>
+<text class="muted" x="24" y="135" font-size="11">50 questions</text>
+<text class="ink" x="24" y="177" font-size="13" font-weight="600">Near-miss</text>
+<text class="muted" x="24" y="193" font-size="11">12 questions, answer absent</text>
+<text class="ink" x="24" y="235" font-size="13" font-weight="600">Off-topic</text>
+<text class="muted" x="24" y="251" font-size="11">9 questions</text>
+<text class="ink" x="24" y="293" font-size="13" font-weight="600">Wrong upload</text>
+<text class="muted" x="24" y="309" font-size="11">50 searches, unrelated upload</text>
+</svg>

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 570" width="960" height="570" role="img" aria-labelledby="t2 d2">
+<title id="t2">Vector search alone vs reranked: ranking and threshold results</title>
+<desc id="d2">Share of test questions per check. Ranking: answer first in All uploads 33 of 43 vs 40 of 43; in one upload 36 vs 40 of 43; expected upload first 48 vs 50 of 50. Threshold: answerable questions sent on to the LLM 50 of 50 both; stopped before the LLM: wrong upload 38 vs 50 of 50, near-miss 0 vs 10 of 12, off-topic 3 vs 9 of 9, several uploads without the answer 0 vs 4 of 4.</desc>
+
+<style>
+  .surface { fill: #fcfcfb; }
+  .ink { fill: #0b0b0b; }
+  .ink2 { fill: #52514e; }
+  .muted { fill: #898781; }
+  .grid { stroke: #e1e0d9; stroke-width: 1; }
+  .axis { stroke: #c3c2b7; stroke-width: 1; }
+  .thr { stroke: #52514e; stroke-width: 1.5; }
+  .zone { fill: #f0efec; }
+  .s1 { fill: #2a78d6; }
+  .s2 { fill: #eb6834; }
+  .ring { stroke: #fcfcfb; stroke-width: 1.5; }
+  text { font-family: system-ui, -apple-system, &quot;Segoe UI&quot;, sans-serif; }
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19; }
+    .ink { fill: #ffffff; }
+    .ink2 { fill: #c3c2b7; }
+    .grid { stroke: #2c2c2a; }
+    .axis { stroke: #383835; }
+    .thr { stroke: #c3c2b7; }
+    .zone { fill: #242423; }
+    .s1 { fill: #3987e5; }
+    .s2 { fill: #d95926; }
+    .ring { stroke: #1a1a19; }
+  }
+</style>
+<rect class="surface" width="960" height="570" rx="8"/>
+<text class="ink" x="24" y="34" font-size="18" font-weight="600">Vector search alone vs reranked</text>
+<text class="ink2" x="24" y="56" font-size="13">Share of the test questions that come out right, per check. Stopped = "not found in your uploads" without calling the LLM (thresholds 0.62 cosine, 0.58 rerank).</text>
+<rect class="s1" x="24" y="70" width="12" height="12" rx="2"/><text class="ink2" x="42" y="80" font-size="12">Vector search alone</text>
+<rect class="s2" x="190" y="70" width="12" height="12" rx="2"/><text class="ink2" x="208" y="80" font-size="12">Reranked</text>
+<text class="ink" x="24" y="120" font-size="14" font-weight="600">Ranking: the chunk with the answer comes first</text>
+<text class="ink2" x="290" y="153" font-size="12" text-anchor="end">Answer ranked first (All uploads)</text>
+<text class="ink2" x="290" y="197" font-size="12" text-anchor="end">Answer ranked first (one upload)</text>
+<text class="ink2" x="290" y="241" font-size="12" text-anchor="end">Expected upload ranked first</text>
+<text class="ink" x="24" y="286" font-size="14" font-weight="600">Threshold: answerable questions should go on to the LLM; the rest should stop before it</text>
+<text class="ink2" x="290" y="319" font-size="12" text-anchor="end">Answerable: sent on to the LLM</text>
+<text class="ink2" x="290" y="363" font-size="12" text-anchor="end">Wrong upload: stopped</text>
+<text class="ink2" x="290" y="407" font-size="12" text-anchor="end">Near-miss: stopped</text>
+<text class="ink2" x="290" y="451" font-size="12" text-anchor="end">Off-topic: stopped</text>
+<text class="ink2" x="290" y="495" font-size="12" text-anchor="end">Several ticked, none has it: stopped</text>
+<line class="axis" x1="314" y1="130" x2="314" y2="256"/>
+<line class="axis" x1="314" y1="296" x2="314" y2="510"/>
+<text class="muted" x="314" y="532" font-size="12" text-anchor="middle">0%</text>
+<line class="grid" x1="448" y1="130" x2="448" y2="256"/>
+<line class="grid" x1="448" y1="296" x2="448" y2="510"/>
+<text class="muted" x="448" y="532" font-size="12" text-anchor="middle">25%</text>
+<line class="grid" x1="582" y1="130" x2="582" y2="256"/>
+<line class="grid" x1="582" y1="296" x2="582" y2="510"/>
+<text class="muted" x="582" y="532" font-size="12" text-anchor="middle">50%</text>
+<line class="grid" x1="716" y1="130" x2="716" y2="256"/>
+<line class="grid" x1="716" y1="296" x2="716" y2="510"/>
+<text class="muted" x="716" y="532" font-size="12" text-anchor="middle">75%</text>
+<line class="grid" x1="850" y1="130" x2="850" y2="256"/>
+<line class="grid" x1="850" y1="296" x2="850" y2="510"/>
+<text class="muted" x="850" y="532" font-size="12" text-anchor="middle">100%</text>
+<path class="s1" d="M314,134 h407.34883720930236 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-407.34883720930236 z"><title>Answer ranked first (All uploads): 33 of 43</title></path>
+<text class="ink2" x="731.3488372093024" y="145" font-size="11">33 of 43</text>
+<path class="s2" d="M314,150 h494.6046511627907 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-494.6046511627907 z"><title>Answer ranked first (All uploads): 40 of 43</title></path>
+<text class="ink2" x="818.6046511627907" y="161" font-size="11">40 of 43</text>
+<path class="s1" d="M314,178 h444.7441860465117 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-444.7441860465117 z"><title>Answer ranked first (one upload): 36 of 43</title></path>
+<text class="ink2" x="768.7441860465117" y="189" font-size="11">36 of 43</text>
+<path class="s2" d="M314,194 h494.6046511627907 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-494.6046511627907 z"><title>Answer ranked first (one upload): 40 of 43</title></path>
+<text class="ink2" x="818.6046511627907" y="205" font-size="11">40 of 43</text>
+<path class="s1" d="M314,222 h510.55999999999995 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-510.55999999999995 z"><title>Expected upload ranked first: 48 of 50</title></path>
+<text class="ink2" x="834.56" y="233" font-size="11">48 of 50</text>
+<path class="s2" d="M314,238 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Expected upload ranked first: 50 of 50</title></path>
+<text class="ink2" x="856" y="249" font-size="11">50 of 50</text>
+<path class="s1" d="M314,300 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Answerable: sent on to the LLM: 50 of 50</title></path>
+<text class="ink2" x="856" y="311" font-size="11">50 of 50</text>
+<path class="s2" d="M314,316 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Answerable: sent on to the LLM: 50 of 50</title></path>
+<text class="ink2" x="856" y="327" font-size="11">50 of 50</text>
+<path class="s1" d="M314,344 h403.36 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-403.36 z"><title>Wrong upload: stopped: 38 of 50</title></path>
+<text class="ink2" x="727.36" y="355" font-size="11">38 of 50</text>
+<path class="s2" d="M314,360 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Wrong upload: stopped: 50 of 50</title></path>
+<text class="ink2" x="856" y="371" font-size="11">50 of 50</text>
+
+<text class="ink2" x="320" y="399" font-size="11">0 of 12</text>
+<path class="s2" d="M314,404 h442.66666666666674 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-442.66666666666674 z"><title>Near-miss: stopped: 10 of 12</title></path>
+<text class="ink2" x="766.6666666666667" y="415" font-size="11">10 of 12</text>
+<path class="s1" d="M314,432 h174.66666666666663 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-174.66666666666663 z"><title>Off-topic: stopped: 3 of 9</title></path>
+<text class="ink2" x="498.66666666666663" y="443" font-size="11">3 of 9</text>
+<path class="s2" d="M314,448 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Off-topic: stopped: 9 of 9</title></path>
+<text class="ink2" x="856" y="459" font-size="11">9 of 9</text>
+
+<text class="ink2" x="320" y="487" font-size="11">0 of 4</text>
+<path class="s2" d="M314,492 h532 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-532 z"><title>Several ticked, none has it: stopped: 4 of 4</title></path>
+<text class="ink2" x="856" y="503" font-size="11">4 of 4</text>
+</svg>
