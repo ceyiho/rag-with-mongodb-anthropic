@@ -51,6 +51,9 @@ so no logins or usage limits are needed.
   Switching models later means re-embedding everything. Uses a one-time free
   allocation of 200 million tokens per model (not monthly), so avoid unnecessary
   re-embedding.
+- Reranking (milestone 9): the `$rerank` stage with Voyage AI `rerank-3`, run by
+  Atlas outside the cluster; on for every answer by default. A one-time allocation of
+  200 million free tokens per organization, then $0.05 per million.
 - Chunking: custom splitter (sections → paragraphs → sentences), sized in characters
   (≈4 characters per token). No library. Sections come from the extractor: Markdown
   headings, one per plain-text file, pages for PDFs.
@@ -69,8 +72,9 @@ so no logins or usage limits are needed.
 3. Embed: Atlas Auto-Embedding converts each chunk's text to a vector with Voyage AI,
    through the vector search index.
 4. Retrieve: the question is sent to Atlas as text; Atlas embeds it with the same
-   model, and Vector Search finds the closest chunks (pre-filtered by the uploadIds of
-   the ticked uploads).
+   model, and Vector Search finds the 50 closest chunks (pre-filtered by the uploadIds
+   of the ticked uploads). The `$rerank` stage re-sorts them by how well each answers
+   the question, and the top 10 go on.
 5. Answer: if the best match scores below the threshold, reply "not found in your
    uploads". Otherwise the chunks and question go to the LLM, which answers with
    citations.
@@ -79,7 +83,8 @@ so no logins or usage limits are needed.
 - Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Atlas Search autocomplete (fuzzy) on upload titles, for the picker's search
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
-- To consider: reranking with `$rerank` (Voyage AI), see milestone 9
+- Reranking with `$rerank` (Voyage AI) on every answer (milestone 9; results in
+  `test/RERANKING.md`)
 - Optional: aggregation pipeline analytics (most-asked questions, most-cited uploads,
   questions with no good match). Parked; see the last milestone.
 
@@ -139,18 +144,20 @@ so no logins or usage limits are needed.
    sets the layout, the states and how the page behaves, not its code or exact
    styling; where it and API_SPEC.md differ, the spec wins. It isn't updated after
    milestone 7.
-9. Hybrid search: add an Atlas Search (keyword) index and combine it with vector search.
-   Combined scores use a different scale, so re-tune the "not found" threshold (record
-   it under Findings), and
-   compare against vector-only results using `test/questions.json`.
-   Optional, for the demo: a search mode switch (Vector · Keyword · Hybrid) in the
-   "How this was found" panel, to show how results differ, e.g. for exact codes or
-   typos.
-   To consider: the `$rerank` stage (Voyage AI) to rerank 20–50 candidates into the
-   top 5. Its score may separate near-misses from answers, which cosine can't;
-   measure that first. Available since the move to M10: it needs MongoDB 8.3+ (the
-   M0 ran 8.0.32), and is generally available in 9.0. Documentation:
-   https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/
+9. Better retrieval: reranking, then hybrid search, each measured against vector
+   search alone with `test/questions.json`.
+   - Reranking (done): the `$rerank` stage (Voyage AI) reranks the top 50 vector
+     results into the top 10 for every answer, with its own "not found" threshold.
+     It needs MongoDB 8.3+ (the M0 ran 8.0.32; generally available in 9.0). Results
+     in `test/RERANKING.md`.
+   - Web page: a "compare without rerank" option that asks both ways and shows both
+     answers, and rerank scores in "How this was found".
+   - Hybrid search: add an Atlas Search (keyword) index and combine it with vector
+     search. With reranking last, the threshold stays on rerank scores; re-check it
+     and record it under Findings.
+   - Optional, for the demo: a search mode switch (Vector · Keyword · Hybrid, with or
+     without reranking) in the "How this was found" panel, to show how results
+     differ, e.g. for exact codes or typos.
 
 ### Phase 3
 10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
@@ -163,9 +170,7 @@ so no logins or usage limits are needed.
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
-- Search kind in answers (milestone 9): how `POST /api/ask` reports vector, keyword
-  or hybrid search. Leaning towards a separate field in `retrieval`, since `mode`
-  (exact or approximate) says how the vector search ran, which is a different thing.
+- None.
 
 ## Decisions
 - Database: `knowledge_base` (`DB_NAME` in `.env`).
@@ -204,7 +209,13 @@ so no logins or usage limits are needed.
   within a few uploads); "All uploads" uses approximate search, filtered on the ids of
   searchable uploads (milestone 4: complete) rather than no filter, so orphan chunks,
   crash leftovers and half-embedded uploads never reach an answer. The LLM gets the
-  top `search.limit` chunks (10).
+  top `search.limit` chunks (10), reranked from 50 since milestone 9.
+- Reranking (milestone 9): on for every answer: `rerank-3`, 50 candidates, top 10 to
+  the LLM; "not found" threshold 0.58 on the top rerank score, both modes (see
+  Findings: Rerank threshold). Asked with `rerank: false` (API) or `--no-rerank`
+  (command line), answers come from vector search alone at the cosine 0.62. Tied
+  rerank scores are broken by the cosine score. No fallback to vector search alone:
+  embedding the question needs Voyage AI too.
 - PDF pages (milestone 6; detailed rules in the PDF extractor's header comment): each
   page is a section, cited by its PDF page number, and page breaks stay hard
   boundaries. Pages are read in visual order (some PDFs store code blocks after the
@@ -240,6 +251,8 @@ so no logins or usage limits are needed.
   - `GET /api/health` tells a stopped server from an unreachable database.
   - Uploads: the request waits for the ingest; one at a time; 50 MB limit.
   - Answers: parts with citation numbers; "How this was found" on every answer.
+    `retrieval.search` names the kind of search (vector; hybrid later), separate from
+    `mode` (exact or approximate), and `retrieval.rerank` the reranking (milestone 9).
   - Questions are standalone; no follow-ups.
   - Earlier questions are kept in the browser (`localStorage`), not in Atlas.
   - The server listens on `127.0.0.1` unless `HOST` is set.
@@ -291,7 +304,9 @@ milestones run.
   and the vector index toward 512 MB. Measured on M0; M10's storage (10 GB by
   default) makes it a non-issue.
 - "Not found" score threshold (milestones 4, 6; runs of 2026-09-29 and 2026-10-01):
-  0.62 for both search modes, which scored almost the same (two config entries, so
+  since milestone 9 it applies only to answers without reranking (cosine scores);
+  reranked answers use 0.58 (Findings: Rerank threshold). 0.62 for both search modes,
+  which scored almost the same (two config entries, so
   they can diverge, e.g. for hybrid). Answerable questions scored 0.65–0.86 and
   clearly unrelated ones 0.58–0.61, so it rejects those and most questions asked of
   the wrong upload. But near-misses (on topic, answer absent: 0.68–0.80) and technical
@@ -313,13 +328,16 @@ milestones run.
   content, so they aren't merged. One weak retrieval: a book answer on a mostly-code
   page ranks #10, behind symbol-only cheatsheet pages; try neighbour expansion (send
   each hit with the chunks at `chunkIndex` ± 1) or hybrid search (milestone 9).
+  Reranking (milestone 9) moved it to #5.
 - Answers (milestones 5–7; runs of 2026-09-29, 2026-10-01 and 2026-10-05): all 112
   question/mode pairs passed; with the PDFs, 188 of 191 (the 3 failures were badly
   designed questions, since fixed); after milestone 7's search and answer changes,
   with several ticked uploads added, 203 of 203. The LLM replied "not found" to every
   near-miss and off-topic question the threshold let through (up to 0.80), so
   threshold plus LLM work as planned. Detecting "not found" by citations held, and
-  partial answers named their missing part.
+  partial answers named their missing part. With reranking (milestone 9), no full
+  answer run was made, to save cost; a run of the 7 questions whose top 10 changed
+  most passed 19 of 19 question/mode pairs (runs of 2026-10-09).
 - Answer prompt (milestone 5; runs of 2026-09-29): tuned against unasked gap notes, an
   invented example value and long answers; the kept rules are in the system prompt.
   Accepted: proxy answers note that no exact syntax is given. Replies vary between
@@ -331,7 +349,8 @@ milestones run.
   chunk size. `search.limit` raised from 5 to 10 in milestone 6 (runs of 2026-10-01):
   uploads of 10–13 chunks now get complete answers; the book's stay partial. "What
   kinds of examples does the book include?" stays incomplete at any limit (no table
-  of contents in its text). Cost: ~$0.003 more per question.
+  of contents in its text). Cost: ~$0.003 more per question. Reranked (milestone 9),
+  that question finds the book's list of example chapters and names about a dozen.
 - Scanned PDFs (milestone 6): rejected as intended, tested with image-only mock PDFs,
   including one with a small text footer as phone scanner apps add. A text PDF with a
   few image-only pages (a cover, a diagram) is accepted; those pages give no section.
@@ -358,7 +377,23 @@ milestones run.
   0.6211, still kept by 0.62), probably because two test uploads (6 chunks) were in
   the M0 run and not this one. No answer run needed, since the same chunks reach the
   LLM. This run is milestone 9's vector-only baseline.
-- Hybrid "not found" score threshold (milestone 9): not chosen yet
+- Reranking (milestone 9; runs of 2026-10-09; details and charts in
+  `test/RERANKING.md`): the answer text comes first for 40 of 43 questions (vector
+  search alone: 33 in All uploads, 36 in one upload), the expected upload first for 50
+  of 50 (was 48). Rerank scores separate answers from non-answers, which cosine scores
+  didn't: unanswerable questions scoring at or above the lowest answer dropped from 16
+  to 2, and unrelated chunks sit near 0.25 (cosine: about 0.59). 20 and 50 candidates
+  gave practically the same results; 50 leaves room for large uploads. Cost: about
+  20,000 rerank tokens and 300 ms per question (estimates).
+- Rerank threshold (milestone 9; runs of 2026-10-09): 0.58 for both search modes. It
+  sends all 50 answerable questions to the LLM (lowest 0.637, a margin of 0.057) and
+  stops every wrong-upload, off-topic and several-uploads-without-the-answer search,
+  and 10 of 12 near-misses (vector search alone at 0.62 stopped 38 of 50 wrong
+  uploads, 0 to 3 of 9 off-topic, and none of the others). 0.62 would stop the same, but at 20 candidates a real answer
+  scored one score step above it. The 2 near-misses still sent to the LLM got "not
+  found" from it. Rerank scores keep about 3 significant digits, so ties are common.
+- Hybrid "not found" score threshold (milestone 9): not chosen yet. With reranking
+  last, the rerank threshold may serve as is; re-check it.
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
@@ -398,5 +433,8 @@ milestones run.
 - Before milestone 9: moved to an M10 cluster (MongoDB 9.0), where `$rerank` is
   generally available. Search scores unchanged (Findings: Cluster move); the run
   `2026-10-09-m10-baseline` is the vector-only baseline for milestone 9.
-- Next: milestone 9 (hybrid search).
+- Milestone 9 in progress: reranking is done and on for every answer (Decisions:
+  Reranking; Findings: Reranking, Rerank threshold; `test/RERANKING.md`). The API and
+  command line can still answer without it (`rerank: false`, `--no-rerank`).
+- Next: the web page's reranking options (milestone 9), then hybrid search.
 - Files and commands: see ARCHITECTURE.md.

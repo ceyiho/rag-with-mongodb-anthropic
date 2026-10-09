@@ -11,14 +11,21 @@ so during one it may lag behind the files.
 file ──► extractor ──► splitter ──► chunks collection ──► Atlas Auto-Embedding
          (sections)    (chunks)     (text + metadata)     (vectors, in the vector index)
 
-question ──► search ──► top chunks + scores ──► threshold check ──► LLM answer with citations
-             (Atlas embeds the question        (below it: "not found",
-              with the same model)              no LLM call)
+question ──► vector search ──► rerank ─────► threshold check ──► LLM answer with citations
+             (top 50; Atlas    (Voyage AI    (top score; below it:
+              embeds the        re-sorts,     "not found", no LLM call)
+              question)         top 10)
 ```
 
 The app never creates vectors: it stores chunk text, and Atlas embeds it in the
 background through the vector search index. New chunks become searchable a few
 seconds after they are saved.
+
+Answers are reranked by default: vector search fetches the 50 closest chunks, the
+`$rerank` stage re-sorts them by how well each answers the question, and the top 10
+go on. The threshold then checks the top rerank score. Asked without reranking
+(`rerank: false`, `--no-rerank`), the top 10 come from vector search alone and the
+threshold checks the cosine score. `test/RERANKING.md` compares the two.
 
 The LLM (Claude, through the Anthropic API) gets the top chunks as search results and
 cites the ones it uses; each citation maps back to an upload and section. A reply with
@@ -90,7 +97,7 @@ Scripts and tools import from `src/`, never the reverse.
 
 | File | Purpose |
 |---|---|
-| `config.js` | Application settings: collection and search index names, search limits, "not found" thresholds (all uploads, selected uploads), answer model, upload size and file-name limits, title search settings, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
+| `config.js` | Application settings: collection and search index names, search limits, "not found" thresholds (all uploads, selected uploads; cosine for vector search alone, and their own for reranking), reranking (model, candidates), answer model, upload size and file-name limits, title search settings, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section; its chunks start with a title made from the file name. Also decodes file bytes to text. |
@@ -101,8 +108,8 @@ Scripts and tools import from `src/`, never the reverse.
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
 | `upload-error.js` | `UploadError`: an upload problem the user can fix (duplicate, unsupported type, scanned PDF…), with a code the API turns into a 4xx. |
 | `readiness.js` | The readiness check: counts an upload's searchable chunks (exact vector search, then `$count`) and sets `searchableAt` once all are. |
-| `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; joins each chunk's upload (`$lookup`). Returns the chunks with scores, and the mode and counts. |
-| `answer.js` | Answers a question: search, then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format). Holds the system prompt. |
+| `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; optionally reranks a number of candidates (`$rerank`); joins each chunk's upload (`$lookup`). Returns the chunks with their score (rerank or cosine) and cosine `vectorScore`, and the mode, reranking and counts. |
+| `answer.js` | Answers a question: search (reranked unless asked with `rerank: false`), then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format). Holds the system prompt. |
 | `indexes.js` | The Atlas Search index definitions (vector, title autocomplete) and their status. |
 | `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. Remembers a working title index until the server stops. |
 
@@ -114,7 +121,7 @@ Route files handle a request first; helpers are only called by them.
 |---|---|---|
 | `health.js` | `GET /api/health` | Whether the server can reach the database. |
 | `uploads.js` | `GET /api/uploads`<br>`GET /api/uploads/search`<br>`GET /api/uploads/:id`<br>`POST /api/uploads` | Upload routes: the list, title search, one upload with its readiness check, and the upload itself (`multer`). |
-| `ask.js` | `POST /api/ask` | Checks the request, answers it, and sends the fields API_SPEC.md lists. |
+| `ask.js` | `POST /api/ask` | Checks the request (including the optional `rerank`), answers it, and sends the fields API_SPEC.md lists; turns a busy or refusing LLM into its own error codes. |
 | `errors.js` | Any other `/api` route (a 404) | Helper: `ApiError`, and the error handler that turns every route's errors into `{ error: { code, message } }`. |
 | `ids.js` | – | Helper: turns upload ids from requests into ObjectIds, or a 400 (for `uploads.js` and `ask.js`). |
 
@@ -141,7 +148,7 @@ Setup, and the command-line versions of uploading and asking.
 |---|---|---|
 | `setup-db.js` | `npm run setup` | Creates the collections, regular indexes and search indexes (skips ones that exist), then sets `searchableAt` on complete uploads that lack it. |
 | `ingest-file.js` | `npm run ingest -- <file>` | Uploads a file from the command line, then waits until it is searchable. |
-| `ask.js` | `npm run ask -- "<question>" [--upload <fileName>]...` | Asks a question from the command line, of all uploads or the ones named; prints the answer and its sources. |
+| `ask.js` | `npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank]` | Asks a question from the command line, of all uploads or the ones named; prints the answer and its sources. Reranked unless `--no-rerank`. |
 
 ### `tools/`: maintenance and testing, not needed for the app to work
 
@@ -153,13 +160,13 @@ Everything that shows the app's internals.
 | `index-status.js` | `npm run index-status` | Status of each search index, or that it's missing. |
 | `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. Only counts; never sets `searchableAt`. |
 | `chunk-file.js` | `npm run chunk -- <file> [--full]` | Chunking preview, no database: each chunk's start and end on one line, with the PDF prefix; `--full` prints whole chunks. |
-| `search.js` | `npm run search -- "<question>" [--upload <fileName>]...` | Raw search results with scores, for testing and tuning. |
-| `run-test-questions.js` | `npm run test-questions` | Runs `test/questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does. `--save <label>` writes a report to `test/results/`. Its header describes the question fields and kinds. |
-| `run-test-answers.js` | `npm run test-answers` | Runs `test/questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s. |
+| `search.js` | `npm run search -- "<question>" [--upload <fileName>]...` | Raw search results with scores (rerank and cosine), for testing and tuning. Reranked like answers; `--rerank <n>` reranks another number of candidates, `--no-rerank` shows vector search alone. |
+| `run-test-questions.js` | `npm run test-questions` | Runs `test/questions.json` through search only: scores, ranks, whether the answer text was retrieved, and what the threshold does (sent to the LLM or stopped). Reranked by default; `--no-rerank` for vector search alone, `--rerank <n>` and `--threshold <score>` to try other values. `--save <label>` writes a report to `test/results/`. Its header describes the question fields and kinds. |
+| `run-test-answers.js` | `npm run test-answers` | Runs `test/questions.json` through the answer function (calls the LLM): Pass/Fail per reply, with a diagnosis for each Fail. `--save <label>` writes a report with every answer; `--only <ids>` runs a few questions; `--limit <n>` sends n chunks to the LLM instead of `config.js`'s; `--no-rerank` answers from vector search alone. |
 | `cleanup.js` | `npm run cleanup` | Removes orphan chunks, stale ingests, or one named upload. Lists first; `--yes` removes. |
 | `test-modes.js` | – | The search modes both test runners use (all, one, wrong, several) and when each expects an answer. |
 
-### `test/`: test questions and saved test runs
+### `test/`: test questions, saved test runs, and what they showed
 
 `questions.json` holds the test questions against the samples: which upload should
 answer each, the answer phrases, a wrong upload for each answerable one, and for some,
@@ -171,6 +178,11 @@ several uploads to search together. Fields and kinds are described in
 and `npm run test-answers -- --save <label>` writes `<date>-answers-<label>.md`
 (answers, with the system prompt used). Each report lists the settings that affect its
 results. Findings in PROJECT_PLAN.md name the date of the runs they rely on.
+
+`RERANKING.md` is a hand-written comparison of reranked answers with vector search
+alone (milestone 9), built from the saved reports it links to. Its two charts are in
+`charts/` (static SVG, light and dark), drawn by a one-off script that isn't kept in
+the repository.
 
 ### `samples/`: test files to upload
 
