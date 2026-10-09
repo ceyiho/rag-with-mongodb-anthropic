@@ -144,20 +144,12 @@ so no logins or usage limits are needed.
    sets the layout, the states and how the page behaves, not its code or exact
    styling; where it and API_SPEC.md differ, the spec wins. It isn't updated after
    milestone 7.
-9. Better retrieval: reranking, then hybrid search, each measured against vector
-   search alone with `test/questions.json`.
-   - Reranking (done): the `$rerank` stage (Voyage AI) reranks the top 50 vector
-     results into the top 10 for every answer, with its own "not found" threshold.
-     It needs MongoDB 8.3+ (the M0 ran 8.0.32; generally available in 9.0). Results
-     in `test/RERANKING.md`.
-   - Web page: a "compare without rerank" option that asks both ways and shows both
-     answers, and rerank scores in "How this was found".
-   - Hybrid search: add an Atlas Search (keyword) index and combine it with vector
-     search. With reranking last, the threshold stays on rerank scores; re-check it
-     and record it under Findings.
-   - Optional, for the demo: a search mode switch (Vector · Keyword · Hybrid, with or
-     without reranking) in the "How this was found" panel, to show how results
-     differ, e.g. for exact codes or typos.
+9. Better retrieval: rerank the top vector results with `$rerank` (Voyage AI; needs
+   MongoDB 8.3+), then add hybrid search (an Atlas Search keyword index combined with
+   vector search, reranked last). Measure each against vector search alone with
+   `test/questions.json`, and re-check the "not found" threshold. Then the web page:
+   let the user compare search choices (with or without reranking, vector or hybrid)
+   and see the difference in "How this was found".
 
 ### Phase 3
 10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
@@ -436,5 +428,5 @@ milestones run.
 - Milestone 9 in progress: reranking is done and on for every answer (Decisions:
   Reranking; Findings: Reranking, Rerank threshold; `test/RERANKING.md`). The API and
   command line can still answer without it (`rerank: false`, `--no-rerank`).
-- Next: the web page's reranking options (milestone 9), then hybrid search.
+- Next: hybrid search (milestone 9), then the web page's search choices.
 - Files and commands: see ARCHITECTURE.md.
