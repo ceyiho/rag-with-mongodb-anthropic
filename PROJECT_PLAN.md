@@ -42,7 +42,9 @@ so no logins or usage limits are needed.
 - Runtime: Node.js (LTS)
 - Backend: Express 5 (catches errors in `async` route handlers itself); file uploads
   read with `multer` 2
-- Database: MongoDB Atlas (free M0 cluster) via the official MongoDB Node.js driver
+- Database: MongoDB Atlas via the official MongoDB Node.js driver. An M10 cluster
+  running MongoDB 9.0 since milestone 9; milestones 1–8 ran on the free M0 (8.0).
+  See Findings: Cluster move.
 - Frontend: plain HTML + JavaScript (no framework for now)
 - Language: plain JavaScript (no TypeScript for now)
 - Embeddings: Auto-Embedding with Voyage AI on MongoDB Atlas, model `voyage-4`.
@@ -146,8 +148,8 @@ so no logins or usage limits are needed.
    typos.
    To consider: the `$rerank` stage (Voyage AI) to rerank 20–50 candidates into the
    top 5. Its score may separate near-misses from answers, which cosine can't;
-   measure that first. Blocked: needs MongoDB 8.3+ (our M0 runs 8.0.32) and is in
-   Preview. Documentation:
+   measure that first. Available since the move to M10: it needs MongoDB 8.3+ (the
+   M0 ran 8.0.32), and is generally available in 9.0. Documentation:
    https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/
 
 ### Phase 3
@@ -187,13 +189,13 @@ so no logins or usage limits are needed.
   similarity; filter on `uploadId` (queries must pass ObjectIds, not strings).
   Search indexes can't be edited, and setup skips an index that already exists and
   never updates one.
-- Search indexes on M0 (milestone 7): all 3 slots are used: the vector index, the
-  keyword index (milestone 9), and `uploads_title_autocomplete` on `uploads` for the
-  picker's title search. The vector index stays as it is. The keyword and title
-  indexes hold no embeddings, so a changed definition is applied by dropping and
-  recreating them. A 4th index means upgrading the cluster tier (check first that
-  Auto-Embedding works the same there). Not chosen: filtering titles in the browser,
-  which showcases nothing.
+- Search indexes (milestone 7): three, chosen to fit the M0's 3 slots: the vector
+  index, the keyword index (milestone 9), and `uploads_title_autocomplete` on
+  `uploads` for the picker's title search. The vector index stays as it is. The
+  keyword and title indexes hold no embeddings, so a changed definition is applied by
+  dropping and recreating them. M10 has no cap on search indexes, so a 4th index is
+  possible now, though each one adds load on a small tier. Not chosen: filtering
+  titles in the browser, which showcases nothing.
 - Chunk size: 1,600 characters (≈400 tokens), max 2,000, overlap 200; values in
   `config.js`. Sections are hard boundaries (a chunk never spans two): each Markdown
   heading starts a section, a plain-text file is one section, and each PDF page is one
@@ -277,14 +279,17 @@ milestones run.
   Changing the model, embedded path, dimensions or quantization rebuilds and re-embeds
   everything. An autoEmbed field can't be edited. Adding filter fields later isn't
   documented. Dropping an index also removes its stored embeddings.
-- M0 limits (milestone 3): 3 search indexes (all planned for use; see Decisions:
-  Search indexes on M0). Auto-Embedding needs no extra setup on M0.
+- Cluster limits (milestone 3; Atlas documentation): M0 allows 3 search indexes
+  (vector and keyword together); M10 and above have no cap, but many indexes can slow
+  a small tier or run it out of memory. Auto-Embedding needs no extra setup on either
+  (see Decisions: Search indexes).
 - Storage (milestones 3, 6): measured ~5.5 KB per chunk worst case, all-in (data
   2.4 KB, with indexes and generated embeddings ~4.5 KB on disk, plus ~1.1 KB of
   vector index); the book takes ~1.7 MB. 512 MB holds ~90,000 chunks, fewer than the
   200M-token allowance would embed (~500,000), so storage is the tighter limit, but
   not a concern at this project's scale. Unknown: whether M0 counts the embeddings
-  and the vector index toward 512 MB.
+  and the vector index toward 512 MB. Measured on M0; M10's storage (10 GB by
+  default) makes it a non-issue.
 - "Not found" score threshold (milestones 4, 6; runs of 2026-09-29 and 2026-10-01):
   0.62 for both search modes, which scored almost the same (two config entries, so
   they can diverge, e.g. for hybrid). Answerable questions scored 0.65–0.86 and
@@ -344,6 +349,15 @@ milestones run.
   raise an unrelated question's best match (0.63 with one wrong upload, 0.68 with
   two), so none of the 4 fell below it; the LLM replied "not found" to all 4. All 11
   passed in the full answer run.
+- Cluster move (before milestone 9; run of 2026-10-09, `m10-baseline`): the data was
+  moved from M0 to an M10 (MongoDB 9.0.4) with mongodump and mongorestore. A dump
+  holds the chunks' text but not their embeddings, which live in the vector index, so
+  M10 embedded all 360 chunks again with the same model. Compared with the M0 run of
+  2026-10-05: ranks, answer positions and every threshold result unchanged; all
+  scores within the ~0.001 jitter except one off-topic All uploads score (0.6270 →
+  0.6211, still kept by 0.62), probably because two test uploads (6 chunks) were in
+  the M0 run and not this one. No answer run needed, since the same chunks reach the
+  LLM. This run is milestone 9's vector-only baseline.
 - Hybrid "not found" score threshold (milestone 9): not chosen yet
 
 ## Current status
@@ -366,7 +380,7 @@ milestones run.
   PDFs. The test set has 71 questions.
 - Before milestone 7: a static wireframe of the web page (`wireframe/index.html`)
   settled what the page needs from the API; the decisions are under Decisions (Web
-  page and API, Search indexes on M0), the routes and formats in API_SPEC.md.
+  page and API, Search indexes), the routes and formats in API_SPEC.md.
 - Milestone 7 is completed: the Express API (`npm start`, `server.js` and `src/api/`)
   with every route in API_SPEC.md, tested with curl: health, the upload list, title
   search (Atlas Search autocomplete, the M0's second search index), readiness
@@ -381,5 +395,8 @@ milestones run.
   banners that clear by themselves when the server or database comes back. Checked in
   the browser against the running server (no front-end tests); the page's behaviours
   are in API_SPEC.md.
+- Before milestone 9: moved to an M10 cluster (MongoDB 9.0), where `$rerank` is
+  generally available. Search scores unchanged (Findings: Cluster move); the run
+  `2026-10-09-m10-baseline` is the vector-only baseline for milestone 9.
 - Next: milestone 9 (hybrid search).
 - Files and commands: see ARCHITECTURE.md.

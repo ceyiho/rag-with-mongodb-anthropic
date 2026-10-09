@@ -1,8 +1,9 @@
 // The Atlas Search indexes (search indexes, as opposed to the regular indexes created in
 // scripts/setup-db.js): their definitions, and a status check. npm run setup creates
 // them, npm run index-status lists them, and the server checks them at startup.
-// The M0 tier allows 3 search indexes: the vector index, the title index, and the
-// keyword index planned for milestone 9 (see Decisions in PROJECT_PLAN.md).
+// Three search indexes, chosen to fit the M0 tier's 3 slots: the vector index, the
+// title index, and the keyword index planned for milestone 9. The M10 the app runs on
+// now has no cap (see Decisions in PROJECT_PLAN.md).
 // Search indexes can't be edited in place: a changed definition means dropping and
 // recreating the index (or, for the vector index, a new name; see below).
 
