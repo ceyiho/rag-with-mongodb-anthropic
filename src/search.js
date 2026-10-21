@@ -202,9 +202,10 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
       },
     },
     { $set: { score: { $meta: 'score' } } },   // $rerank replaced the search score
-    // Rerank scores keep about 3 significant digits, so ties are common, and $rerank
-    // returns tied chunks in no useful order. The merged score (hybrid), then the
-    // cosine, break ties, so the cut at `limit` keeps the better chunks and runs repeat.
+    // Rerank scores can tie (on 2026-10-09 they were rounded to steps of 1/256, so ties
+    // were common; by 2026-10-21 they had full precision), and $rerank returns tied
+    // chunks in no useful order. The merged score (hybrid), then the cosine, break ties,
+    // so the cut at `limit` keeps the better chunks and runs repeat.
     { $sort: { score: -1, fusionScore: -1, vectorScore: -1 } },
     { $limit: limit },
   ] : [];
