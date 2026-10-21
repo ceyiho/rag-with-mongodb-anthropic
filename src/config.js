@@ -11,6 +11,7 @@ module.exports = {
   searchIndexes: {
     vector: 'chunks_vector_cosine',        // on chunks
     title: 'uploads_title_autocomplete',   // on uploads
+    keyword: 'chunks_keyword',             // on chunks, for hybrid search
   },
 
   // Title search (GET /api/uploads/search): how many suggestions, and the typo

@@ -76,7 +76,13 @@ async function main() {
 
 // Without the vector index no question can be answered, so the server doesn't start.
 // Without the title index only the picker's title search is lost (the page filters its
-// own list instead), so it only warns.
+// own list instead), and without the keyword index only hybrid search (vector answers
+// still work), so for those it only warns.
+const LOST_WITHOUT = {
+  [config.searchIndexes.title]: 'title search is off',
+  [config.searchIndexes.keyword]: 'hybrid search is off',
+};
+
 async function checkSearchIndexes(db) {
   for (const { index, exists, queryable } of await searchIndexStatus(db)) {
     if (queryable) continue;
@@ -86,7 +92,7 @@ async function checkSearchIndexes(db) {
       console.error(`The vector search index ${index.name} ${problem}; ${fix}.`);
       process.exit(1);
     }
-    console.warn(`Warning: the search index ${index.name} ${problem}, so title search is off; ${fix}.`);
+    console.warn(`Warning: the search index ${index.name} ${problem}, so ${LOST_WITHOUT[index.name]}; ${fix}.`);
   }
 }
 

@@ -2,8 +2,8 @@
 // scripts/setup-db.js): their definitions, and a status check. npm run setup creates
 // them, npm run index-status lists them, and the server checks them at startup.
 // Three search indexes, chosen to fit the M0 tier's 3 slots: the vector index, the
-// title index, and the keyword index planned for milestone 9. The M10 the app runs on
-// now has no cap (see Decisions in PROJECT_PLAN.md).
+// title index, and the keyword index (milestone 9). The M10 the app runs on now has no
+// cap (see Decisions in PROJECT_PLAN.md).
 // Search indexes can't be edited in place: a changed definition means dropping and
 // recreating the index (or, for the vector index, a new name; see below).
 
@@ -68,7 +68,31 @@ const titleIndex = {
   },
 };
 
-const SEARCH_INDEXES = [vectorIndex, titleIndex];
+// Keyword search on each chunk's text (milestone 9), for hybrid search: $rankFusion
+// combines it with vector search. lucene.english lowercases words, drops common ones
+// ("the", "a") and reduces them to a base form ("limits" finds "limit"); a question is
+// analyzed the same way at search time, and never stored. uploadId is indexed as
+// objectId so a query can filter on the selected uploads, like the vector index. Only
+// these two fields: dynamic mapping would also index fields no query uses. The analyzer
+// splits "NMB-1001" into "nmb" and "1001", while a typed "NMB1001" stays one word, so
+// keyword search can't match the two. Holds no embeddings, so it can be dropped and
+// recreated freely.
+const keywordIndex = {
+  collection: config.collections.chunks,
+  name: config.searchIndexes.keyword,
+  type: 'search',
+  definition: {
+    mappings: {
+      dynamic: false,
+      fields: {
+        text: { type: 'string', analyzer: 'lucene.english' },
+        uploadId: { type: 'objectId' },
+      },
+    },
+  },
+};
+
+const SEARCH_INDEXES = [vectorIndex, titleIndex, keywordIndex];
 
 // Each search index with what Atlas reports: { index, exists, status, queryable }.
 // queryable is true once a query can use it (also while a new version is building).
@@ -79,4 +103,4 @@ async function searchIndexStatus(db) {
   }));
 }
 
-module.exports = { vectorIndex, titleIndex, SEARCH_INDEXES, searchIndexStatus };
+module.exports = { vectorIndex, titleIndex, keywordIndex, SEARCH_INDEXES, searchIndexStatus };
