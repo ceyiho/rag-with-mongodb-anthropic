@@ -51,9 +51,10 @@ so no logins or usage limits are needed.
   Switching models later means re-embedding everything. Uses a one-time free
   allocation of 200 million tokens per model (not monthly), so avoid unnecessary
   re-embedding.
-- Reranking (milestone 9): the `$rerank` stage with Voyage AI `rerank-3`, run by
-  Atlas outside the cluster; on for every answer by default. A one-time allocation of
-  200 million free tokens per organization, then $0.05 per million.
+- Reranking (milestone 9): the `$rerank` stage with Voyage AI `rerank-3` (GA since
+  2026-09-29; the Atlas `$rerank` page still says Preview), run by Atlas outside the
+  cluster; on for every answer by default. A one-time allocation of 200 million free
+  tokens per organization, then $0.05 per million.
 - Chunking: custom splitter (sections → paragraphs → sentences), sized in characters
   (≈4 characters per token). No library. Sections come from the extractor: Markdown
   headings, one per plain-text file, pages for PDFs.
@@ -82,7 +83,9 @@ so no logins or usage limits are needed.
 ## MongoDB features to showcase
 - Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Atlas Search autocomplete (fuzzy) on upload titles, for the picker's search
-- Hybrid search: vector search combined with Atlas Search (keyword/fuzzy)
+- Hybrid search: vector search combined with Atlas Search (keyword/fuzzy) by
+  `$rankFusion` (milestone 9; an option in the API and tools, results in
+  `test/HYBRID.md`)
 - Reranking with `$rerank` (Voyage AI) on every answer (milestone 9; results in
   `test/RERANKING.md`)
 - Optional: aggregation pipeline analytics (most-asked questions, most-cited uploads,
@@ -148,8 +151,8 @@ so no logins or usage limits are needed.
    MongoDB 8.3+), then add hybrid search (an Atlas Search keyword index combined with
    vector search, reranked last). Measure each against vector search alone with
    `test/questions.json`, and re-check the "not found" threshold. Then the web page:
-   let the user compare search choices (with or without reranking, vector or hybrid)
-   and see the difference in "How this was found".
+   let the user compare answers with and without reranking and see the difference in
+   "How this was found".
 
 ### Phase 3
 10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
@@ -208,6 +211,8 @@ so no logins or usage limits are needed.
   (command line), answers come from vector search alone at the cosine 0.62. Tied
   rerank scores are broken by the cosine score. No fallback to vector search alone:
   embedding the question needs Voyage AI too.
+- Hybrid search (milestone 9): an option only (`search: "hybrid"`, `--search hybrid`),
+  not the default or on the page: no gain (Findings). Details: `src/search.js`.
 - PDF pages (milestone 6; detailed rules in the PDF extractor's header comment): each
   page is a section, cited by its PDF page number, and page breaks stay hard
   boundaries. Pages are read in visual order (some PDFs store code blocks after the
@@ -243,7 +248,7 @@ so no logins or usage limits are needed.
   - `GET /api/health` tells a stopped server from an unreachable database.
   - Uploads: the request waits for the ingest; one at a time; 50 MB limit.
   - Answers: parts with citation numbers; "How this was found" on every answer.
-    `retrieval.search` names the kind of search (vector; hybrid later), separate from
+    `retrieval.search` names the kind of search (vector or hybrid), separate from
     `mode` (exact or approximate), and `retrieval.rerank` the reranking (milestone 9).
   - Questions are standalone; no follow-ups.
   - Earlier questions are kept in the browser (`localStorage`), not in Atlas.
@@ -383,9 +388,25 @@ milestones run.
   and 10 of 12 near-misses (vector search alone at 0.62 stopped 38 of 50 wrong
   uploads, 0 to 3 of 9 off-topic, and none of the others). 0.62 would stop the same, but at 20 candidates a real answer
   scored one score step above it. The 2 near-misses still sent to the LLM got "not
-  found" from it. Rerank scores keep about 3 significant digits, so ties are common.
-- Hybrid "not found" score threshold (milestone 9): not chosen yet. With reranking
-  last, the rerank threshold may serve as is; re-check it.
+  found" from it. On 2026-10-09 rerank scores were rounded to steps of 1/256 (ties
+  common); by 2026-10-21 they came at full precision on the same scale. Re-checked
+  then with 77 questions (`2026-10-21-vector-rerank`): same outcomes, lowest
+  answerable 0.638.
+- Hybrid search (milestone 9; runs of 2026-10-21, details in `test/HYBRID.md`): no
+  measurable gain with reranking last. Vector + rerank and hybrid + rerank gave the
+  same results on every check (77 questions, 6 of them new `keyword` questions about
+  exact identifiers), and the 10 chunks sent to the LLM were the same for 59 of 77
+  questions, never different in the top 3; the 26 chunks only hybrid sent were all
+  unrelated. Every answer was already among vector search's 50 candidates, and the
+  reranker decides the order. Costs about 1.6 times the rerank tokens (merged lists of
+  67–96 chunks). The 0.58 threshold serves both. It could matter with a much larger
+  library, or codes vector search handles badly.
+- Per-chunk floor (milestone 9; measured 2026-10-21, not adopted): the threshold
+  checks only the top chunk, and #2–#10 go to the LLM whatever their score. Sending
+  only chunks at or above a floor lost no answer chunk up to 0.50 (lowest 0.514); 0.45
+  would cut about 15% of the LLM's input, about $0.002 per question. Not adopted: a
+  small saving, it also drops related same-upload chunks, filler hasn't caused a wrong
+  answer, and it would need an answer run.
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.
@@ -427,6 +448,11 @@ milestones run.
   `2026-10-09-m10-baseline` is the vector-only baseline for milestone 9.
 - Milestone 9 in progress: reranking is done and on for every answer (Decisions:
   Reranking; Findings: Reranking, Rerank threshold; `test/RERANKING.md`). The API and
-  command line can still answer without it (`rerank: false`, `--no-rerank`).
-- Next: hybrid search (milestone 9), then the web page's search choices.
+  command line can still answer without it (`rerank: false`, `--no-rerank`). Hybrid
+  search is done too, as an option in the API and command line (`search: "hybrid"`,
+  `--search hybrid`; the keyword index `chunks_keyword` is the M10's third search
+  index); it showed no gain, so it isn't the default (Decisions and Findings: Hybrid
+  search; `test/HYBRID.md`). The test set has 77 questions.
+- Next: the web page's comparison of answers with and without reranking (milestone 9),
+  then the milestone's wrap-up.
 - Files and commands: see ARCHITECTURE.md.

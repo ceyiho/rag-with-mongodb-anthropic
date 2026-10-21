@@ -100,8 +100,9 @@ sit against each panel's own threshold, not across panels.
   Vector search's best match is the sewing pattern PDF at 0.625, just above the 0.62
   threshold, because both are instructions, so the LLM is called. Reranked, the best
   match scores 0.25 and the question stops at the threshold.
-- Rerank scores keep about 3 significant digits (steps of 1/256 above 0.5), so ties
-  are common; ties are broken by the cosine score.
+- In these runs rerank scores kept about 3 significant digits (steps of 1/256 above
+  0.5), so ties were common; ties are broken by the cosine score. By 2026-10-21 the
+  scores came at full precision on the same scale (see [HYBRID.md](HYBRID.md)).
 
 ## Ranking changes
 
@@ -169,7 +170,8 @@ A targeted answer run (LLM) covered the 7 questions whose top 10 changed most: 1
   candidates never reaches the reranker.
 - No full answer run was made with reranking (the last one, vector only, passed 203
   of 203); the targeted run covers the answers it changed most.
-- `rerank-3` is in Preview, so its scores may change; reports record the model.
+- Scores can change with the model's service: their precision did between these runs
+  and 2026-10-21 (the threshold's outcomes didn't). Reports record the model.
 - Both the question's embedding and reranking run at Voyage AI, so neither works
   without it (there's no fallback, and none would help).
 
