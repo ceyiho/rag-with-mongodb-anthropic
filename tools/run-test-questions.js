@@ -10,9 +10,9 @@
 // --rerank reranks the top n vector results instead of config.js's count.
 // --no-rerank tests vector search alone, at the cosine thresholds (the baseline).
 //
-// Each question runs up to three searches:
-// - all:   All uploads (approximate). Also reports the rank of the first chunk from an
-//          expected upload (upload or alsoIn) within the top results.
+// Each question runs up to four searches:
+// - all:   All uploads (approximate). Also reports where the first chunk from an
+//          expected upload (upload or alsoIn) sits in the top results ("Upload at").
 // - one:   scoped to `upload` (exact).
 // - wrong: scoped to `wrongUpload` (exact), answerable questions only: an easy negative,
 //          like a user who picked the wrong upload.
@@ -219,10 +219,10 @@ function printRow({ q, all, rank, one, wrong, several, allText, oneText, error }
     console.log(`${label} ERROR: ${error}`);
     return;
   }
-  const hit = q.answerable ? (rank ? `#${rank}` : 'miss') : '';
+  const hit = q.answerable ? `upload ${rank ? `#${rank}` : 'miss'}` : '';
   const text = allText === undefined ? '' : `  answer ${position(allText)}/${position(oneText)}`;
   const many = several ? `  several(${q.several.length}) ${fmt(several.score)} ${several.expectAnswer ? 'Y' : 'N'}` : '';
-  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(4)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}${many}`);
+  console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(11)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}${many}`);
 }
 
 function printSummary(results, thresholds, rerank) {
@@ -234,6 +234,7 @@ function printSummary(results, thresholds, rerank) {
   console.log(`\n${ok.length} of ${results.length} questions ran${failed ? `, ${failed} failed` : ''}.`);
   console.log(`Y = answerable, N = not answerable. Scores are the top score (${scoreKind(rerank)}).`);
   if (rerank) console.log(`Each search reranked the top ${rerank} vector results.`);
+  console.log('upload #n = position of the first chunk from the right upload in all, with or without the answer.');
   console.log('answer #a/#b = position of the first chunk with the answer text, in all/one ("-" = not in the results).');
 
   const text = answerText(answerable);
@@ -431,22 +432,25 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
     && tOne === defaultThresholds.selectedUploads ? ' (config.js)' : ' (--threshold)'} |`, '');
 
   add('## How to read the results', '');
-  add(`Each question runs up to three searches. The score is the top score (${scoreKind(rerank)}).`, '');
-  add('- **All**: All uploads. The rank is the position of the first chunk from an expected');
-  add(`  upload (\`upload\` or \`alsoIn\`) in the top ${searchConfig.limit}.`);
-  add('- **One**: scoped to the question\'s `upload`.');
-  add('- **Answer** (after All and after One): position of the first chunk in the results that');
-  add('  contains one of the question\'s `expect` phrases (copied from the sample), or **missing**.');
-  add('  It checks that the passage with the answer came back whole, not just the right upload.');
-  add('- **Wrong**: scoped to the question\'s `wrongUpload` (answerable questions only). The');
-  add('  right result is "not found".');
+  add('Each question runs up to four searches: All, One, Wrong, and Several (below) when it has a');
+  add(`\`several\` list. A score is the search's top score (${scoreKind(rerank)}).`, '');
+  add('- **All**: the top score, searching All uploads.');
+  add('- **Upload at** (after All): position of the first chunk from an expected upload (`upload`');
+  add(`  or \`alsoIn\`) in the top ${searchConfig.limit}, whether or not it contains the answer; **miss** if none.`);
+  add('- **Answer at** (after All and after One): position of the first chunk that contains one of');
+  add('  the question\'s `expect` phrases (copied from the sample), or **missing**. It checks that the');
+  add('  passage with the answer came back whole. It can sit below "Upload at" when another chunk');
+  add('  of the same upload ranks above it: the right upload, but not the passage with the answer.');
+  add('- **One**: the top score, searching only the question\'s `upload`.');
+  add('- **Wrong**: the top score, searching only the question\'s `wrongUpload` (answerable');
+  add('  questions only). The right result is "not found".');
   add(`- **At ${thresholdText}**: what the threshold does with the top score. At or above it, the`);
   add('  question is **sent to the LLM**; below it, it\'s **stopped**: "not found" without calling the');
   add('  LLM. Answerable questions should be sent to the LLM in All and One, and stopped in Wrong;');
   add('  the others should be stopped. A wrong outcome is in bold.', '');
 
   add(`## Answerable questions (${answerable.length})`, '');
-  add(`| id | Kind | Question | All | Rank | Answer | One | Answer | Wrong | At ${thresholdText} |`);
+  add(`| id | Kind | Question | All | Upload at | Answer at | One | Answer at | Wrong | At ${thresholdText} |`);
   add('|---|---|---|---|---|---|---|---|---|---|');
   const answerCell = (rank) => (rank === undefined ? '' : rank ? `#${rank}` : '**missing**');
   for (const r of answerable) {
@@ -473,9 +477,9 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
   if (severalRows.length) {
     add(`## Several uploads ticked (${severalRows.length})`, '');
     add('Exact search over the uploads in the question\'s `several` list, at the selected-uploads');
-    add(`threshold (${tOne}). An answer is expected if one of them answers the question. Rank is`);
-    add('the position of the first chunk from an answering upload; Answer as above.', '');
-    add(`| id | Kind | Uploads | Score | Expected | Rank | Answer | At ${tOne} |`, '|---|---|---|---|---|---|---|---|');
+    add(`threshold (${tOne}). An answer is expected if one of them answers the question. Upload at`);
+    add('is the position of the first chunk from an answering upload; Answer at as above.', '');
+    add(`| id | Kind | Uploads | Score | Expected | Upload at | Answer at | At ${tOne} |`, '|---|---|---|---|---|---|---|---|');
     for (const r of severalRows) {
       const s = r.several;
       const above = s.score != null && s.score >= tOne;
