@@ -3,13 +3,15 @@
 // problem is. tools/run-test-questions.js tests search only; this tests the answers.
 // The question fields and kinds are described in tools/run-test-questions.js.
 // Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>]
-//        [--no-rerank]
+//        [--no-rerank | --search hybrid]
 // --save writes a report to test/results/<date>-answers-<label>.md, with every answer
 // text, the settings and the system prompt.
 // --only runs just these question ids, e.g. to recheck failures after a prompt change.
 // --limit sends the top n chunks to the LLM instead of config.search.limit.
 // --no-rerank answers from vector search alone, at the cosine thresholds; by default
 // answers are reranked, as in the app (config.search.rerank).
+// --search hybrid answers from hybrid search (vector and keyword search, always
+// reranked; up to twice the rerank tokens).
 //
 // Each question runs in up to four modes (see tools/test-modes.js):
 // - all:     All uploads.
@@ -46,7 +48,8 @@ const { uploadsFor, answeringUploads, expectsAnswer } = require('./test-modes');
 const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test', 'results');
-const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>] [--no-rerank]';
+const USAGE = 'Usage: npm run test-answers [-- --save <label>] [--only <id,id,...>] [--limit <n>] '
+  + '[--no-rerank | --search hybrid]';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -57,9 +60,12 @@ async function main() {
   const noRerankAt = args.indexOf('--no-rerank');   // a flag without a value
   if (noRerankAt !== -1) args.splice(noRerankAt, 1);
   const rerank = noRerankAt === -1;
+  const search = takeFlag(args, '--search') ?? 'vector';
 
   const badLabel = label !== undefined && !/^[a-z0-9-]+$/.test(label);
-  if (args.length || badLabel || only === '' || !(Number.isInteger(limit) && limit > 0)) {
+  // Hybrid search is always reranked.
+  const badSearch = !['vector', 'hybrid'].includes(search) || (search === 'hybrid' && !rerank);
+  if (args.length || badLabel || badSearch || only === '' || !(Number.isInteger(limit) && limit > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
     process.exit(1);
@@ -101,7 +107,7 @@ async function main() {
       for (const mode of modesFor(q)) {
         const row = { q, mode, expectAnswer: expectsAnswer(q, mode) };
         try {
-          row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit, rerank });
+          row.result = await answer(db, q.question, { uploadIds: uploadIdsFor(q, mode), limit, rerank, search });
           Object.assign(row, judge(row));
         } catch (err) {
           row.error = err.message;
@@ -116,7 +122,7 @@ async function main() {
 
     if (reportFile) {
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
-      fs.writeFileSync(reportFile, report({ label, only, limitArg, limit, rerank, rows, summary, uploads }));
+      fs.writeFileSync(reportFile, report({ label, only, limitArg, limit, rerank, search, rows, summary, uploads }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
   } finally {
@@ -261,13 +267,15 @@ function printSummary(s) {
 
 // --- Saved report (Markdown) ---
 
-function report({ label, only, limitArg, limit, rerank, rows, summary: s, uploads }) {
+function report({ label, only, limitArg, limit, rerank, search, rows, summary: s, uploads }) {
   const { chunking, search: searchConfig, answer: answerConfig } = config;
   const thresholds = rerank ? searchConfig.rerank.notFoundThreshold : searchConfig.notFoundThreshold;
   const totalChunks = uploads.reduce((sum, upload) => sum + (upload.chunkCount || 0), 0);
   const cell = (text) => String(text).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
+  const hybrid = search === 'hybrid';
   const command = `npm run test-answers -- --save ${label}${only ? ` --only ${only}` : ''}`
-    + `${limitArg !== undefined ? ` --limit ${limitArg}` : ''}${rerank ? '' : ' --no-rerank'}`;
+    + `${limitArg !== undefined ? ` --limit ${limitArg}` : ''}${rerank ? '' : ' --no-rerank'}`
+    + `${hybrid ? ' --search hybrid' : ''}`;
 
   const lines = [];
   const add = (...more) => lines.push(...more);
@@ -285,11 +293,13 @@ function report({ label, only, limitArg, limit, rerank, rows, summary: s, upload
   add(`| Model | \`${answerConfig.model}\` |`);
   add(`| Threshold | All ${thresholds.allUploads}, selected uploads ${thresholds.selectedUploads} `
     + `(config.js, ${rerank ? 'rerank' : 'cosine'} scores) |`);
-  add(`| Search | top ${limit} chunks sent to the LLM (${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
-  add(`| Rerank | ${rerank
-    ? `\`${searchConfig.rerank.model}\`: vector search fetches ${Math.max(searchConfig.rerank.candidates, limit)} chunks, `
-      + `\`$rerank\` keeps the top ${limit}`
-    : 'none (--no-rerank)'} |`);
+  add(`| Search | ${hybrid ? 'hybrid (vector + keyword)' : 'vector'}; top ${limit} chunks sent to the LLM `
+    + `(${limitArg !== undefined ? '--limit' : 'config.js'}) |`);
+  const fetched = Math.max(searchConfig.rerank.candidates, limit);
+  add(`| Rerank | ${!rerank ? 'none (--no-rerank)'
+    : hybrid ? `\`${searchConfig.rerank.model}\`: vector and keyword search each fetch ${fetched} chunks, `
+      + `\`$rerank\` re-sorts the whole merged list and keeps the top ${limit}`
+    : `\`${searchConfig.rerank.model}\`: vector search fetches ${fetched} chunks, \`$rerank\` keeps the top ${limit}`} |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Uploads | ${uploads.length} complete, ${totalChunks} chunks |`);
   add(`| LLM calls | ${s.llmCalls}; tokens in ${s.inputTokens}, out ${s.outputTokens} |`, '');

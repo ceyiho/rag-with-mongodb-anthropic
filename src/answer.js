@@ -18,7 +18,8 @@
 //   it points (see location below), its upload's title, and the excerpt.
 // - retrieval: how the answer was found (search kind and mode, reranking, threshold, top
 //   score, whether the LLM was called) and the chunks sent to it (hits, each with the
-//   score the threshold checks and the cosine vectorScore), for "How this was found".
+//   score the threshold checks, the cosine vectorScore, its rank in each list before
+//   reranking, and the merged score of hybrid search), for "How this was found".
 // - text: the answer with [n] markers after cited parts, or the "not found" reply
 //   (for npm run ask).
 // - chunks: every chunk searched, with its text, for diagnosing wrong replies. rawText
@@ -28,7 +29,9 @@
 // config.search.limit (how many chunks go to the LLM), for testing other values;
 // rerank: false answers from vector search alone, at the cosine thresholds (for the
 // page's comparison and the vector-only baseline). By default answers are reranked
-// (config.search.rerank), with the rerank thresholds.
+// (config.search.rerank), with the rerank thresholds. search: 'hybrid' answers from
+// hybrid search (vector and keyword search; always reranked, so not with rerank:
+// false), at the rerank thresholds; the default is 'vector'.
 
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
@@ -46,16 +49,16 @@ const SYSTEM_PROMPT = `You answer questions using only the search results sent w
 
 let anthropic;   // created on first use, so importing this file needs no API key
 
-async function answer(db, question, { uploadIds, limit, rerank = true } = {}) {
+async function answer(db, question, { uploadIds, limit, rerank = true, search: kind = 'vector' } = {}) {
   const searched = await search(db, question, {
-    uploadIds, limit, rerank: rerank ? config.search.rerank.candidates : 0,
+    uploadIds, limit, rerank: rerank ? config.search.rerank.candidates : 0, kind,
   });
   const { mode, uploadCount, chunksSearched, chunks } = searched;
   const thresholds = rerank ? config.search.rerank.notFoundThreshold : config.search.notFoundThreshold;
   const threshold = uploadIds ? thresholds.selectedUploads : thresholds.allUploads;
   const topScore = chunks.length ? chunks[0].score : null;
   const retrieval = (llmCalled, citations = []) => ({
-    search: 'vector',   // the kind of search; 'hybrid' once hybrid search is added
+    search: searched.search,
     mode,
     rerank: searched.rerank,
     uploadCount, chunksSearched, threshold, topScore, llmCalled,
@@ -141,6 +144,9 @@ function toHit(chunk, citations) {
   return {
     score: chunk.score,
     vectorScore: chunk.vectorScore,
+    vectorRank: chunk.vectorRank,
+    keywordRank: chunk.keywordRank,
+    fusionScore: chunk.fusionScore,
     uploadId: chunk.uploadId,
     title: chunk.title,
     fileType: chunk.fileType,

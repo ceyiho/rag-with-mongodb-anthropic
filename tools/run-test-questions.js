@@ -1,7 +1,7 @@
 // Runs every question in test/questions.json and prints the scores, to choose the
 // "not found" threshold for each search mode (and later to compare hybrid search).
 // Usage: npm run test-questions [-- --save <label>] [--threshold <score>]
-//        [--rerank <n> | --no-rerank]
+//        [--rerank <n> | --no-rerank] [--search vector|hybrid]
 // --save writes a report to test/results/<date>-<label>.md, e.g. --save chunk-800.
 // --threshold tries another threshold for both modes instead of the ones in config.js.
 // Like answers, every search is reranked by default (config.search.rerank), and the
@@ -9,6 +9,9 @@
 // candidates, about 4 million for a full run.
 // --rerank reranks the top n vector results instead of config.js's count.
 // --no-rerank tests vector search alone, at the cosine thresholds (the baseline).
+// --search hybrid tests hybrid search: vector and keyword search each fetch the rerank
+// count, and the whole merged list is reranked (up to twice the tokens, about 8 million
+// for a full run). Always reranked, so not with --no-rerank.
 //
 // Each question runs up to four searches:
 // - all:   All uploads (approximate). Also reports where the first chunk from an
@@ -67,7 +70,7 @@ const ROOT = path.join(__dirname, '..');
 const QUESTIONS_FILE = path.join(ROOT, 'test', 'questions.json');
 const RESULTS_DIR = path.join(ROOT, 'test', 'results');
 const USAGE = 'Usage: npm run test-questions [-- --save <label>] [--threshold <score>] '
-  + '[--rerank <n> | --no-rerank]';
+  + '[--rerank <n> | --no-rerank] [--search vector|hybrid]';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -79,6 +82,7 @@ async function main() {
   if (noRerankAt !== -1) args.splice(noRerankAt, 1);
   const rerank = noRerankAt !== -1 ? 0
     : rerankArg === undefined ? config.search.rerank.candidates : Number(rerankArg);
+  const kind = takeFlag(args, '--search') ?? 'vector';
   const defaultThresholds = defaultThresholdsFor(rerank);
   const thresholds = thresholdArg === undefined
     ? defaultThresholds
@@ -90,10 +94,14 @@ async function main() {
   const tooFew = rerank > 0 && rerank < config.search.limit;
   const badRerank = !Number.isInteger(rerank) || rerank < 0 || tooFew
     || (noRerankAt !== -1 && rerankArg !== undefined);
-  if (args.length || badLabel || badRerank || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
+  const hybridNoRerank = kind === 'hybrid' && !rerank;
+  const badKind = !['vector', 'hybrid'].includes(kind) || hybridNoRerank;
+  if (args.length || badLabel || badRerank || badKind
+    || !(thresholds.selectedUploads > 0 && thresholds.allUploads > 0)) {
     console.error(USAGE);
     if (badLabel) console.error('The label may contain lowercase letters, digits and hyphens.');
     if (tooFew) console.error(`--rerank needs at least ${config.search.limit} candidates (the results sent to the LLM).`);
+    if (hybridNoRerank) console.error('Hybrid search is always reranked; leave out --no-rerank.');
     process.exit(1);
   }
   const reportFile = label && path.join(RESULTS_DIR, `${today()}-${label}.md`);
@@ -115,13 +123,14 @@ async function main() {
         return idOf.get(fileName);
       }),
       rerank,
+      kind,
     });
 
     const results = [];
     for (const q of questions) {
       const result = { q };
       try {
-        const { chunks: all } = await search(db, q.question, { rerank });
+        const { chunks: all } = await search(db, q.question, { rerank, kind });
         result.all = topScore(all);
         const expected = [q.upload, ...(q.alsoIn || [])];
         const rank = all.findIndex((chunk) => expected.includes(chunk.fileName));
@@ -151,13 +160,13 @@ async function main() {
       printRow(result);
     }
 
-    printSummary(results, thresholds, rerank);
+    printSummary(results, thresholds, rerank, kind);
 
     if (reportFile) {
       const index = await vectorIndexSettings(db);
       fs.mkdirSync(RESULTS_DIR, { recursive: true });
       fs.writeFileSync(reportFile, report({
-        label, command, results, thresholds, defaultThresholds, rerank, uploads, index,
+        label, command, results, thresholds, defaultThresholds, rerank, kind, uploads, index,
       }));
       console.log(`\nSaved ${path.relative(ROOT, reportFile)}`);
     }
@@ -225,7 +234,7 @@ function printRow({ q, all, rank, one, wrong, several, allText, oneText, error }
   console.log(`${label} all ${fmt(all).padStart(6)} ${hit.padEnd(11)}  one ${fmt(one).padStart(6)}  wrong ${fmt(wrong).padStart(6)}${text}${many}`);
 }
 
-function printSummary(results, thresholds, rerank) {
+function printSummary(results, thresholds, rerank, kind) {
   const ok = results.filter((r) => !r.error);
   const failed = results.length - ok.length;
   const answerable = ok.filter((r) => r.q.answerable);
@@ -233,7 +242,11 @@ function printSummary(results, thresholds, rerank) {
 
   console.log(`\n${ok.length} of ${results.length} questions ran${failed ? `, ${failed} failed` : ''}.`);
   console.log(`Y = answerable, N = not answerable. Scores are the top score (${scoreKind(rerank)}).`);
-  if (rerank) console.log(`Each search reranked the top ${rerank} vector results.`);
+  if (kind === 'hybrid') {
+    console.log(`Hybrid search: vector and keyword search each fetched ${rerank} chunks; each search reranked the merged list.`);
+  } else if (rerank) {
+    console.log(`Each search reranked the top ${rerank} vector results.`);
+  }
   console.log('upload #n = position of the first chunk from the right upload in all, with or without the answer.');
   console.log('answer #a/#b = position of the first chunk with the answer text, in all/one ("-" = not in the results).');
 
@@ -389,7 +402,7 @@ async function vectorIndexSettings(db) {
     + `${field.quantization || 'no'} quantization, ${field.similarity}`;
 }
 
-function report({ label, command, results, thresholds, defaultThresholds, rerank, uploads, index }) {
+function report({ label, command, results, thresholds, defaultThresholds, rerank, kind, uploads, index }) {
   const ok = results.filter((r) => !r.error);
   const failed = results.filter((r) => r.error);
   const answerable = ok.filter((r) => r.q.answerable);
@@ -422,9 +435,15 @@ function report({ label, command, results, thresholds, defaultThresholds, rerank
     + `${uploads.map((u) => `${u.fileName} ${u.chunkCount}`).join(', ')}) |`);
   add(`| Chunk size | target ${chunking.targetSize}, max ${chunking.maxSize}, overlap ${chunking.overlap} characters |`);
   add(`| Vector index | ${index} |`);
-  add(`| Search | top ${searchConfig.limit}; All uploads approximate (numCandidates `
+  add(`| Search | ${kind === 'hybrid' ? 'hybrid (vector + keyword, `$rankFusion`)' : 'vector'}; `
+    + `top ${searchConfig.limit}; vector search: All uploads approximate (numCandidates `
     + `${Math.max(rerank, searchConfig.limit) * searchConfig.candidatesPerResult}), one upload exact |`);
-  if (rerank) {
+  if (kind === 'hybrid') {
+    add(`| Keyword search | index \`${config.searchIndexes.keyword}\`; a word may differ by `
+      + `${searchConfig.hybrid.fuzzyMaxEdits} letter(s) (typos); same upload filter as vector search |`);
+    add(`| Rerank | \`${searchConfig.rerank.model}\`: vector and keyword search each fetch ${rerank} chunks, `
+      + `\`$rerank\` re-sorts the whole merged list and keeps the top ${searchConfig.limit} |`);
+  } else if (rerank) {
     add(`| Rerank | \`${searchConfig.rerank.model}\`: vector search fetches ${rerank} chunks, `
       + `\`$rerank\` keeps the top ${searchConfig.limit} |`);
   }

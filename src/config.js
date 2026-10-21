@@ -45,8 +45,9 @@ module.exports = {
     // Reranking (milestone 9), the default for answers: vector search fetches the top
     // `candidates` chunks, a Voyage AI model re-sorts them, and the top `limit` are kept.
     // The thresholds are on the top rerank score, which has its own scale. Chosen from
-    // the runs of 2026-10-09 (test/results/2026-10-09-rerank-50.md): 0.58 keeps every
-    // answerable question with room to spare and rejects most unanswerable ones.
+    // the runs of 2026-10-09 (test/results/2026-10-09-rerank-50.md): 0.58 sends every
+    // answerable question to the LLM with room to spare and stops most unanswerable ones.
+    // Hybrid search uses the same candidates (from each side) and thresholds.
     rerank: {
       model: 'rerank-3',
       candidates: 50,
@@ -54,6 +55,12 @@ module.exports = {
         selectedUploads: 0.58,
         allUploads: 0.58,
       },
+    },
+    // Hybrid search (milestone 9; src/search.js): the keyword side's typo tolerance, in
+    // letters a word may differ by (1: a wrong, missing, extra or swapped letter). 2
+    // would let short words match unrelated ones ("ram" and "run").
+    hybrid: {
+      fuzzyMaxEdits: 1,
     },
   },
 

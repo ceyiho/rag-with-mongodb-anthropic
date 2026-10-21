@@ -225,6 +225,7 @@ The page:
 { "question": "How long is an invitation valid?", "uploadIds": ["66f1...", "66f2..."] }
 { "question": "How long is an invitation valid?", "scope": "all" }
 { "question": "How long is an invitation valid?", "scope": "all", "rerank": false }
+{ "question": "How long is an invitation valid?", "scope": "all", "search": "hybrid" }
 ```
 
 - Exactly one of `uploadIds` (one or more) or `scope: "all"`. Neither is a 400, so a
@@ -242,6 +243,13 @@ The page:
   (0.58). `false` answers from vector search alone, checked against the cosine
   thresholds (0.62), as before milestone 9. It's for the page's "compare without
   rerank" option, which sends the question twice, once each way (two LLM calls).
+- `search` (optional, milestone 9): `"vector"` (the default) or `"hybrid"`. Hybrid
+  search runs vector search and keyword search (Atlas Search on the chunks' text, with
+  one-letter typo tolerance) on the same uploads, 50 chunks each; `$rankFusion` merges
+  the two lists, each chunk once, and `$rerank` re-sorts the whole merged list (50 to
+  100 chunks), checked against the rerank thresholds. Always reranked: the merged score
+  depends only on the ranks, so no threshold can use it, and `rerank: false` with it is
+  a 400. Not chosen: a keyword-only mode, whose scores have no fixed range.
 - Stateless: no conversation history. Each question is answered on its own.
 
 `200`, an answer:
@@ -278,7 +286,8 @@ The page:
     "topScore": 0.91,
     "llmCalled": true,
     "hits": [
-      { "score": 0.91, "vectorScore": 0.81, "uploadId": "66f1...",
+      { "score": 0.91, "vectorScore": 0.81, "vectorRank": 3, "keywordRank": null,
+        "fusionScore": null, "uploadId": "66f1...",
         "title": "Nimbus Admin Handbook", "fileType": "txt", "section": null,
         "page": null, "chunkIndex": 1, "chunkCount": 7, "cited": 2 }
     ]
@@ -313,14 +322,23 @@ The page:
   `hits` are the chunks sent to the LLM (or that would have been), best first; `cited`
   is the citation number or null. Each hit has the same location fields as a citation,
   so the page labels it the same way. No chunk text, so it stays small.
-  - `search`: the kind of search that found the chunks: `"vector"` for now
-    (milestone 9 adds hybrid search). `mode` is how the vector search ran: `"exact"`
-    or `"approximate"`.
-  - `rerank`: the model and candidate count, or `null` when asked with
-    `rerank: false`.
+  - `search`: the kind of search that found the chunks: `"vector"` or `"hybrid"`.
+    `mode` is how the vector search ran: `"exact"` or `"approximate"`.
+  - `rerank`: the model and `candidates`, how many chunks were actually reranked
+    (vector: up to 50, fewer when the searched uploads hold fewer chunks; hybrid: the
+    merged list, 50 to 100), or `null` when asked with `rerank: false`.
   - `score` (each hit), `topScore` and `threshold` are on the same scale: rerank
-    scores when reranked, cosine otherwise. `vectorScore` is always the cosine score,
-    so a comparison can show it either way.
+    scores when reranked, cosine otherwise. `vectorScore` is the cosine score, so a
+    comparison can show it either way; `null` for a hybrid hit only keyword search
+    found.
+  - `vectorRank`, `keywordRank`: the hit's position in each list before reranking
+    (1 = first), so the page can show how far reranking moved it ("vector #23 → #2").
+    `null` when that list didn't find it; `keywordRank` is always `null` in vector
+    search. In hybrid search they're copied from `$rankFusion`'s `scoreDetails`, whose
+    format MongoDB doesn't guarantee, so the API keeps its own two fields.
+  - `fusionScore`: hybrid search's merged score (Reciprocal Rank Fusion: each list
+    adds 1 / (60 + rank), so about 0.009 to 0.033), `null` in vector search. It only
+    reflects the ranks, so the page shows it as background, never as relevance.
 
 `200`, "not found in your uploads":
 
@@ -346,12 +364,14 @@ all uploads instead".
 | 400 | `missingScope` | Neither `uploadIds` nor `scope: "all"`, or an empty `uploadIds`. |
 | 400 | `invalidScope` | Both, a `scope` other than `"all"`, or `uploadIds` not a list. |
 | 400 | `invalidRerank` | `rerank` other than `true` or `false` (e.g. the string `"false"`). |
+| 400 | `invalidSearch` | `search` other than `"vector"` or `"hybrid"`, or `"hybrid"` with `rerank: false`. |
 | 400 | `invalidId` | A malformed id. |
 | 400 | `invalidJson` | The body isn't valid JSON. |
 | 413 | `requestTooLarge` | The body is over 100 KB (Express's default limit). |
 | 404 | `uploadNotFound` | An id that isn't a complete upload. |
 | 409 | `uploadNotReady` | An upload that isn't searchable yet. |
 | 503 | `llmUnavailable` | The Anthropic API is overloaded or rate-limited. |
+| 503 | `hybridUnavailable` | Hybrid search asked, but the keyword index is missing or still building (`npm run setup`, `npm run index-status`). Vector search still works. |
 | 502 | `llmAccessDenied` | The Anthropic API, or a gateway in front of it (`ANTHROPIC_BASE_URL`), refused the server's key (401) or access (403). The server's settings need fixing; retrying won't help. |
 | 500 | `internal` | Anything else, including an LLM reply that was cut off. |
 

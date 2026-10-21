@@ -1,6 +1,7 @@
 // POST /api/ask: answers a question from the ticked uploads or all uploads (see
 // API_SPEC.md: Questions). Body: { question, uploadIds } or { question, scope: "all" },
-// plus rerank: false for an answer from vector search alone (reranked by default).
+// plus rerank: false for an answer from vector search alone (reranked by default), or
+// search: "hybrid" for hybrid search (always reranked).
 // Checks the request, then calls src/answer.js, and sends only the fields the spec
 // lists: the answer's extra fields (text, chunks, rawText, usage) stay on the server.
 
@@ -8,6 +9,7 @@ const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('../config');
 const { answer } = require('../answer');
+const { HybridUnavailable } = require('../search');
 const { ApiError } = require('./errors');
 const { toObjectId } = require('./ids');
 
@@ -29,12 +31,17 @@ module.exports = function askRoutes(db) {
 
   // express.json() reads the JSON body into req.body (only for this route).
   router.post('/ask', express.json(), async (req, res) => {
-    const { question, uploadIds, rerank } = await readRequest(req.body ?? {}, uploads);
+    const { question, uploadIds, rerank, search } = await readRequest(req.body ?? {}, uploads);
 
     let result;
     try {
-      result = await answer(db, question, { uploadIds, rerank });
+      result = await answer(db, question, { uploadIds, rerank, search });
     } catch (err) {
+      if (err instanceof HybridUnavailable) {
+        console.error('Ask: hybrid search unavailable:', err.message);
+        throw new ApiError(503, 'hybridUnavailable',
+          'Hybrid search isn\'t available right now. Ask with vector search instead.');
+      }
       if (llmBusy(err)) {
         console.error('Ask: answer service unavailable:', err.message);
         throw new ApiError(503, 'llmUnavailable', 'The answer service is busy right now. Try again in a minute.');
@@ -52,8 +59,9 @@ module.exports = function askRoutes(db) {
   return router;
 };
 
-// Checks the body and returns the question, the uploadIds (undefined for all uploads)
-// and whether to rerank. Throws an ApiError for anything the spec rejects.
+// Checks the body and returns the question, the uploadIds (undefined for all uploads),
+// whether to rerank and the kind of search. Throws an ApiError for anything the spec
+// rejects.
 async function readRequest(body, uploads) {
   const question = typeof body.question === 'string' ? body.question.trim() : '';
   if (!question) throw new ApiError(400, 'missingQuestion', 'Type a question first.');
@@ -63,6 +71,14 @@ async function readRequest(body, uploads) {
   // Only a real boolean: a string "false" would otherwise count as true.
   const rerank = body.rerank ?? true;
   if (typeof rerank !== 'boolean') throw new ApiError(400, 'invalidRerank', 'rerank must be true or false.');
+  const search = body.search ?? 'vector';
+  if (search !== 'vector' && search !== 'hybrid') {
+    throw new ApiError(400, 'invalidSearch', 'search must be "vector" or "hybrid".');
+  }
+  // The merged score of hybrid search can't be checked against a threshold.
+  if (search === 'hybrid' && !rerank) {
+    throw new ApiError(400, 'invalidSearch', 'Hybrid search is always reranked; leave out rerank: false.');
+  }
 
   // Exactly one of uploadIds (one or more) or scope "all". An empty list is refused,
   // so a bug that sends one can't quietly search everything.
@@ -75,7 +91,7 @@ async function readRequest(body, uploads) {
   }
   if (scope !== undefined) {
     if (scope !== 'all') throw invalid('scope can only be "all".');
-    return { question, uploadIds: undefined, rerank };
+    return { question, uploadIds: undefined, rerank, search };
   }
   if (!Array.isArray(uploadIds)) throw invalid('uploadIds must be a list of upload ids.');
   if (!uploadIds.length) throw missing();
@@ -91,7 +107,7 @@ async function readRequest(body, uploads) {
   if (found.some((upload) => !upload.searchableAt)) {
     throw new ApiError(409, 'uploadNotReady', 'One of the ticked uploads is still being processed.');
   }
-  return { question, uploadIds: ids, rerank };
+  return { question, uploadIds: ids, rerank, search };
 }
 
 function llmBusy(err) {

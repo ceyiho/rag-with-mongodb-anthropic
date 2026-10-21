@@ -1,8 +1,10 @@
 // Asks a question from the command line and prints the answer with its sources.
-// Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank]
+// Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank | --search hybrid]
 // --upload asks that complete upload; repeat it to ask several. Without it, all
 // searchable uploads.
 // --no-rerank answers from vector search alone (by default the chunks are reranked).
+// --search hybrid answers from hybrid search: vector and keyword search combined, always
+// reranked (up to twice the rerank tokens). --search vector is the default.
 // Each run embeds the question, reranks (about 20,000 tokens), and calls the LLM unless
 // the top score is below the "not found" threshold. To see the raw chunks and scores,
 // use npm run search.
@@ -32,10 +34,14 @@ async function main() {
   // --no-rerank has no value, so remove just the flag itself.
   const noRerankAt = args.indexOf('--no-rerank');
   if (noRerankAt !== -1) args.splice(noRerankAt, 1);
+  const [search = 'vector'] = takeFlags(args, '--search');
   const question = args.join(' ').trim();
 
-  if (!question || fileNames.includes(undefined)) {
-    console.error('Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank]');
+  // Hybrid search is always reranked: its merged score can't be checked against a
+  // threshold.
+  const badSearch = !['vector', 'hybrid'].includes(search) || (search === 'hybrid' && noRerankAt !== -1);
+  if (!question || fileNames.includes(undefined) || badSearch) {
+    console.error('Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank | --search hybrid]');
     process.exit(1);
   }
 
@@ -62,9 +68,9 @@ async function main() {
     // All the work happens here: search, the threshold check, then the LLM
     // (src/answer.js). result.text is the answer with [n] markers after cited
     // passages, or "not found in your uploads".
-    const result = await answer(db, question, { uploadIds, rerank: noRerankAt === -1 });
-    console.log(`"${question}" in ${fileNames.join(', ') || 'All uploads'}`
-      + `${noRerankAt === -1 ? '' : ' (without reranking)'}\n`);
+    const result = await answer(db, question, { uploadIds, rerank: noRerankAt === -1, search });
+    const how = search === 'hybrid' ? ' (hybrid search)' : noRerankAt === -1 ? '' : ' (without reranking)';
+    console.log(`"${question}" in ${fileNames.join(', ') || 'All uploads'}${how}\n`);
     console.log(result.text);
 
     // Sources: one line per [n] marker in the answer, with where it points ("page 12",
