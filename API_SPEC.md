@@ -279,7 +279,7 @@ The page:
   "retrieval": {
     "search": "vector",
     "mode": "exact",
-    "rerank": { "model": "rerank-3", "candidates": 50 },
+    "rerank": { "model": "rerank-3", "candidates": 18 },
     "uploadCount": 2,
     "chunksSearched": 18,
     "threshold": 0.58,
@@ -304,8 +304,8 @@ The page:
   (paragraphs, bullet and numbered lists, `code`, **bold**), and finally turns the
   placeholders into marker buttons. Anything else shows as plain text.
 - Where the citation fields come from: `title`, `fileType` and `chunkCount` from
-  `uploads`, joined to the search results with a `$lookup` stage after
-  `$vectorSearch`; `section` and `chunkIndex` from the chunk.
+  `uploads`, joined to the search results with a `$lookup` stage at the end of the
+  search pipeline; `section` and `chunkIndex` from the chunk.
 - Where a citation points, by file type, and how the page shows it:
   - PDF: `page`, read from the section ("page 12"), shown as "PDF p. 12". It's the
     PDF's page number, not the printed one. No chapter, even when the chunk's prefix

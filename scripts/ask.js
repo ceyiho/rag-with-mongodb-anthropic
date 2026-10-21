@@ -34,11 +34,12 @@ async function main() {
   // --no-rerank has no value, so remove just the flag itself.
   const noRerankAt = args.indexOf('--no-rerank');
   if (noRerankAt !== -1) args.splice(noRerankAt, 1);
-  const [search = 'vector'] = takeFlags(args, '--search');
+  const searchArgs = takeFlags(args, '--search');
+  const search = searchArgs.length ? searchArgs[0] : 'vector';
   const question = args.join(' ').trim();
 
   // Hybrid search is always reranked: its merged score can't be checked against a
-  // threshold.
+  // threshold. A bare --search (no value) is refused rather than read as vector.
   const badSearch = !['vector', 'hybrid'].includes(search) || (search === 'hybrid' && noRerankAt !== -1);
   if (!question || fileNames.includes(undefined) || badSearch) {
     console.error('Usage: npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank | --search hybrid]');

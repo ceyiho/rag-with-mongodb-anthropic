@@ -41,7 +41,8 @@ async function main() {
   if (noRerankAt !== -1) args.splice(noRerankAt, 1);
   const rerank = noRerankAt !== -1 ? 0
     : rerankArg === undefined ? config.search.rerank.candidates : Number(rerankArg);
-  const [kind = 'vector'] = takeFlags(args, '--search');
+  const searchArgs = takeFlags(args, '--search');
+  const kind = searchArgs.length ? searchArgs[0] : 'vector';   // a bare --search is refused below
   const question = args.join(' ').trim();
 
   const badKind = !['vector', 'hybrid'].includes(kind);

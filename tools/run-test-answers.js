@@ -135,6 +135,12 @@ function takeFlag(args, name) {
   const at = args.indexOf(name);
   if (at === -1) return undefined;
   const [, value] = args.splice(at, 2);
+  // A flag left without its value would otherwise quietly fall back to the default:
+  // a bare --only would run every question (about 150 LLM calls).
+  if (value === undefined || value.startsWith('--')) {
+    console.error(`${name} needs a value.\n${USAGE}`);
+    process.exit(1);
+  }
   return value;
 }
 

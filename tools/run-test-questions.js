@@ -10,8 +10,8 @@
 // --rerank reranks the top n vector results instead of config.js's count.
 // --no-rerank tests vector search alone, at the cosine thresholds (the baseline).
 // --search hybrid tests hybrid search: vector and keyword search each fetch the rerank
-// count, and the whole merged list is reranked (up to twice the tokens, about 8 million
-// for a full run). Always reranked, so not with --no-rerank.
+// count, and the whole merged list is reranked (about 1.6 times the tokens, about 7
+// million for a full run). Always reranked, so not with --no-rerank.
 //
 // Each question runs up to four searches:
 // - all:   All uploads (approximate). Also reports where the first chunk from an
@@ -183,6 +183,11 @@ function takeFlag(args, name) {
   const at = args.indexOf(name);
   if (at === -1) return undefined;
   const [, value] = args.splice(at, 2);
+  // A flag left without its value would otherwise quietly fall back to the default.
+  if (value === undefined || value.startsWith('--')) {
+    console.error(`${name} needs a value.\n${USAGE}`);
+    process.exit(1);
+  }
   return value;
 }
 

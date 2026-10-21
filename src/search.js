@@ -29,7 +29,11 @@
 // on a single list (at least 2/110 vs at most 1/61), so a cut would drop the tail of
 // each list, including vector results that vector search alone would rerank. A missing
 // keyword index makes $search find nothing rather than fail, so it's checked when the
-// keyword side found nothing.
+// keyword side found nothing. Not chosen: $scoreFusion (merges scores, so it needs a
+// score normalization to tune, for no effect once $rerank re-sorts everything), and a
+// keyword-only mode (keyword scores have no fixed range, so no threshold could use
+// them). Hybrid search is an option, not the default: with reranking last it made no
+// measurable difference (test/HYBRID.md).
 //
 // Returns { search, mode, uploadCount, chunksSearched, rerank, chunks }: search is the
 // kind ('vector' or 'hybrid'), mode 'exact' or 'approximate' (how vector search ran),
@@ -51,6 +55,7 @@ const config = require('./config');
 const { keywordIndex } = require('./indexes');
 
 const MAX_CANDIDATES = 10000;     // Atlas limit on numCandidates
+const MAX_RERANKED = 1000;        // Atlas limit on $rerank's numDocsToRerank
 const EXACT_MAX_CHUNKS = 10000;   // the Atlas documentation: exact search below 10,000
 const KINDS = ['vector', 'hybrid'];
 
@@ -88,6 +93,11 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
   // Reranking needs at least `limit` candidates to keep `limit` results. In hybrid
   // search, each side fetches this many.
   const candidates = rerank ? Math.max(rerank, limit) : limit;
+  const reranked = hybrid ? candidates * 2 : candidates;   // at most, before $rerank
+  if (rerank && reranked > MAX_RERANKED) {
+    throw new TypeError(`$rerank takes at most ${MAX_RERANKED} chunks; `
+      + `${hybrid ? `hybrid search reranks up to twice the ${candidates} per side` : `${candidates} asked`}`);
+  }
   const result = {
     search: kind,
     mode: exact ? 'exact' : 'approximate',
@@ -197,7 +207,7 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
       $rerank: {
         query: { text: question },
         path: 'text',
-        numDocsToRerank: hybrid ? candidates * 2 : candidates,
+        numDocsToRerank: reranked,
         model: config.search.rerank.model,
       },
     },
