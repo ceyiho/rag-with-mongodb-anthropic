@@ -682,5 +682,73 @@
     "upload": "Shanti_Pouch_Instructions.pdf",
     "kind": "off-topic",
     "note": "Sewing, but not the pouch; shares the pattern's stitching vocabulary."
+  },
+  {
+    "id": "kw-parallel-uploads",
+    "question": "What does the parallel_uploads setting do?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "keyword",
+    "expect": [
+      "up to four parallel connections"
+    ],
+    "note": "A config key, one word to the keyword index; mentioned in a long chunk about how syncing works."
+  },
+  {
+    "id": "kw-status-why",
+    "question": "What does nimbus status --why do?",
+    "answerable": true,
+    "upload": "nimbus-admin-handbook.txt",
+    "wrongUpload": "mongodb-document-model.md",
+    "kind": "keyword",
+    "expect": [
+      "prints the rule that stopped the upload"
+    ],
+    "note": "A command flag mentioned once, in the handbook's long troubleshooting paragraph."
+  },
+  {
+    "id": "kw-poll-env",
+    "question": "What is NIMBUS_POLL_INTERVAL?",
+    "answerable": true,
+    "upload": "nimbus-guide.md",
+    "wrongUpload": "claude-code-first-steps.txt",
+    "kind": "keyword",
+    "expect": [
+      "Environment variables take priority over the file"
+    ],
+    "note": "An environment variable, one word to the keyword index; it overrides poll_interval for a run."
+  },
+  {
+    "id": "kw-indexstats",
+    "question": "What is $indexStats for?",
+    "answerable": true,
+    "upload": "mongodb-document-model.md",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "keyword",
+    "expect": [
+      "shows how often each one is used"
+    ],
+    "note": "A trap for keyword search: the book also names $indexStats, but only in a list of stages it leaves out (page 250)."
+  },
+  {
+    "id": "kw-claude-continue",
+    "question": "What does claude --continue do?",
+    "answerable": true,
+    "upload": "claude-code-first-steps.txt",
+    "wrongUpload": "nimbus-guide.md",
+    "kind": "keyword",
+    "expect": [
+      "claude --continue in the terminal reopens the most recent one"
+    ],
+    "note": "A command flag mentioned once, in a list of slash commands."
+  },
+  {
+    "id": "kw-sync-force",
+    "question": "What does nimbus sync --force do?",
+    "answerable": false,
+    "upload": "nimbus-guide.md",
+    "kind": "keyword",
+    "note": "nimbus sync exists, --force doesn't: a good keyword match on \"nimbus sync\" mustn't lift it past the threshold."
   }
 ]

@@ -57,7 +57,10 @@
 //                `expect`; the answer's coverage is judged by reading it.
 // - near-miss:   on topic, same vocabulary, but the answer isn't in the uploads.
 // - off-topic:   not about any upload, either general or technical sharing our wording.
-// The first six are answerable, the last two are not.
+// - keyword:     asks about an exact identifier (a config key, flag, variable or stage
+//                name) with little else to go on, where keyword search should help
+//                (milestone 9). Mostly answerable; one isn't (the flag doesn't exist).
+// The first six are answerable, near-miss and off-topic are not, keyword is both.
 
 const fs = require('fs');
 const path = require('path');
