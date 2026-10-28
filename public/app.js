@@ -733,10 +733,15 @@ function dropSavedMessage(id) {
 // other code shows the server's own message.
 const ASK_ERRORS = {
   llmUnavailable: 'The answer service is busy right now. Try again in a minute.',
+  llmAccessDenied: 'The answer service didn\'t accept this server\'s key. Check the API key in the server\'s .env file.',
   internal: 'Something went wrong on the server while answering.',
   uploadNotFound: 'One of the ticked uploads no longer exists, so it has been unticked.',
   uploadNotReady: 'One of the ticked uploads is still being processed. Try again once it shows as ready.',
 };
+
+// 5xx errors from the answer service (the LLM), not the server or the database, so
+// they don't start a connection check.
+const LLM_ERRORS = ['llmUnavailable', 'llmAccessDenied'];
 
 // Asks the question in the box (or `question`) of the ticked uploads, or of all uploads
 // when `all` is set ("Ask all uploads instead"). One question at a time: Ask stays
@@ -774,7 +779,7 @@ async function ask({ question, all = false } = {}) {
     state.latest = { ...state.latest, status: 'error', error: err };
     if (err instanceof ApiError && ['uploadNotFound', 'uploadNotReady'].includes(err.code)) {
       loadUploads();   // unticks what is gone
-    } else if (!(err instanceof ApiError) || (err.status >= 500 && err.code !== 'llmUnavailable')) {
+    } else if (!(err instanceof ApiError) || (err.status >= 500 && !LLM_ERRORS.includes(err.code))) {
       checkConnection();   // the server or the database may be down
     }
   }
@@ -913,40 +918,163 @@ function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
-// The score bar spans these scores; the red line on it marks the threshold.
-const SCORE_BAR = { min: 0.45, max: 0.95 };
+// Score bars span these scores; the red line on each marks its threshold. Rerank scores
+// run from 0 to 1 (unrelated passages sit near 0.25); cosine scores fill a narrow band,
+// which their bar spreads out.
+const SCORE_BARS = {
+  rerank: { min: 0, max: 1 },
+  cosine: { min: 0.45, max: 0.95 },
+};
 
 // "How this was found", collapsed: how the search ran, what the threshold decided,
 // whether the LLM cited anything, and the passages sent to it (or that would have
-// been), with their scores.
+// been), with their scores. A reranked answer compares its passages, in two tabs, with
+// the ones vector search alone would have sent (withoutRerank, milestone 9).
+// Answers saved earlier lack withoutRerank (and those from before milestone 9 lack
+// rerank too, with cosine scores), so they show one table.
 function detailsHtml(r) {
-  const pct = (score) => Math.max(0, Math.min(100, ((score - SCORE_BAR.min) / (SCORE_BAR.max - SCORE_BAR.min)) * 100));
-  const rows = r.hits.map((h, i) => {
-    const where = locationLabel(h);
-    return `<tr class="${h.score < r.threshold ? 'low' : ''}"><td class="rank">${i + 1}</td>
-      <td class="score">${h.score.toFixed(2)}<span class="scorebar"><span style="width:${pct(h.score)}%"></span><i style="left:${pct(r.threshold)}%"></i></span></td>
-      <td>${esc(h.title)}${where ? ` <span class="where">· ${esc(where)}</span>` : ''}</td>
-      <td>${h.cited ? `<span class="citedtag">cited [${h.cited}]</span>` : ''}</td></tr>`;
-  }).join('');
-
+  const w = r.withoutRerank;
+  const n = r.hits.length;
+  const passages = plural(n, 'passage');
   const mode = r.mode.charAt(0).toUpperCase() + r.mode.slice(1);
-  const passages = plural(r.hits.length, 'passage');
-  let verdict;
-  if (r.topScore === null) verdict = 'no passages found, so the LLM was not called';
-  else if (r.llmCalled) verdict = `best match ${r.topScore.toFixed(3)} ≥ ${r.threshold}, so the top ${passages} went to the LLM`;
-  else verdict = `best match ${r.topScore.toFixed(3)} < ${r.threshold}, so the LLM was not called`;
+  const reranked = r.rerank
+    ? `, then reranked by Voyage AI ${esc(r.rerank.model)} (${plural(r.rerank.candidates, 'candidate')})` : '';
   const cited = r.hits.filter((h) => h.cited).length;
   const answer = !r.llmCalled ? ''
     : `<dt>Answer</dt><dd>${cited ? `cites ${cited} of the ${passages}` : 'no passage cited, so it counts as not found'}</dd>`;
+  const facts = (threshold) => `<dl class="facts">
+      <dt>Search</dt><dd>${esc(mode)} vector search over ${plural(r.uploadCount, 'upload')} (${plural(r.chunksSearched, 'chunk')})${reranked}</dd>
+      ${threshold}${answer}
+    </dl>`;
+  const panel = (body) => `<details class="details"><summary>How this was found</summary><div class="box">${body}</div></details>`;
 
-  return `<details class="details"><summary>How this was found</summary><div class="box">
-    <dl class="facts">
-      <dt>Search</dt><dd>${esc(mode)} vector search over ${plural(r.uploadCount, 'upload')} (${plural(r.chunksSearched, 'chunk')})</dd>
-      <dt>Threshold</dt><dd>${verdict}</dd>${answer}
-    </dl>
-    ${rows ? `<table class="hits">${rows}</table>` : ''}
-    <div class="modes">Search mode: Vector.</div>
-  </div></details>`;
+  if (!w || !n) {
+    let verdict;
+    if (r.topScore === null) verdict = 'no passages found, so the LLM was not called';
+    else if (r.llmCalled) verdict = `best match ${r.topScore.toFixed(3)} ≥ ${r.threshold}, so the top ${passages} went to the LLM`;
+    else verdict = `best match ${r.topScore.toFixed(3)} < ${r.threshold}, so the LLM was not called`;
+    const bar = r.rerank ? SCORE_BARS.rerank : SCORE_BARS.cosine;
+    return panel(`${facts(`<dt>Threshold</dt><dd>${verdict}</dd>`)}${hitsTable(r.hits, { bar, threshold: r.threshold, parts: partNumbers(r.hits) })}`);
+  }
+  // Both tabs number the parts of a page or section the same way.
+  const parts = partNumbers([...r.hits, ...w.hits]);
+
+  // Passages in one list only: in the reranked top n but below vector search's own top,
+  // or the other way round.
+  const vectorOnly = (h) => h.rerankRank > n;
+  const rerankOnly = (h) => h.vectorRank > w.hits.length;
+  const replaced = r.hits.filter(rerankOnly).length;
+  let summary;
+  if (replaced) summary = `Reranking replaced ${replaced} of the ${passages}.`;
+  else if (r.hits.every((h, i) => h.vectorRank === i + 1)) summary = `Reranking kept the same ${passages}, in the same order.`;
+  else summary = `Reranking kept the same ${passages}, in a different order.`;
+  if (r.llmCalled !== w.llmCalled) {
+    summary += r.llmCalled
+      ? ' Without it, this question would have been stopped before the LLM.'
+      : ' Without it, this question would have been sent to the LLM.';
+  }
+
+  const rerankVerdict = r.llmCalled
+    ? `Best relevance ${r.topScore.toFixed(3)} ≥ ${r.threshold}: sent to the LLM.`
+    : `Best relevance ${r.topScore.toFixed(3)} < ${r.threshold}: stopped, so the LLM was not called.`;
+  const vectorVerdict = w.llmCalled
+    ? `Best similarity ${w.topScore.toFixed(3)} ≥ ${w.threshold}: would have been sent to the LLM.`
+    : `Best similarity ${w.topScore.toFixed(3)} < ${w.threshold}: would have been stopped.`;
+
+  // Two tabs, one list each; the first is open. Both panels sit in the same grid cell,
+  // so the box keeps the taller one's height and switching never moves the page.
+  return panel(`<div class="compare-summary">${summary}</div>
+    ${facts('')}
+    <div class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true" data-action="showTab" data-tab="0">With reranking</button>
+      <button class="tab" role="tab" aria-selected="false" data-action="showTab" data-tab="1">Without reranking (vector search alone)</button>
+    </div>
+    <div class="tab-panels">
+      <div class="tab-panel on" role="tabpanel">
+        ${hitsTable(r.hits, {
+          bar: SCORE_BARS.rerank, threshold: r.threshold, parts, scoreHead: 'Relevance',
+          otherHead: 'Vector Search', other: (h) => `#${h.vectorRank}`,
+          mark: (h) => (rerankOnly(h) ? 'surfaced' : ''),
+        })}
+        <div class="verdict">${rerankVerdict}</div>
+        <div class="legend">Highlighted: surfaced by reranking.</div></div>
+      <div class="tab-panel" role="tabpanel">
+        ${hitsTable(w.hits, {
+          bar: SCORE_BARS.cosine, threshold: w.threshold, parts, scoreHead: 'Similarity',
+          otherHead: 'Reranked', other: (h) => `#${h.rerankRank}`,
+          mark: (h) => (vectorOnly(h) ? 'dropped' : ''),
+        })}
+        <div class="verdict">${vectorVerdict}</div>
+        <div class="legend">Shaded: dropped by reranking.</div></div>
+    </div>
+    <div class="legend">Relevance (reranking) and similarity (vector search) are different scales.</div>`);
+}
+
+// Switches the comparison to the clicked tab. The card isn't redrawn while it's shown,
+// so the tab stays as clicked, like an opened source.
+function showTab(button) {
+  const box = button.closest('.box');
+  const index = Number(button.dataset.tab);
+  box.querySelectorAll('.tab').forEach((tab, i) => {
+    tab.classList.toggle('on', i === index);
+    tab.setAttribute('aria-selected', String(i === index));
+  });
+  box.querySelectorAll('.tab-panel').forEach((panel, i) => panel.classList.toggle('on', i === index));
+}
+
+// The passages as a table: position, score with its bar (the red line marks the
+// threshold), title and location, and the citation. With headings, a fourth column
+// (`other`) gives each passage's position in the other list, and `mark` names a class
+// for the passages missing from it ('surfaced' or 'dropped'); when every passage comes
+// from one upload, its title (and "PDF") is in the heading instead of on each row.
+// `parts` (from partNumbers) tells apart passages from the same page or section.
+function hitsTable(hits, { bar, threshold, parts, scoreHead, otherHead, other, mark }) {
+  if (!hits.length) return '';
+  const pct = (score) => Math.max(0, Math.min(100, ((score - bar.min) / (bar.max - bar.min)) * 100));
+  const oneUpload = Boolean(scoreHead) && hits.every((h) => h.uploadId === hits[0].uploadId);
+  const pdf = hits[0].fileType === 'pdf';
+  const passageHead = oneUpload ? `Passage, all from ${esc(hits[0].title)}${pdf ? ' (PDF)' : ''}` : 'Passage';
+  const head = scoreHead
+    ? `<tr><th></th><th>${scoreHead}</th><th>${passageHead}</th><th class="other">${otherHead}</th></tr>` : '';
+  const rows = hits.map((h, i) => {
+    // "PDF p. 8" becomes "p. 8" when the heading already says PDF.
+    const where = oneUpload && pdf && h.page ? `p. ${h.page}` : locationLabel(h);
+    const part = parts.get(`${h.uploadId}:${h.chunkIndex}`);
+    const place = where && part ? `${where} (part ${part})` : where;
+    // A passage with no location (a PDF passage without a page, which ingest never
+    // stores) keeps the title, even in a one-upload table, so the row isn't empty.
+    const name = oneUpload && place ? esc(place)
+      : `${esc(h.title)}${place ? ` <span class="where">· ${esc(place)}</span>` : ''}`;
+    const classes = [h.score < threshold ? 'low' : '', mark?.(h) ?? ''].filter(Boolean).join(' ');
+    return `<tr class="${classes}"><td class="rank">${i + 1}</td>
+      <td class="score">${h.score.toFixed(2)}<span class="scorebar"><span style="width:${pct(h.score)}%"></span><i style="left:${pct(threshold)}%"></i></span></td>
+      <td>${name}${h.cited ? ` <span class="citedtag">cited [${h.cited}]</span>` : ''}</td>
+      ${other ? `<td class="other">${other(h)}</td>` : ''}</tr>`;
+  }).join('');
+  return `<table class="hits">${head}${rows}</table>`;
+}
+
+// Part numbers for passages that share a page or section (one long PDF page, or a
+// Markdown section split into several chunks), which would otherwise look the same:
+// numbered in chunkIndex order (their order in the upload), among the passages shown.
+// A map from "uploadId:chunkIndex" to the part number; locations with one passage
+// shown get none. Plain-text passages are already told apart ("passage 2 of 7").
+function partNumbers(hits) {
+  const byPlace = new Map();   // "uploadId|location" -> { uploadId, chunkIndexes }
+  for (const h of hits) {
+    const where = locationLabel(h);
+    if (!where) continue;
+    const key = `${h.uploadId}|${where}`;
+    if (!byPlace.has(key)) byPlace.set(key, { uploadId: h.uploadId, chunkIndexes: new Set() });
+    byPlace.get(key).chunkIndexes.add(h.chunkIndex);
+  }
+  const parts = new Map();
+  for (const { uploadId, chunkIndexes } of byPlace.values()) {
+    if (chunkIndexes.size < 2) continue;
+    [...chunkIndexes].sort((a, b) => a - b)
+      .forEach((chunkIndex, i) => parts.set(`${uploadId}:${chunkIndex}`, i + 1));
+  }
+  return parts;
 }
 
 // ---------- Events ----------
@@ -1022,6 +1150,9 @@ $('answers').addEventListener('click', (e) => {
   switch (button.dataset.action) {
     case 'toggleSource':
       button.closest('.src').classList.toggle('open');
+      break;
+    case 'showTab':
+      showTab(button);
       break;
     case 'retry':
       ask({ question: entry().question });

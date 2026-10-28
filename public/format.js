@@ -39,21 +39,52 @@ export function answerHtml(parts) {
 // indentation sets how deeply it is nested.
 const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 
+// The start or end of a fenced code block: three backticks, optionally indented (a
+// block inside a list item) and, on the opening line, followed by a language name.
+const FENCE = /^(\s*)```/;
+
 // The Markdown the LLM writes, as HTML: paragraphs, bullet and numbered lists (nested
-// by indentation), `code` and **bold**. Anything else (headings, links, tables) stays
-// as plain text. Takes text that is already escaped.
+// by indentation), fenced code blocks, `code` and **bold**. Anything else (headings,
+// links, tables) stays as plain text. Takes text that is already escaped.
 function markdownHtml(text) {
   const out = [];
   let paragraph = [];   // lines of the paragraph being read; a line break inside one stays
   const lists = [];     // the lists open around the current line, innermost last
+  let code = null;      // inside a fenced code block: { indent, lines }
 
   const endParagraph = () => {
     if (paragraph.length) out.push(`<p>${paragraph.join('<br>')}</p>`);
     paragraph = [];
   };
   const closeList = () => out.push(`</li></${lists.pop().tag}>`);
+  // Code lines are kept as written (only the fence's own indentation is removed), with
+  // no Markdown inside. The language name isn't used: no syntax colouring.
+  const endCode = () => {
+    out.push(`<pre class="codeblock"><code>${code.lines.join('\n')}</code></pre>`);
+    code = null;
+  };
 
   for (const line of text.split('\n')) {
+    if (code) {
+      if (FENCE.test(line)) {
+        endCode();
+        // A citation marker placed after the closing fence (the part ended there).
+        const after = line.trim().slice(3).trim();
+        if (after) out.push(`<p>${inlineHtml(after)}</p>`);
+      } else {
+        code.lines.push(line.startsWith(code.indent) ? line.slice(code.indent.length) : line.trimStart());
+      }
+      continue;
+    }
+    const fence = FENCE.exec(line);
+    if (fence) {
+      endParagraph();
+      // An indented block belongs to the open list item; one at the margin ends the list.
+      if (!fence[1]) while (lists.length) closeList();
+      code = { indent: fence[1], lines: [] };
+      continue;
+    }
+
     const item = LIST_ITEM.exec(line);
     if (item) {
       endParagraph();
@@ -79,6 +110,7 @@ function markdownHtml(text) {
       paragraph.push(inlineHtml(line.trim()));
     }
   }
+  if (code) endCode();   // a block the answer never closed
   endParagraph();
   while (lists.length) closeList();
   return out.join('');
@@ -92,12 +124,14 @@ function inlineHtml(text) {
 }
 
 // Where a citation or a search hit points, as shown on the page (API_SPEC.md: where a
-// citation points): "PDF p. 12", "Installation › Windows", "passage 2 of 7", or null
-// when there is no location (Markdown text under the title only).
+// citation points): "PDF p. 12", "Installation › Windows", "passage 2 of 7", or
+// "Opening text" for Markdown text before the first heading below the title (its
+// section is null). Null only for a PDF passage without a page, which ingest never
+// stores.
 export function locationLabel(item) {
   if (item.fileType === 'pdf') return item.page ? `PDF p. ${item.page}` : null;
   if (item.fileType === 'txt') return `passage ${item.chunkIndex + 1} of ${item.chunkCount}`;
-  return item.section ? item.section.split(' > ').join(' › ') : null;
+  return item.section ? item.section.split(' > ').join(' › ') : 'Opening text';
 }
 
 // When something happened, for answers: "just now", "12 min ago", "3 h ago", then the

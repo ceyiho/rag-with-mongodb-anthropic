@@ -313,8 +313,10 @@ The page:
 - Formatting: the LLM writes simple Markdown, and a list can be cut across several
   parts. So the page joins the parts into one text with a placeholder where each
   marker goes, escapes everything, then turns a small set of Markdown into formatting
-  (paragraphs, bullet and numbered lists, `code`, **bold**), and finally turns the
-  placeholders into marker buttons. Anything else shows as plain text.
+  (paragraphs, bullet and numbered lists, fenced code blocks, `code`, **bold**), and
+  finally turns the placeholders into marker buttons. Anything else shows as plain
+  text. Code blocks (milestone 9) keep their lines and indentation as written, in a
+  grey box that scrolls sideways instead of wrapping; no syntax colouring.
 - Where the citation fields come from: `title`, `fileType` and `chunkCount` from
   `uploads`, joined to the search results with a `$lookup` stage at the end of the
   search pipeline; `section` and `chunkIndex` from the chunk.
@@ -323,8 +325,9 @@ The page:
     PDF's page number, not the printed one. No chapter, even when the chunk's prefix
     line names one.
   - Markdown: `section`, the heading path without the title, shown as
-    "Installation › Windows". Text before the first heading (stored with the file
-    name as its section) has `section: null` and shows no location.
+    "Installation › Windows". Text before the first heading below the title (stored
+    with the file name or the title as its section) has `section: null` and is shown
+    as "Opening text" (milestone 9; it showed no location before).
   - Plain text: `section` is null, so it's shown as "passage 2 of 7" (`chunkIndex`
     + 1 of `chunkCount`).
 
@@ -407,13 +410,33 @@ The page:
   count shows past 800 of the 1,000 allowed.
 - Disables Ask while waiting, so a double click can't cost two LLM calls.
 - Shows a failed question as the latest card, with its own wording for
-  `llmUnavailable`, `internal`, `uploadNotFound`, `uploadNotReady` and an unreachable
-  server (the server's message for any other code) and a "Try again" button. The
-  question stays in the box. The card goes when the next question is asked; failed
-  questions aren't saved.
+  `llmUnavailable`, `llmAccessDenied`, `internal`, `uploadNotFound`, `uploadNotReady`
+  and an unreachable server (the server's message for any other code) and a "Try
+  again" button. The question stays in the box. The card goes when the next question
+  is asked; failed questions aren't saved.
 - After `uploadNotFound` or `uploadNotReady`, reloads the list (which unticks the
-  upload, with a notice); after a network failure or another 5xx, checks the
-  connection.
+  upload, with a notice); after a network failure or a 5xx other than the answer
+  service's (`llmUnavailable`, `llmAccessDenied`), checks the connection.
+- "How this was found" (milestone 9), on every answer and "not found" card: the search
+  line names the reranking ("…then reranked by Voyage AI rerank-3 (50 candidates)").
+  With `withoutRerank`, it opens with a summary ("Reranking replaced 4 of the 10
+  passages", plus "Without it, this question would have been sent to the LLM" or
+  "…stopped before the LLM" when the two verdicts differ), then two tabs, one table
+  each: "With reranking" (open first; relevance, and each passage's position in
+  vector search) and "Without reranking (vector search alone)" (similarity, and its
+  position after reranking), each ending with its threshold verdict. The panel keeps
+  the taller table's height, so switching tabs moves nothing. Passages in one list
+  only are marked, with a note under each table: green in "With reranking"
+  ("Highlighted: surfaced by reranking"), grey in "Without reranking" ("Shaded:
+  dropped by reranking"). When every passage in a table comes from one upload, its
+  title is in the heading ("Passage, all from …", with "(PDF)" for a PDF) and the
+  rows show only the location ("p. 8"). Passages from the same page or section are told apart as parts ("PDF
+  p. 9 (part 2)"), numbered in `chunkIndex` order among the passages the two tabs
+  show (not out of all the page's chunks), the same in both tabs. Score bars span 0–1 for rerank
+  scores and 0.45–0.95 for cosine scores, with the threshold as a red line. Answers
+  saved before this (no `withoutRerank`, or no `rerank` before milestone 9) show one
+  table, drawn on the scale their scores use; the saved format's version is
+  unchanged, since it only gained fields.
 - Escapes all text before showing it (see Formatting above): uploaded text and LLM
   output are untrusted.
 
@@ -554,7 +577,15 @@ wireframe review (2026-10-02) and while building the page (2026-10-06 to 10-08).
 - Icons: line icons (inline SVG) for the empty states; chevrons, close buttons and
   status marks stay characters (▸ ▾ × ✓ ? !), which take the page's colours, unlike
   emoji.
-- "How this was found" ends with "Search mode: Vector.": milestone 9 builds on the
-  panel, where its optional mode switch would go. Not chosen: naming milestone 9 on
-  the page (the wireframe's "Keyword and Hybrid come with milestone 9."), which
-  advertises unfinished work in a demo.
+- "How this was found" ended with "Search mode: Vector." in milestone 8, where a
+  mode switch might go. Milestone 9 dropped the line: the page has no mode switch
+  (hybrid search made no difference, see `test/HYBRID.md`). Not chosen: naming
+  milestone 9 on the page (the wireframe's "Keyword and Hybrid come with milestone
+  9."), which advertises unfinished work in a demo.
+- The comparison with vector search alone (milestone 9, 2026-10-28) is built from the
+  reranked search itself: free, one request, and the same candidates on both sides.
+  Not chosen: a checkbox that asks twice and shows two answers (two LLM calls, about
+  $0.03 a question), a search-only route for the second list (a second search), or a
+  choice of one way per question (no visible difference). Tabs rather than the two
+  tables side by side, tried first: side by side, each table was so narrow that
+  titles wrapped onto two or three lines and rows differed in height.
