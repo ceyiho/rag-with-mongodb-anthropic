@@ -294,6 +294,8 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50);
    the ones it pushed out. */
 .hits .surfaced td { background: var(--green-50); }
 .hits .dropped td { background: var(--border); }
+/* The bar's empty part is the same grey as a dropped row, so it would vanish there. */
+.hits .dropped .scorebar { background: #d3dad7; }
 /* Reranking compared with vector search alone: one tab per list. Both panels share one
    grid cell, so the taller sets the height and switching tabs moves nothing. */
 .compare-summary { font-weight: 600; margin-bottom: 6px; }

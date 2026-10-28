@@ -982,7 +982,8 @@ function detailsHtml(r) {
     : `Best similarity ${w.topScore.toFixed(3)} < ${w.threshold}: would have been stopped.`;
 
   // Two tabs, one list each; the first is open. Both panels sit in the same grid cell,
-  // so the box keeps the taller one's height and switching never moves the page.
+  // so the box keeps the taller one's height and switching never moves the page. Each
+  // note on the marked rows shows only when a row is marked, so no one looks for them.
   return panel(`<div class="compare-summary">${summary}</div>
     ${facts('')}
     <div class="tabs" role="tablist">
@@ -997,7 +998,7 @@ function detailsHtml(r) {
           mark: (h) => (rerankOnly(h) ? 'surfaced' : ''),
         })}
         <div class="verdict">${rerankVerdict}</div>
-        <div class="legend">Highlighted: surfaced by reranking.</div></div>
+        ${replaced ? '<div class="legend">Highlighted: surfaced by reranking.</div>' : ''}</div>
       <div class="tab-panel" role="tabpanel">
         ${hitsTable(w.hits, {
           bar: SCORE_BARS.cosine, threshold: w.threshold, parts, scoreHead: 'Similarity',
@@ -1005,7 +1006,7 @@ function detailsHtml(r) {
           mark: (h) => (vectorOnly(h) ? 'dropped' : ''),
         })}
         <div class="verdict">${vectorVerdict}</div>
-        <div class="legend">Shaded: dropped by reranking.</div></div>
+        ${w.hits.some(vectorOnly) ? '<div class="legend">Shaded: dropped by reranking.</div>' : ''}</div>
     </div>
     <div class="legend">Relevance (reranking) and similarity (vector search) are different scales.</div>`);
 }

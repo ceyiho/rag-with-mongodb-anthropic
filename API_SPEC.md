@@ -426,7 +426,8 @@ The page:
   vector search) and "Without reranking (vector search alone)" (similarity, and its
   position after reranking), each ending with its threshold verdict. The panel keeps
   the taller table's height, so switching tabs moves nothing. Passages in one list
-  only are marked, with a note under each table: green in "With reranking"
+  only are marked, with a note under the table only when it has a marked row (so no
+  one looks for marks that aren't there): green in "With reranking"
   ("Highlighted: surfaced by reranking"), grey in "Without reranking" ("Shaded:
   dropped by reranking"). When every passage in a table comes from one upload, its
   title is in the heading ("Passage, all from …", with "(PDF)" for a PDF) and the
