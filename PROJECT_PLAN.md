@@ -155,10 +155,10 @@ so no logins or usage limits are needed.
    search alone would have sent.
 
 ### Phase 3
-10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
-    number 80" (tlsv1 alert internal error) when connecting means your IP address has
-    changed; add it in Atlas Network Access. The driver may label it
-    `SystemOverloadedError`, but it isn't an Atlas outage.
+10. README with an architecture diagram and a Troubleshooting section, starting
+    with: "SSL alert number 80" (tlsv1 alert internal error) when connecting means
+    your IP address has changed; add it in Atlas Network Access. The driver may label
+    it `SystemOverloadedError`, but it isn't an Atlas outage.
 
 ### Optional (parked)
 11. Analytics: log each question, top score, and cited chunks in a `questions`
@@ -458,5 +458,5 @@ milestones run.
   On the page, "How this was found" compares the reranked passages with vector search
   alone's, in two tabs (Decisions: Web page and API), and answers show code blocks
   formatted. The test set has 77 questions.
-- Next: milestone 10 (README with an architecture diagram, and a demo video).
+- Next: milestone 10 (README with an architecture diagram).
 - Files and commands: see ARCHITECTURE.md.
