@@ -151,8 +151,8 @@ so no logins or usage limits are needed.
    MongoDB 8.3+), then add hybrid search (an Atlas Search keyword index combined with
    vector search, reranked last). Measure each against vector search alone with
    `test/questions.json`, and re-check the "not found" threshold. Then the web page:
-   let the user compare answers with and without reranking and see the difference in
-   "How this was found".
+   "How this was found" compares the passages sent to the LLM with the ones vector
+   search alone would have sent.
 
 ### Phase 3
 10. README with architecture diagram, and a demo video. Troubleshooting: "SSL alert
@@ -240,7 +240,7 @@ so no logins or usage limits are needed.
     structured output.) Fallback if citations prove unreliable: a "not found" tool.
   - Partial answers: the LLM answers the part the chunks cover, with citations, and
     says what the uploads don't cover. It counts as an answer.
-- Web page and API (milestones 7–8; details, reasons and rejected options in
+- Web page and API (milestones 7–9; details, reasons and rejected options in
   API_SPEC.md):
   - Picker: several uploads or "All uploads"; nothing ticked when the page opens.
   - Readiness: search and count, saved as `searchableAt` by the page, `npm run ingest`
@@ -255,6 +255,9 @@ so no logins or usage limits are needed.
   - The server listens on `127.0.0.1` unless `HOST` is set.
   - The page (milestone 8): plain browser modules, no build step or framework; green
     scheme; recovers by itself when the server or database comes back.
+  - Comparison (milestone 9): "How this was found" shows the reranked passages and
+    vector search alone's in two tabs, from the same search
+    (`retrieval.withoutRerank`): no second request or LLM call.
 - Folder layout (milestone 3). Scripts and tools import from `src/`, never the reverse.
   `src/` is app code; `scripts/` is what's needed to make the app work (setup, and the
   user-facing commands ingest and ask until the web page); `tools/` is maintenance and
@@ -446,13 +449,14 @@ milestones run.
 - Before milestone 9: moved to an M10 cluster (MongoDB 9.0), where `$rerank` is
   generally available. Search scores unchanged (Findings: Cluster move); the run
   `2026-10-09-m10-baseline` is the vector-only baseline for milestone 9.
-- Milestone 9 in progress: reranking is done and on for every answer (Decisions:
-  Reranking; Findings: Reranking, Rerank threshold; `test/RERANKING.md`). The API and
-  command line can still answer without it (`rerank: false`, `--no-rerank`). Hybrid
-  search is done too, as an option in the API and command line (`search: "hybrid"`,
-  `--search hybrid`; the keyword index `chunks_keyword` is the M10's third search
-  index); it showed no gain, so it isn't the default (Decisions and Findings: Hybrid
-  search; `test/HYBRID.md`). The test set has 77 questions.
-- Next: the web page's comparison of answers with and without reranking (milestone 9),
-  then the milestone's wrap-up.
+- Milestone 9 is completed: reranking is on for every answer (Decisions: Reranking;
+  Findings: Reranking, Rerank threshold; `test/RERANKING.md`); the API and command
+  line can still answer without it (`rerank: false`, `--no-rerank`). Hybrid search is
+  an option in the API and command line (`search: "hybrid"`, `--search hybrid`; the
+  keyword index `chunks_keyword` is the M10's third search index); it showed no gain,
+  so it isn't the default (Decisions and Findings: Hybrid search; `test/HYBRID.md`).
+  On the page, "How this was found" compares the reranked passages with vector search
+  alone's, in two tabs (Decisions: Web page and API), and answers show code blocks
+  formatted. The test set has 77 questions.
+- Next: milestone 10 (README with an architecture diagram, and a demo video).
 - Files and commands: see ARCHITECTURE.md.

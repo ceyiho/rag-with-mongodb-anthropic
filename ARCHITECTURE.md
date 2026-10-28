@@ -25,7 +25,10 @@ Answers are reranked by default: vector search fetches the 50 closest chunks, th
 `$rerank` stage re-sorts them by how well each answers the question, and the top 10
 go on. The threshold then checks the top rerank score. Asked without reranking
 (`rerank: false`, `--no-rerank`), the top 10 come from vector search alone and the
-threshold checks the cosine score. `test/RERANKING.md` compares the two.
+threshold checks the cosine score. `test/RERANKING.md` compares the two. Each
+reranked answer also says which passages vector search alone would have sent: the
+top 10 of the same 50 candidates in vector order, so no second search runs. The page
+shows both lists in "How this was found", in two tabs.
 
 Hybrid search is an option (`search: "hybrid"`, `--search hybrid`), not the default and
 not on the page: vector search and keyword search (the Atlas Search index
@@ -114,8 +117,8 @@ Scripts and tools import from `src/`, never the reverse.
 | `ingest.js` | Saves an upload and its chunks, all or nothing (`processing` → `complete`); rejects duplicate file names. |
 | `upload-error.js` | `UploadError`: an upload problem the user can fix (duplicate, unsupported type, scanned PDF…), with a code the API turns into a 4xx. |
 | `readiness.js` | The readiness check: counts an upload's searchable chunks (exact vector search, then `$count`) and sets `searchableAt` once all are. |
-| `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; optionally reranks a number of candidates (`$rerank`); or hybrid search (`kind: 'hybrid'`: vector and keyword search merged by `$rankFusion`, then reranked); joins each chunk's upload (`$lookup`). Returns the chunks with their score (rerank or cosine), cosine `vectorScore`, rank in each list (`vectorRank`, `keywordRank`) and merged `fusionScore`, and the kind, mode, reranking (with the count actually reranked) and counts. Throws `HybridUnavailable` when the keyword index is missing. |
-| `answer.js` | Answers a question: search (reranked unless asked with `rerank: false`; hybrid with `search: 'hybrid'`), then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format). Holds the system prompt. |
+| `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; optionally reranks a number of candidates (`$rerank`); or hybrid search (`kind: 'hybrid'`: vector and keyword search merged by `$rankFusion`, then reranked); joins each chunk's upload (`$lookup`). Returns the chunks with their score (rerank or cosine), cosine `vectorScore`, rank in each list before reranking (`vectorRank`, `keywordRank`) and after it (`rerankRank`), and merged `fusionScore`; for reranked vector search also the top chunks in vector order (`vectorTop`, what vector search alone would have returned); and the kind, mode, reranking (with the count actually reranked) and counts. Throws `HybridUnavailable` when the keyword index is missing. |
+| `answer.js` | Answers a question: search (reranked unless asked with `rerank: false`; hybrid with `search: 'hybrid'`), then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format), including, when reranked, what vector search alone would have sent and whether its threshold would have stopped the question (`withoutRerank`). Holds the system prompt. |
 | `indexes.js` | The Atlas Search index definitions (vector, title autocomplete, keyword) and their status. |
 | `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. Remembers a working title index until the server stops. |
 
@@ -127,7 +130,7 @@ Route files handle a request first; helpers are only called by them.
 |---|---|---|
 | `health.js` | `GET /api/health` | Whether the server can reach the database. |
 | `uploads.js` | `GET /api/uploads`<br>`GET /api/uploads/search`<br>`GET /api/uploads/:id`<br>`POST /api/uploads` | Upload routes: the list, title search, one upload with its readiness check, and the upload itself (`multer`). |
-| `ask.js` | `POST /api/ask` | Checks the request (including the optional `rerank` and `search`), answers it, and sends the fields API_SPEC.md lists; turns a busy or refusing LLM, or a missing keyword index, into its own error codes. |
+| `ask.js` | `POST /api/ask` | Checks the request (including the optional `rerank` and `search`), answers it, and sends the fields API_SPEC.md lists (including `withoutRerank`); turns a busy or refusing LLM, or a missing keyword index, into its own error codes. |
 | `errors.js` | Any other `/api` route (a 404) | Helper: `ApiError`, and the error handler that turns every route's errors into `{ error: { code, message } }`. |
 | `ids.js` | – | Helper: turns upload ids from requests into ObjectIds, or a 400 (for `uploads.js` and `ask.js`). |
 
@@ -142,9 +145,9 @@ them as they are (`package.json` has no `"type": "module"`). Built from
 |---|---|
 | `index.html` | The page's fixed frame: header, sidebar (upload, title search, picker) and workspace (question box, answers). |
 | `style.css` | The page's styles (green scheme), with the phone layout below 760 px. |
-| `app.js` | The page itself: its state, the functions that draw each area from it, and the events. Upload list and connection banners, picker and title search, uploads and readiness checks, questions and answer cards, earlier questions in `localStorage`. |
+| `app.js` | The page itself: its state, the functions that draw each area from it, and the events. Upload list and connection banners, picker and title search, uploads and readiness checks, questions and answer cards (with "How this was found", which compares the reranked passages with vector search alone's in two tabs), earlier questions in `localStorage`. |
 | `api.js` | Calls the API routes; turns a failed request into `ServerUnreachable` (no reply) or `ApiError` (a reply with an error code). |
-| `format.js` | Turns untrusted text into HTML: answers (escaping, the Markdown subset, citation markers), citation locations, relative times, and title search highlights. |
+| `format.js` | Turns untrusted text into HTML: answers (escaping, the Markdown subset with fenced code blocks, citation markers), citation locations ("PDF p. 12", a heading path, "passage 2 of 7", "Opening text"), relative times, and title search highlights. |
 
 ### `scripts/`: needed to make the app work
 
@@ -230,7 +233,7 @@ real page (`public/`) from this one.
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
-| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–8). |
+| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–9). |
 | `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |

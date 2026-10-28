@@ -2,6 +2,8 @@
 
 The Express API (milestone 7) and how the web page (milestone 8) uses it: routes,
 request and response formats, error codes, and the `src/` changes milestone 7 made.
+Milestone 9 added reranking, hybrid search and the page's comparison with vector
+search alone, marked "(milestone 9)" where they appear.
 Written before milestone 7 from the wireframe (`wireframe/index.html`, whose state
 menu names the route behind each state), and kept in step with the routes as they
 were built. Decisions and reasons are in PROJECT_PLAN.md; this file is the detail.
