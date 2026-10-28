@@ -117,6 +117,8 @@ function llmBusy(err) {
 
 // The answer as API_SPEC.md lists it, with ids as hex strings.
 function toApiAnswer(result) {
+  const withHexIds = (hits) => hits.map((hit) => ({ ...hit, uploadId: hit.uploadId.toHexString() }));
+  const { withoutRerank } = result.retrieval;
   return {
     found: result.found,
     reason: result.reason,
@@ -135,7 +137,8 @@ function toApiAnswer(result) {
     })),
     retrieval: {
       ...result.retrieval,
-      hits: result.retrieval.hits.map((hit) => ({ ...hit, uploadId: hit.uploadId.toHexString() })),
+      hits: withHexIds(result.retrieval.hits),
+      withoutRerank: withoutRerank && { ...withoutRerank, hits: withHexIds(withoutRerank.hits) },
     },
   };
 }

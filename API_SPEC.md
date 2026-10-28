@@ -241,8 +241,9 @@ The page:
   fetches the top 50 chunks (`search.rerank.candidates` in `config.js`), the `$rerank`
   stage re-sorts them, and the top 10 go on, checked against the rerank thresholds
   (0.58). `false` answers from vector search alone, checked against the cosine
-  thresholds (0.62), as before milestone 9. It's for the page's "compare without
-  rerank" option, which sends the question twice, once each way (two LLM calls).
+  thresholds (0.62), as before milestone 9. The page never sends it: a reranked
+  answer already says what vector search alone would have sent (`withoutRerank`
+  below), with no second request.
 - `search` (optional, milestone 9): `"vector"` (the default) or `"hybrid"`. Hybrid
   search runs vector search and keyword search (Atlas Search on the chunks' text, with
   one-letter typo tolerance) on the same uploads, 50 chunks each; `$rankFusion` merges
@@ -287,10 +288,21 @@ The page:
     "llmCalled": true,
     "hits": [
       { "score": 0.91, "vectorScore": 0.81, "vectorRank": 3, "keywordRank": null,
-        "fusionScore": null, "uploadId": "66f1...",
+        "rerankRank": 1, "fusionScore": null, "uploadId": "66f1...",
         "title": "Nimbus Admin Handbook", "fileType": "txt", "section": null,
         "page": null, "chunkIndex": 1, "chunkCount": 7, "cited": 2 }
-    ]
+    ],
+    "withoutRerank": {
+      "threshold": 0.62,
+      "topScore": 0.84,
+      "llmCalled": true,
+      "hits": [
+        { "score": 0.84, "vectorScore": 0.84, "vectorRank": 1, "keywordRank": null,
+          "rerankRank": 12, "fusionScore": null, "uploadId": "66f2...",
+          "title": "Nimbus CLI Guide", "fileType": "md", "section": "Configuration",
+          "page": null, "chunkIndex": 4, "chunkCount": 11, "cited": null }
+      ]
+    }
   }
 }
 ```
@@ -336,9 +348,23 @@ The page:
     `null` when that list didn't find it; `keywordRank` is always `null` in vector
     search. In hybrid search they're copied from `$rankFusion`'s `scoreDetails`, whose
     format MongoDB doesn't guarantee, so the API keeps its own two fields.
+  - `rerankRank`: the hit's position after reranking, among all the candidates (1 =
+    first); `null` when not reranked.
   - `fusionScore`: hybrid search's merged score (Reciprocal Rank Fusion: each list
     adds 1 / (60 + rank), so about 0.009 to 0.033), `null` in vector search. It only
     reflects the ranks, so the page shows it as background, never as relevance.
+  - `withoutRerank` (milestone 9): what vector search alone would have done, for the
+    page's comparison. `hits` are vector search's own top 10 (`vectorRank` 1–10,
+    best first), with `score` the cosine and `rerankRank` where reranking put each
+    one (above 10: not sent). `threshold` is the cosine threshold (0.62), `topScore`
+    the cosine of vector #1, and `llmCalled` whether that would have sent the question
+    to the LLM rather than stopped it. Nothing in it went to the LLM; `cited` marks
+    the passages the reranked answer cited. Taken from the same search: the 10 are
+    among the 50 candidates fetched for reranking, so no second search runs. For
+    ticked uploads (exact search) they match a search with `rerank: false`; in All
+    uploads they're at least as close to the exact top 10, since vector search
+    explores more candidates when fetching 50 (`numCandidates` 1,000 rather than
+    200). `null` with `rerank: false` or hybrid search.
 
 `200`, "not found in your uploads":
 

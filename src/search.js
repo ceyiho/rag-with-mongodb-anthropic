@@ -35,18 +35,25 @@
 // them). Hybrid search is an option, not the default: with reranking last it made no
 // measurable difference (test/HYBRID.md).
 //
-// Returns { search, mode, uploadCount, chunksSearched, rerank, chunks }: search is the
-// kind ('vector' or 'hybrid'), mode 'exact' or 'approximate' (how vector search ran),
-// chunksSearched the chunk count of the uploads searched, rerank { model, candidates }
-// (candidates: how many chunks were actually reranked) or null, and chunks the results
-// best first, each with its upload's title, fileType and chunkCount, joined from
-// uploads, and:
+// Returns { search, mode, uploadCount, chunksSearched, rerank, chunks, vectorTop }:
+// search is the kind ('vector' or 'hybrid'), mode 'exact' or 'approximate' (how vector
+// search ran), chunksSearched the chunk count of the uploads searched, rerank
+// { model, candidates } (candidates: how many chunks were actually reranked) or null,
+// chunks the results best first, and vectorTop, in reranked vector search only (else
+// null), the top `limit` chunks in vector order before reranking: what vector search
+// alone would have returned, for the page's comparison. They're all among the
+// candidates, so no second search is needed. For ticked uploads (exact search) they're
+// the same as a vector-only search's; in All uploads at least as close to the exact top
+// `limit`, since vector search explores more candidates here (numCandidates). Each
+// chunk has its upload's title, fileType and chunkCount, joined from uploads, and:
 // - score: what the threshold checks. The rerank score when reranked (higher is more
 //   relevant), otherwise the cosine one.
 // - vectorScore: the cosine score (higher is closer); null for a chunk only keyword
 //   search found.
 // - vectorRank, keywordRank: the chunk's position in each list before reranking (1 =
 //   first), or null when that list didn't find it (or, for keyword, didn't run).
+// - rerankRank: the chunk's position after reranking, among all the candidates (1 =
+//   first), or null when not reranked.
 // - fusionScore: the merged score (hybrid only, else null). It depends only on the
 //   ranks (about 0.009 to 0.033), so it says nothing about relevance.
 
@@ -87,6 +94,9 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
   // The merged score depends only on ranks, so no threshold can use it.
   const hybrid = kind === 'hybrid';
   if (hybrid && !rerank) throw new TypeError('hybrid search is always reranked');
+  // Only reranked vector search has a "without reranking" list to compare with: vector
+  // search alone is that list, and hybrid search has no single vector order to show.
+  const compare = Boolean(rerank) && !hybrid;
 
   const chunksSearched = uploads.reduce((sum, upload) => sum + upload.chunkCount, 0);
   const exact = Boolean(uploadIds) && chunksSearched <= EXACT_MAX_CHUNKS;
@@ -105,7 +115,7 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
     chunksSearched,
     rerank: rerank ? { model: config.search.rerank.model, candidates: 0 } : null,
   };
-  if (!uploads.length) return { ...result, chunks: [] };
+  if (!uploads.length) return { ...result, chunks: [], vectorTop: compare ? [] : null };
 
   // The filter is always a list of upload ids: $vectorSearch can only filter on fields
   // in the vector index (uploadId), and searchableAt is on the upload, not the chunks.
@@ -197,7 +207,7 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
         output: { vectorRank: { $documentNumber: {} }, ...counting() },
       },
     },
-    { $set: { keywordRank: null, fusionScore: null } },
+    { $set: { keywordRank: null, fusionScore: null, rerankRank: null } },
   ];
 
   // $rerank takes the candidates in pipeline order; numDocsToRerank covers all of them
@@ -217,10 +227,21 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
     // chunks in no useful order. The merged score (hybrid), then the cosine, break ties,
     // so the cut at `limit` keeps the better chunks and runs repeat.
     { $sort: { score: -1, fusionScore: -1, vectorScore: -1 } },
-    { $limit: limit },
+    // Numbers the chunks in that order (rerankRank). $documentNumber can't: it takes a
+    // single sort field. $push keeps the order of a $sort before it (the $push page of
+    // the MongoDB documentation), and $unwind gives each element its position.
+    { $group: { _id: null, chunks: { $push: '$$ROOT' } } },
+    { $unwind: { path: '$chunks', includeArrayIndex: 'position' } },
+    { $replaceWith: { $mergeObjects: ['$chunks', { rerankRank: { $add: ['$position', 1] } }] } },
+    // The reranked top `limit`, and for the comparison the vector top `limit` too.
+    {
+      $match: compare
+        ? { $or: [{ rerankRank: { $lte: limit } }, { vectorRank: { $lte: limit } }] }
+        : { rerankRank: { $lte: limit } },
+    },
   ] : [];
 
-  const chunks = await db.collection(config.collections.chunks).aggregate([
+  const found = await db.collection(config.collections.chunks).aggregate([
     ...searching,
     ...reranking,
     // Joins each chunk's upload (a join between collections, like SQL's JOIN), for the
@@ -239,8 +260,8 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
     { $unset: 'upload' },
   ]).toArray();
 
-  const { candidateCount = 0, keywordFound = 0 } = chunks[0] ?? {};
-  for (const chunk of chunks) {
+  const { candidateCount = 0, keywordFound = 0 } = found[0] ?? {};
+  for (const chunk of found) {
     delete chunk.candidateCount;
     delete chunk.keywordFound;
   }
@@ -248,7 +269,16 @@ async function search(db, question, { uploadIds, limit = config.search.limit, re
     throw new HybridUnavailable('the keyword search index is missing or not queryable yet');
   }
   if (result.rerank) result.rerank.candidates = candidateCount;
-  return { ...result, chunks };
+  // Ordered by rank here: $setWindowFields doesn't guarantee the order of what it
+  // returns (its page in the MongoDB documentation), and $lookup keeps what it gets. A
+  // chunk in both top lists is in both arrays.
+  const top = (rank) => found.filter((chunk) => chunk[rank] !== null && chunk[rank] <= limit)
+    .sort((a, b) => a[rank] - b[rank]);
+  return {
+    ...result,
+    chunks: top(rerank ? 'rerankRank' : 'vectorRank'),
+    vectorTop: compare ? top('vectorRank') : null,
+  };
 }
 
 // An expression that reads one field (rank or value) of one input list's entry in
