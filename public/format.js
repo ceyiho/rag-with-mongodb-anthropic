@@ -17,7 +17,12 @@ export function escapeHtml(value) {
 const MARK_OPEN = String.fromCharCode(0xe000);
 const MARK_CLOSE = String.fromCharCode(0xe001);
 const MARKER = new RegExp(`${MARK_OPEN}([0-9]+)${MARK_CLOSE}`, 'g');
-const STRAY_MARKS = new RegExp(`[${MARK_OPEN}${MARK_CLOSE}]`, 'g');
+// The same kind of placeholder for `code` spans while a line looks for **bold** (see
+// inlineHtml). Removed from the answer first too.
+const CODE_OPEN = String.fromCharCode(0xe002);
+const CODE_CLOSE = String.fromCharCode(0xe003);
+const CODE_SPAN = new RegExp(`${CODE_OPEN}([0-9]+)${CODE_CLOSE}`, 'g');
+const STRAY_MARKS = new RegExp(`[${MARK_OPEN}${MARK_CLOSE}${CODE_OPEN}${CODE_CLOSE}]`, 'g');
 
 // The answer's parts as HTML (API_SPEC.md: Formatting). A Markdown list can be cut
 // across several parts, so the parts are joined into one text with a placeholder where
@@ -44,8 +49,9 @@ const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const FENCE = /^(\s*)```/;
 
 // The Markdown the LLM writes, as HTML: paragraphs, bullet and numbered lists (nested
-// by indentation), fenced code blocks, `code` and **bold**. Anything else (headings,
-// links, tables) stays as plain text. Takes text that is already escaped.
+// by indentation), fenced code blocks, `code`, **bold** and *italic*. Anything else
+// (headings, links, tables) stays as plain text: none of it appeared in about 1,000
+// saved answers (test/results/, checked 2026-10-28). Takes text that is already escaped.
 function markdownHtml(text) {
   const out = [];
   let paragraph = [];   // lines of the paragraph being read; a line break inside one stays
@@ -116,11 +122,19 @@ function markdownHtml(text) {
   return out.join('');
 }
 
-// `code` and **bold** in one line of escaped text. Bold isn't looked for inside code.
+// `code`, **bold**, *italic* and ***both*** in one line of escaped text. Code spans are
+// set aside as placeholders first, so bold can contain code ("**Use `$map`.**") while
+// "**" inside code stays as written; then they go back in. Italics need text right
+// inside the stars and no word character right outside them, so "2 * 3" and "a*b"
+// stay as they are. Not _italic_: underscores start MongoDB names like _id.
 function inlineHtml(text) {
-  return text.split(/(`[^`]+`)/).map((piece, i) => (i % 2
-    ? `<code>${piece.slice(1, -1)}</code>`
-    : piece.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'))).join('');
+  const codes = [];
+  return text
+    .replace(/`([^`]+)`/g, (_, code) => `${CODE_OPEN}${codes.push(code) - 1}${CODE_CLOSE}`)
+    .replace(/\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^\w*])\*([^*\s](?:[^*]*[^*\s])?)\*(?![\w*])/g, '$1<em>$2</em>')
+    .replace(CODE_SPAN, (_, i) => `<code>${codes[i]}</code>`);
 }
 
 // Where a citation or a search hit points, as shown on the page (API_SPEC.md: where a

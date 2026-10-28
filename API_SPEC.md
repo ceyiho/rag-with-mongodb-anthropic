@@ -315,9 +315,11 @@ The page:
 - Formatting: the LLM writes simple Markdown, and a list can be cut across several
   parts. So the page joins the parts into one text with a placeholder where each
   marker goes, escapes everything, then turns a small set of Markdown into formatting
-  (paragraphs, bullet and numbered lists, fenced code blocks, `code`, **bold**), and
-  finally turns the placeholders into marker buttons. Anything else shows as plain
-  text. Code blocks (milestone 9) keep their lines and indentation as written, in a
+  (paragraphs, bullet and numbered lists, fenced code blocks, `code`, **bold**,
+  *italic*), and finally turns the placeholders into marker buttons. Anything else
+  shows as plain text; headings, tables and links never appeared in the saved test
+  answers. Bold may contain `code`. Not `_italic_`, since underscores start MongoDB
+  names like `_id`. Code blocks (milestone 9) keep their lines and indentation as written, in a
   grey box that scrolls sideways instead of wrapping; no syntax colouring.
 - Where the citation fields come from: `title`, `fileType` and `chunkCount` from
   `uploads`, joined to the search results with a `$lookup` stage at the end of the
