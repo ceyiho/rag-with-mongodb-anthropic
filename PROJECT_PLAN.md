@@ -159,6 +159,12 @@ so no logins or usage limits are needed.
     with: "SSL alert number 80" (tlsv1 alert internal error) when connecting means
     your IP address has changed; add it in Atlas Network Access. The driver may label
     it `SystemOverloadedError`, but it isn't an Atlas outage.
+    For a portfolio reader: what it showcases, the diagram (Mermaid, with a box around
+    what runs in Atlas), the vector search and rerank pipeline as example code, a
+    short results summary, a quick start (M10 or larger with MongoDB 8.3+ for
+    `$rerank`), a screenshot of the page, and an MIT license. Links to the other
+    files rather than repeating them. Re-measure rerank tokens per search on the Atlas
+    dashboard and correct the estimate where it appears.
 
 ### Optional (parked)
 11. Analytics: log each question, top score, and cited chunks in a `questions`
