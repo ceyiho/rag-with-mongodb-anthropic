@@ -83,8 +83,8 @@ so no logins or usage limits are needed.
 ## MongoDB features to showcase
 - Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Atlas Search autocomplete (fuzzy) on upload titles, for the picker's search
-- Atlas Search facets on the picker: uploads counted by file type and size, following
-  the title search (milestone 10)
+- Atlas Search facets on the picker: uploads counted by file type and size, as
+  filters for the list and the title search (milestone 10)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy) by
   `$rankFusion` (milestone 9; an option in the API and tools, results in
   `test/HYBRID.md`)
@@ -157,7 +157,7 @@ so no logins or usage limits are needed.
    search alone would have sent.
 10. Faceted upload picker: a Filter block above the title search, with Type (PDF, MD,
     TXT) and Size (Small, Medium, Large) chips whose counts come from Atlas Search
-    facets and follow the typed words. Built from `wireframe/index-facets.html` (the
+    facets, filtering the list and the title search. Built from `wireframe/index-facets.html` (the
     sidebar only; where it and API_SPEC.md differ, the spec wins; not updated after
     this milestone). Check the facet syntax in the Atlas documentation first. Steps:
     the title index gains the two fields, applied with a new
@@ -264,7 +264,9 @@ so no logins or usage limits are needed.
   `fileType` (`token`) and `chunkCount` (`number`), not the outdated `stringFacet` and
   `numberFacet` types. Size: under 10 chunks is Small, 10–99 Medium, 100 or more
   Large. Each row's counts apply the other row's chips, not its own, so a second value
-  can still be added. The filter only narrows what the picker shows; ticks and "All
+  can still be added. The counts are for the whole library and don't follow the typed
+  words: the list isn't narrowed by them, so a chip greyed for 0 matches would block a
+  filter that works on the list. The filter only narrows what the picker shows; ticks and "All
   uploads" don't change. The list still comes from `GET /api/uploads`. If facets are
   unavailable, the Filter block is hidden.
 - Web page and API (milestones 7–10; details, reasons and rejected options in
@@ -485,7 +487,11 @@ milestones run.
   On the page, "How this was found" compares the reranked passages with vector search
   alone's, in two tabs (Decisions: Web page and API), and answers show code blocks
   formatted. The test set has 77 questions.
-- A README draft and the MIT license are committed (milestone 11). Milestone 10 comes
-  first, so the README describes the finished page.
-- Next: milestone 10 (faceted upload picker).
+- Milestone 10 is completed: the Filter block on the page (Type and Size chips with
+  counts from Atlas Search facets; Decisions: Facets),
+  the route `GET /api/uploads/facets` and the chips as filters on title search, tested
+  with curl and checked in the browser. The title index gained `fileType` and
+  `chunkCount`, applied with the new `npm run setup -- --update <index name>`.
+- A README draft and the MIT license are committed (milestone 11).
+- Next: milestone 11 (README with an architecture diagram).
 - Files and commands: see ARCHITECTURE.md.

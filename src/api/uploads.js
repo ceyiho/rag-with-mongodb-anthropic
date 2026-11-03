@@ -2,6 +2,7 @@
 // "processing" is the ingest's internal state and never reaches the page.
 //   GET /api/uploads       all complete uploads, sorted by title
 //   GET /api/uploads/search?q=   title search for the picker (Atlas Search autocomplete)
+//   GET /api/uploads/facets   counts by type and size for the picker's Filter block
 //   GET /api/uploads/:id   one upload, after the readiness check if it isn't searchable
 //   POST /api/uploads      saves an uploaded file (multipart/form-data, field "file")
 
@@ -10,7 +11,7 @@ const multer = require('multer');
 const config = require('../config');
 const { ingest } = require('../ingest');
 const { checkReadiness } = require('../readiness');
-const { searchTitles } = require('../title-search');
+const { searchTitles, countFacets } = require('../title-search');
 const { UploadError } = require('../upload-error');
 const { ApiError } = require('./errors');
 const { toObjectId } = require('./ids');
@@ -63,6 +64,25 @@ function cleanFileName(name) {
   return fileName;
 }
 
+// The Filter block's ticked chips from ?type=pdf,md&size=large: { type: [...], size: [...] }.
+// A parameter given twice (?type=pdf&type=md) arrives as an array and counts the same.
+// An unknown value is a 400, so a mistyped chip isn't silently ignored.
+const FILTER_VALUES = { type: config.facets.types, size: config.facets.sizes.map((s) => s.name) };
+
+function readFilters(query) {
+  const filters = {};
+  for (const [key, allowed] of Object.entries(FILTER_VALUES)) {
+    const given = [query[key] ?? []].flat().filter((v) => typeof v === 'string');
+    const values = [...new Set(given.join(',').split(',').map((v) => v.trim()).filter(Boolean))];
+    const unknown = values.find((v) => !allowed.includes(v));
+    if (unknown) {
+      throw new ApiError(400, 'invalidFilter', `Unknown ${key} "${unknown}": use ${allowed.join(', ')}.`);
+    }
+    filters[key] = values;
+  }
+  return filters;
+}
+
 // The shape every upload route returns. searchable comes from searchableAt (set once
 // all the upload's chunks are searchable), never from status.
 function toUpload(upload) {
@@ -92,16 +112,27 @@ module.exports = function uploadsRoutes(db) {
     res.json(found.map(toUpload));
   });
 
-  // The picker's title search, asked once typing pauses. An empty q gives []. If the
-  // title index is missing (e.g. dropped while being changed), the page filters its
-  // own list instead.
+  // The picker's title search, asked once typing pauses, filtered by the ticked chips.
+  // An empty q gives []. If the title index is missing (e.g. dropped while being
+  // changed), the page filters its own list instead.
   router.get('/uploads/search', async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 200) : '';
-    const found = await searchTitles(db, q);
+    const found = await searchTitles(db, q, readFilters(req.query));
     if (!found) {
       throw new ApiError(503, 'titleSearchUnavailable', 'Title search is unavailable right now.');
     }
     res.json(found.map(toUpload));
+  });
+
+  // Counts for the Filter block (milestone 10): the whole library by type and by size,
+  // each row with the other row's chips applied. If the title index is missing or
+  // doesn't index the facet fields yet, the page hides the Filter block.
+  router.get('/uploads/facets', async (req, res) => {
+    const counts = await countFacets(db, readFilters(req.query));
+    if (!counts) {
+      throw new ApiError(503, 'facetsUnavailable', 'The upload filter is unavailable right now.');
+    }
+    res.json(counts);
   });
 
   // The page asks this every few seconds after an upload, until searchable is true.

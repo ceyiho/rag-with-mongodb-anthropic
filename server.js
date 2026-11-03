@@ -75,16 +75,25 @@ async function main() {
 }
 
 // Without the vector index no question can be answered, so the server doesn't start.
-// Without the title index only the picker's title search is lost (the page filters its
-// own list instead), and without the keyword index only hybrid search (vector answers
-// still work), so for those it only warns.
+// Without the title index only the picker's title search (the page filters its own list
+// instead) and its Filter block are lost, and without the keyword index only hybrid
+// search (vector answers still work), so for those it only warns. It also warns when an
+// index lacks fields the code defines (an older definition), naming what they serve.
 const LOST_WITHOUT = {
-  [config.searchIndexes.title]: 'title search is off',
+  [config.searchIndexes.title]: 'title search and the upload filter are off',
   [config.searchIndexes.keyword]: 'hybrid search is off',
+};
+const LOST_WITHOUT_FIELDS = {
+  [config.searchIndexes.title]: 'the upload filter is off',
+  [config.searchIndexes.keyword]: 'hybrid search may fail',
 };
 
 async function checkSearchIndexes(db) {
-  for (const { index, exists, queryable } of await searchIndexStatus(db)) {
+  for (const { index, exists, queryable, missingFields } of await searchIndexStatus(db)) {
+    if (queryable && missingFields.length) {
+      console.warn(`Warning: the search index ${index.name} doesn't index ${missingFields.join(', ')} yet, `
+        + `so ${LOST_WITHOUT_FIELDS[index.name]}; run "npm run setup -- --update ${index.name}".`);
+    }
     if (queryable) continue;
     const problem = exists ? 'is not queryable yet' : 'is missing';
     const fix = exists ? 'check "npm run index-status"' : 'run "npm run setup"';

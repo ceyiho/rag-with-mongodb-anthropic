@@ -46,7 +46,9 @@ upload take part in "All uploads" and become selectable on the page.
 
 The API server (`server.js`, Express) offers all of this over HTTP for the web page:
 listing, uploading and title search of uploads, readiness checks, and questions.
-API_SPEC.md describes its routes and formats. The web page (`public/`) is served by
+The picker's Filter block counts uploads by file type and size with Atlas Search
+facets (`$searchMeta`) on the same title index, for the whole library; its chips
+filter the list and the title search. API_SPEC.md describes its routes and formats. The web page (`public/`) is served by
 the same server at `/` and runs in the browser: it calls the routes, and keeps the
 earlier questions in the browser's `localStorage`.
 
@@ -62,6 +64,7 @@ npm start              → server.js → src/indexes.js (startup check)
   GET  /api/health          → src/api/health.js
   GET  /api/uploads         → src/api/uploads.js
   GET  /api/uploads/search  → src/api/uploads.js → src/title-search.js
+  GET  /api/uploads/facets  → src/api/uploads.js → src/title-search.js
   GET  /api/uploads/:id     → src/api/uploads.js → src/readiness.js
   POST /api/uploads         → src/api/uploads.js → src/ingest.js → src/extractors/, src/splitter.js
   POST /api/ask             → src/api/ask.js → src/answer.js → src/search.js
@@ -106,7 +109,7 @@ Scripts and tools import from `src/`, never the reverse.
 
 | File | Purpose |
 |---|---|
-| `config.js` | Application settings: collection and search index names, search limits, "not found" thresholds (all uploads, selected uploads; cosine for vector search alone, and their own for reranking), reranking (model, candidates), hybrid search's typo tolerance, answer model, upload size and file-name limits, title search settings, scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
+| `config.js` | Application settings: collection and search index names, search limits, "not found" thresholds (all uploads, selected uploads; cosine for vector search alone, and their own for reranking), reranking (model, candidates), hybrid search's typo tolerance, answer model, upload size and file-name limits, title search settings, the picker's facets (file types, size buckets by chunk count), scanned-PDF threshold, chunk sizes. Secrets go in `.env` instead. |
 | `db.js` | Opens the MongoDB connection from `.env` (`MONGODB_URI`, `DB_NAME`). |
 | `extractors/index.js` | Picks the extractor for a file by its extension; rejects unsupported types. |
 | `extractors/text.js` | Plain text: the whole file is one section; its chunks start with a title made from the file name. Also decodes file bytes to text. |
@@ -119,8 +122,8 @@ Scripts and tools import from `src/`, never the reverse.
 | `readiness.js` | The readiness check: counts an upload's searchable chunks (exact vector search, then `$count`) and sets `searchableAt` once all are. |
 | `search.js` | Vector search for a question: exact within the selected uploads, approximate across all searchable ones; optionally reranks a number of candidates (`$rerank`); or hybrid search (`kind: 'hybrid'`: vector and keyword search merged by `$rankFusion`, then reranked); joins each chunk's upload (`$lookup`). Returns the chunks with their score (rerank or cosine), cosine `vectorScore`, rank in each list before reranking (`vectorRank`, `keywordRank`) and after it (`rerankRank`), and merged `fusionScore`; for reranked vector search also the top chunks in vector order (`vectorTop`, what vector search alone would have returned); and the kind, mode, reranking (with the count actually reranked) and counts. Throws `HybridUnavailable` when the keyword index is missing. |
 | `answer.js` | Answers a question: search (reranked unless asked with `rerank: false`; hybrid with `search: 'hybrid'`), then the "not found" threshold check, then the LLM with citations. Returns the answer as parts, citations and retrieval details (the API's format), including, when reranked, what vector search alone would have sent and whether its threshold would have stopped the question (`withoutRerank`). Holds the system prompt. |
-| `indexes.js` | The Atlas Search index definitions (vector, title autocomplete, keyword) and their status. |
-| `title-search.js` | Title search for the page's picker: Atlas Search autocomplete on titles and file names, with typo tolerance. Remembers a working title index until the server stops. |
+| `indexes.js` | The Atlas Search index definitions (vector, title autocomplete with the facet fields, keyword) and their status. |
+| `title-search.js` | The page's picker, on the title index: title search (Atlas Search autocomplete on titles and file names, with typo tolerance) and facet counts by type and size (`$searchMeta`, one query per row), both filtered by the ticked chips. Remembers a working title index until the server stops. |
 
 ### `src/api/`: the API server's routes (used by `server.js`)
 
@@ -129,7 +132,7 @@ Route files handle a request first; helpers are only called by them.
 | File | Routes it handles | Purpose |
 |---|---|---|
 | `health.js` | `GET /api/health` | Whether the server can reach the database. |
-| `uploads.js` | `GET /api/uploads`<br>`GET /api/uploads/search`<br>`GET /api/uploads/:id`<br>`POST /api/uploads` | Upload routes: the list, title search, one upload with its readiness check, and the upload itself (`multer`). |
+| `uploads.js` | `GET /api/uploads`<br>`GET /api/uploads/search`<br>`GET /api/uploads/facets`<br>`GET /api/uploads/:id`<br>`POST /api/uploads` | Upload routes: the list, title search, the facet counts, one upload with its readiness check, and the upload itself (`multer`). Checks the ticked chips (`type`, `size`). |
 | `ask.js` | `POST /api/ask` | Checks the request (including the optional `rerank` and `search`), answers it, and sends the fields API_SPEC.md lists (including `withoutRerank`); turns a busy or refusing LLM, or a missing keyword index, into its own error codes. |
 | `errors.js` | Any other `/api` route (a 404) | Helper: `ApiError`, and the error handler that turns every route's errors into `{ error: { code, message } }`. |
 | `ids.js` | – | Helper: turns upload ids from requests into ObjectIds, or a 400 (for `uploads.js` and `ask.js`). |
@@ -143,9 +146,9 @@ them as they are (`package.json` has no `"type": "module"`). Built from
 
 | File | Purpose |
 |---|---|
-| `index.html` | The page's fixed frame: header, sidebar (upload, title search, picker) and workspace (question box, answers). |
+| `index.html` | The page's fixed frame: header, sidebar (upload, Filter block, title search, picker) and workspace (question box, answers). |
 | `style.css` | The page's styles (green scheme), with the phone layout below 760 px. |
-| `app.js` | The page itself: its state, the functions that draw each area from it, and the events. Upload list and connection banners, picker and title search, uploads and readiness checks, questions and answer cards (with "How this was found", which compares the reranked passages with vector search alone's in two tabs), earlier questions in `localStorage`. |
+| `app.js` | The page itself: its state, the functions that draw each area from it, and the events. Upload list and connection banners, picker and title search, the Filter block (facet chips that filter the list and the suggestions), uploads and readiness checks, questions and answer cards (with "How this was found", which compares the reranked passages with vector search alone's in two tabs), earlier questions in `localStorage`. |
 | `api.js` | Calls the API routes; turns a failed request into `ServerUnreachable` (no reply) or `ApiError` (a reply with an error code). |
 | `format.js` | Turns untrusted text into HTML: answers (escaping, the Markdown subset with fenced code blocks, citation markers), citation locations ("PDF p. 12", a heading path, "passage 2 of 7", "Opening text"), relative times, and title search highlights. |
 
@@ -155,7 +158,7 @@ Setup, and the command-line versions of uploading and asking.
 
 | File | Command | Purpose |
 |---|---|---|
-| `setup-db.js` | `npm run setup` | Creates the collections, regular indexes and search indexes (skips ones that exist), then sets `searchableAt` on complete uploads that lack it. |
+| `setup-db.js` | `npm run setup [-- --update <index name>]` | Creates the collections, regular indexes and search indexes (skips ones that exist), then sets `searchableAt` on complete uploads that lack it. `--update` applies a changed definition to the title or keyword index in place (never the vector index). |
 | `ingest-file.js` | `npm run ingest -- <file>` | Uploads a file from the command line, then waits until it is searchable. |
 | `ask.js` | `npm run ask -- "<question>" [--upload <fileName>]... [--no-rerank \| --search hybrid]` | Asks a question from the command line, of all uploads or the ones named; prints the answer and its sources. Reranked unless `--no-rerank`; `--search hybrid` for hybrid search. |
 
@@ -166,7 +169,7 @@ Everything that shows the app's internals.
 | File | Command | Purpose |
 |---|---|---|
 | `check-db.js` | `npm run check-db` | Connection check and MDB doc counts per collection. |
-| `index-status.js` | `npm run index-status` | Status of each search index, or that it's missing. |
+| `index-status.js` | `npm run index-status` | Status of each search index, or that it's missing, and any fields it lacks (an older definition, to update with `npm run setup -- --update`). |
 | `probe.js` | `npm run probe -- <fileName>` | How many of an upload's chunks are searchable, and how long since upload. Only counts; never sets `searchableAt`. |
 | `chunk-file.js` | `npm run chunk -- <file> [--full]` | Chunking preview, no database: each chunk's start and end on one line, with the PDF prefix; `--full` prints whole chunks. |
 | `search.js` | `npm run search -- "<question>" [--upload <fileName>]...` | Raw search results with scores (rerank and cosine), for testing and tuning. Reranked like answers; `--rerank <n>` reranks another number of candidates, `--no-rerank` shows vector search alone, `--search hybrid` hybrid search; each result shows its rank in each list. |
@@ -225,6 +228,11 @@ milestone 8 in PROJECT_PLAN.md).
 palette. Only the colours and the empty-state icons differ. Milestone 8 built the
 real page (`public/`) from this one.
 
+`index-facets.html`: a copy of `index-green.html` with only the sidebar changed, for
+milestone 10: the Filter block, the filtered list, and the selection row and groups
+as the real page has them. Its own "Facets (proposed)" states are in the state menu.
+Not updated after milestone 10.
+
 ## Root files
 
 | File | Purpose |
@@ -233,7 +241,7 @@ real page (`public/`) from this one.
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |
-| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–9). |
+| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–10). |
 | `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |

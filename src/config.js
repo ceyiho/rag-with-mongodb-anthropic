@@ -22,6 +22,19 @@ module.exports = {
     fuzzyFrom: 4,
   },
 
+  // The picker's facets (milestone 10; GET /api/uploads/facets): the file types, and
+  // the sizes by chunk count, each below the next one's start (small: under 10 chunks,
+  // medium: 10–99, large: 100 or more). A chunk is about 1,600 characters, so large is
+  // about a book.
+  facets: {
+    types: ['pdf', 'md', 'txt'],
+    sizes: [
+      { name: 'small', below: 10 },
+      { name: 'medium', below: 100 },
+      { name: 'large' },
+    ],
+  },
+
   // Vector search (src/search.js). numCandidates applies to "All uploads" (approximate
   // search) only: how many nearest chunks Atlas considers before keeping the top results
   // (`limit`, or rerank.candidates when reranking). The Atlas documentation suggests at

@@ -37,10 +37,26 @@ export function listUploads() {
 }
 
 // Title search for the picker: complete uploads whose title or file name has words
-// starting with what was typed, best match first, at most 8. A 503
-// titleSearchUnavailable means the title index is missing.
-export function searchTitles(query) {
-  return request(`/api/uploads/search?q=${encodeURIComponent(query)}`);
+// starting with what was typed, best match first, at most 8, filtered by the ticked
+// chips ({ type: ['pdf'], size: [] }). A 503 titleSearchUnavailable means the title
+// index is missing.
+export function searchTitles(query, filters) {
+  return request(`/api/uploads/search?${withFilters({ q: query }, filters)}`);
+}
+
+// Counts for the Filter block (milestone 10): { type: { pdf: 2, ... }, size: { ... } },
+// for the whole library, each row with the other row's chips applied. A 503
+// facetsUnavailable means the title index is missing or doesn't index the facet fields
+// yet.
+export function countFacets(filters) {
+  return request(`/api/uploads/facets?${withFilters({}, filters)}`);
+}
+
+// The query string, with each row's ticked chips comma-separated (type=pdf,md).
+function withFilters(params, filters) {
+  const search = new URLSearchParams(params);
+  for (const [key, values] of Object.entries(filters)) if (values.length) search.set(key, values.join(','));
+  return search;
 }
 
 // Uploads one file (multipart/form-data, field "file"). The reply comes once the file

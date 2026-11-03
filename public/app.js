@@ -1,10 +1,11 @@
 // The web page (milestone 8): its state, the functions that draw the page from it, and
-// the events that change it. Built from wireframe/index-green.html; the routes it
-// calls, and how it reacts to their errors, are in API_SPEC.md.
+// the events that change it. Built from wireframe/index-green.html, and the Filter
+// block (milestone 10) from wireframe/index-facets.html; the routes it calls, and how
+// it reacts to their errors, are in API_SPEC.md.
 // Pattern: every change updates `state`, then calls render(), which redraws each area
 // of the page from state. Simple, and fast enough at this size.
 
-import { listUploads, checkHealth, searchTitles, askQuestion, uploadFile, getUpload, ApiError, ServerUnreachable } from './api.js';
+import { listUploads, checkHealth, searchTitles, countFacets, askQuestion, uploadFile, getUpload, ApiError, ServerUnreachable } from './api.js';
 import { escapeHtml as esc, markWordStarts, answerHtml, locationLabel, timeAgo } from './format.js';
 
 // While the server or the database is unreachable, check again this often.
@@ -23,6 +24,20 @@ const GROUPS = [
   { key: 'MP', label: 'M – P', from: 'M', to: 'P' },
   { key: 'QT', label: 'Q – T', from: 'Q', to: 'T' },
   { key: 'UZ', label: 'U – Z', from: 'U', to: 'Z' },
+];
+
+// The Filter block's rows and chips (milestone 10), keyed as the API takes them. `of`
+// gives an upload's value, for filtering the page's own list. The sizes match
+// facets.sizes in src/config.js, which the browser can't read.
+const FACETS = [
+  { key: 'type', label: 'Type', of: (u) => u.fileType, values: [
+    { key: 'pdf', label: 'PDF' }, { key: 'md', label: 'MD' }, { key: 'txt', label: 'TXT' },
+  ] },
+  { key: 'size', label: 'Size', of: (u) => (u.chunkCount < 10 ? 'small' : u.chunkCount < 100 ? 'medium' : 'large'), values: [
+    { key: 'small', label: 'Small', tip: 'Under 10 chunks (up to about 15,000 characters)' },
+    { key: 'medium', label: 'Medium', tip: '10 to 99 chunks' },
+    { key: 'large', label: 'Large', tip: '100 chunks or more, such as a book' },
+  ] },
 ];
 
 // Line icons for the empty states, drawn in the current text colour.
@@ -57,6 +72,11 @@ const state = {
   // The picker's ticks, in page memory only: every page load starts with nothing ticked.
   all: false,             // "All uploads" ticked
   selected: new Set(),    // ids of the individually ticked uploads
+  // The Filter block (milestone 10): the ticked chips per row, and the counts from
+  // GET /api/uploads/facets ({ type: { pdf: 2, ... }, size: { ... } }), or null while
+  // they are unavailable, which hides the block.
+  filters: Object.fromEntries(FACETS.map((f) => [f.key, new Set()])),
+  facets: null,
   // The latest question: { question, scope, askedAt, status, reply | error }. status is
   // 'loading', 'done' (reply is the API's answer) or 'error'. scope is { all: true } or
   // { uploads: [{ id, title }] }, kept as asked. Replaced as a whole on every change.
@@ -83,6 +103,11 @@ const ready = () => (state.uploads ?? []).filter((u) => u.searchable);
 const nothingSelected = () => !state.all && !state.selected.size;
 const asking = () => state.latest?.status === 'loading';
 const uploading = () => state.messages.some((m) => m.kind === 'progress');
+
+// The Filter block's ticked chips: in a row any may match, and every row must.
+const filtering = () => FACETS.some((f) => state.filters[f.key].size);
+const passes = (u) => FACETS.every((f) => !state.filters[f.key].size || state.filters[f.key].has(f.of(u)));
+const shown = () => (state.uploads ?? []).filter(passes);   // what the picker lists
 
 // Splitting accents off (NFD) leaves the plain letter first: "É" becomes "E" + accent.
 function groupOf(title) {
@@ -128,6 +153,7 @@ async function loadUploads() {
     noticeUnticked(unticked.map((id) => before?.find((u) => u.id === id)).filter(Boolean));
     if (!ready().length) state.all = false;
     syncReadinessChecks();
+    loadFacets();
   } catch (err) {
     console.error('Loading the upload list failed:', err);
     await checkConnection();
@@ -136,8 +162,8 @@ async function loadUploads() {
   render();
 }
 
-// The keys of the groups that hold at least one upload.
-function usedGroups(uploads = state.uploads ?? []) {
+// The keys of the groups that hold at least one upload (of those the filter shows).
+function usedGroups(uploads = shown()) {
   return GROUPS.filter((g) => uploads.some((u) => groupOf(u.title) === g.key)).map((g) => g.key);
 }
 
@@ -151,6 +177,7 @@ function openGroupsAtStart(uploads) {
 function render() {
   renderConnection();
   renderMessages();
+  renderFacets();
   renderAllRow();
   renderTree();
   renderSelBar();
@@ -224,9 +251,13 @@ function renderTree() {
 
   // The list arrives sorted by title, so each group stays sorted.
   const groups = Object.fromEntries(GROUPS.map((g) => [g.key, []]));
-  for (const u of state.uploads) groups[groupOf(u.title)].push(u);
+  const listed = shown();
+  for (const u of listed) groups[groupOf(u.title)].push(u);
+  const note = !filtering() ? ''
+    : listed.length ? `<div class="filter-note">Showing ${listed.length} of ${plural(state.uploads.length, 'upload')}</div>`
+    : '<div class="filter-note">No uploads match the filter.</div>';
 
-  tree.innerHTML = GROUPS.map((g) => {
+  tree.innerHTML = note + GROUPS.map((g) => {
     const items = groups[g.key];
     if (!items.length) {
       return `<button class="bucket-head empty" disabled><span class="chev">▸</span>${g.label}<span class="n">0</span></button>`;
@@ -258,10 +289,16 @@ function itemRow(u) {
 }
 
 // Under "All uploads": what is selected, with Clear while something is, and a toggle
-// that collapses every group while any is open, or else expands them all.
+// that collapses every group while any is open, or else expands them all. Ticked
+// uploads the filter hides stay ticked, and are counted here: short, to fit the row,
+// with the full sentence on hover.
 function renderSelBar() {
   const n = state.selected.size;
-  const label = state.all ? 'All uploads selected' : n ? `${n} selected` : 'Nothing selected';
+  const hidden = [...state.selected].filter((id) => byId(id) && !passes(byId(id))).length;
+  const hiddenNote = hidden
+    ? `, <span title="${hidden} of them ${hidden === 1 ? 'is' : 'are'} hidden by the filter">${hidden} hidden</span>`
+    : '';
+  const label = state.all ? 'All uploads selected' : n ? `${n} selected${hiddenNote}` : 'Nothing selected';
   $('selBar').innerHTML = state.uploads?.length && !isDown()
     ? `<span>${label}</span><span class="spacer"></span>
        ${nothingSelected() ? '' : '<button class="linkbtn" id="clearSel">Clear</button>'}
@@ -484,7 +521,7 @@ async function runSearch(query) {
   let uploads;
   let local = false;
   try {
-    uploads = await searchTitles(query);
+    uploads = await searchTitles(query, filterParams());
   } catch (err) {
     if (!(err instanceof ApiError && err.code === 'titleSearchUnavailable')) {
       console.error('Title search failed:', err);
@@ -499,10 +536,10 @@ async function runSearch(query) {
 }
 
 // The fallback: every typed word must start a word of the title or the file name, as on
-// the server, but without typos. In list order (by title).
+// the server, but without typos. In list order (by title), and only what the filter shows.
 function filterLocally(query) {
   const typed = typedWords(query);
-  return (state.uploads ?? []).filter((u) => {
+  return shown().filter((u) => {
     const own = searchWords(`${u.title} ${u.fileName}`);
     return typed.every((t) => own.some((w) => w.startsWith(t)));
   }).slice(0, MAX_SUGGESTIONS);
@@ -523,10 +560,12 @@ function renderSuggest() {
         <div><div class="t">${markWordStarts(u.title, words)}${u.searchable ? '' : ' <span class="pill processing">processing…</span>'}</div>
         <div class="f">${esc(u.fileName)}</div></div></div>`;
   }).join('');
-  const source = local
+  const source = (local
     ? 'Filtered in the browser: title search is unavailable'
-    : 'Atlas Search · autocomplete on title and file name';
-  const none = suggestions && !rows ? `<div class="none">No titles or file names match "${esc(query)}".</div>` : '';
+    : 'Atlas Search · autocomplete on title and file name') + (filtering() ? ' · filtered' : '');
+  const none = suggestions && !rows
+    ? `<div class="none">No titles or file names match "${esc(query)}"${filtering() ? ' with this filter' : ''}.</div>`
+    : '';
   box.innerHTML = `${rows}${none}<div class="foot">${source}</div>`;
   box.classList.add('show');
 }
@@ -541,6 +580,85 @@ async function pickSuggestion(id) {
   row?.classList.add('flash');
   row?.scrollIntoView({ block: 'nearest' });
   renderSuggest();
+}
+
+// ---------- Filter (facets) ----------
+// The Filter block above the title search (milestone 10): a row of chips for Type and
+// one for Size, each with its count from GET /api/uploads/facets (Atlas Search facets).
+// The counts are for the whole library and don't follow the typed words: the list
+// below isn't narrowed by them, so a chip greyed for 0 matches would block a filter
+// that works on the list. Each row's counts apply the other row's chips, not its own,
+// so a second value can still be added. Ticked chips filter the page's own list and
+// the suggestions; ticks and "All uploads" stay as they are. If the counts can't be
+// had, the chips are cleared and the block is hidden until the list next reloads.
+
+let facetSeq = 0;   // numbers the requests, so a late reply to an older one is dropped
+
+// The ticked chips as the API takes them: { type: ['pdf'], size: [] }.
+function filterParams() {
+  return Object.fromEntries(FACETS.map((f) => [f.key, [...state.filters[f.key]]]));
+}
+
+// Asks for the counts, with the ticked chips.
+async function loadFacets() {
+  const seq = ++facetSeq;
+  let facets = null;
+  try {
+    facets = await countFacets(filterParams());
+  } catch (err) {
+    if (!(err instanceof ApiError && err.code === 'facetsUnavailable')) {
+      console.error('Loading the filter counts failed:', err);
+      checkConnection();
+    }
+  }
+  if (seq !== facetSeq) return;
+  const lost = !facets && filtering();
+  state.facets = facets;
+  if (lost) {
+    FACETS.forEach((f) => state.filters[f.key].clear());
+    render();
+  } else {
+    renderFacets();
+  }
+}
+
+function renderFacets() {
+  const el = $('facets');
+  if (isDown() || !state.uploads?.length || !state.facets) {
+    el.innerHTML = '';
+    return;
+  }
+  const rows = FACETS.map((f) => {
+    const chips = f.values.map((v) => {
+      const n = state.facets[f.key][v.key] ?? 0;
+      const on = state.filters[f.key].has(v.key);
+      return `<button class="fchip ${on ? 'on' : ''}" data-facet="${f.key}" data-value="${v.key}" aria-pressed="${on}"
+          ${n || on ? '' : 'disabled'} ${v.tip ? `title="${esc(v.tip)}"` : ''}>${v.label}<span class="n">${n}</span></button>`;
+    }).join('');
+    return `<div class="frow"><span class="fname">${f.label}</span><div class="fchips">${chips}</div></div>`;
+  }).join('');
+  el.innerHTML = `<div class="fhead"><span>Filter</span>
+      ${filtering() ? '<button class="linkbtn" data-action="clearFilter">Clear filter</button>' : ''}</div>${rows}`;
+}
+
+// Ticking a chip opens every group with a match, since a filtered list is short;
+// unticking or clearing leaves the groups as they are. The counts and any open
+// suggestions are asked again with the new chips.
+function changeFilter(change) {
+  change();
+  if (filtering()) shown().forEach((u) => state.open.add(groupOf(u.title)));
+  render();
+  loadFacets();
+  if (suggestOpen && suggestions) runSearch(suggestions.query);
+}
+
+function toggleChip(facet, value) {
+  const set = state.filters[facet];
+  changeFilter(() => (set.has(value) ? set.delete(value) : set.add(value)));
+}
+
+function clearFilter() {
+  changeFilter(() => FACETS.forEach((f) => state.filters[f.key].clear()));
 }
 
 // ---------- Uploads ----------
@@ -690,6 +808,7 @@ async function checkReady(id) {
         state.uploads = state.uploads.map((u) => (u.id === id ? upload : u));
         showReady(upload);
         render();
+        loadFacets();   // by now the title index counts it too
         return;
       }
     } catch (err) {
@@ -1094,6 +1213,18 @@ $('tree').addEventListener('click', (e) => {
 });
 
 $('allRow').addEventListener('click', toggleAll);
+
+// Chips: mousedown keeps the focus where it is, so a click doesn't close the
+// suggestions (the search box closes them when it loses focus); click toggles, from the
+// mouse or the keyboard.
+$('facets').addEventListener('mousedown', (e) => {
+  if (e.target.closest('button')) e.preventDefault();
+});
+$('facets').addEventListener('click', (e) => {
+  if (e.target.closest('[data-action="clearFilter"]')) return clearFilter();
+  const chip = e.target.closest('.fchip');
+  if (chip && !chip.disabled) toggleChip(chip.dataset.facet, chip.dataset.value);
+});
 
 $('selBar').addEventListener('click', (e) => {
   if (e.target.id === 'clearSel') clearSelection();

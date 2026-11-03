@@ -4,8 +4,9 @@
 // Three search indexes, chosen to fit the M0 tier's 3 slots: the vector index, the
 // title index, and the keyword index (milestone 9). The M10 the app runs on now has no
 // cap (see Decisions in PROJECT_PLAN.md).
-// Search indexes can't be edited in place: a changed definition means dropping and
-// recreating the index (or, for the vector index, a new name; see below).
+// The title and keyword indexes are updated in place (npm run setup -- --update <name>):
+// Atlas keeps answering from the old version until the new one is built. The vector
+// index can't be edited: a change means a new index under a new name (see below).
 
 const config = require('./config');
 
@@ -42,7 +43,11 @@ const vectorIndex = {
 // foldDiacritics lets "cafe" find "Café". File names are split into words at
 // hyphens, underscores and dots by a custom analyzer, since the standard one keeps
 // "Shanti_Pouch_Instructions.pdf" as one word. status is indexed to filter on
-// complete uploads. Holds no embeddings, so it can be dropped and recreated freely.
+// complete uploads. fileType and chunkCount (milestone 10) are for the picker's facets
+// (counts by type and size) and to filter on them: token and number, not the outdated
+// stringFacet and numberFacet types, which can only be counted, not filtered on. Holds
+// no embeddings, so a changed definition is applied in place with
+// npm run setup -- --update uploads_title_autocomplete.
 const AUTOCOMPLETE = { type: 'autocomplete', tokenization: 'edgeGram', minGrams: 2, maxGrams: 20, foldDiacritics: true };
 
 const titleIndex = {
@@ -63,6 +68,8 @@ const titleIndex = {
         title: AUTOCOMPLETE,
         fileName: { ...AUTOCOMPLETE, analyzer: 'fileNameWords' },
         status: { type: 'token' },
+        fileType: { type: 'token' },
+        chunkCount: { type: 'number' },
       },
     },
   },
@@ -75,8 +82,8 @@ const titleIndex = {
 // objectId so a query can filter on the selected uploads, like the vector index. Only
 // these two fields: dynamic mapping would also index fields no query uses. The analyzer
 // splits "NMB-1001" into "nmb" and "1001", while a typed "NMB1001" stays one word, so
-// keyword search can't match the two. Holds no embeddings, so it can be dropped and
-// recreated freely.
+// keyword search can't match the two. Holds no embeddings, so a changed definition is
+// applied in place with npm run setup -- --update chunks_keyword.
 const keywordIndex = {
   collection: config.collections.chunks,
   name: config.searchIndexes.keyword,
@@ -94,12 +101,20 @@ const keywordIndex = {
 
 const SEARCH_INDEXES = [vectorIndex, titleIndex, keywordIndex];
 
-// Each search index with what Atlas reports: { index, exists, status, queryable }.
-// queryable is true once a query can use it (also while a new version is building).
+// Each search index with what Atlas reports: { index, exists, status, queryable,
+// missingFields }. queryable is true once a query can use it (also while a new version
+// is building). missingFields lists the fields defined here that Atlas's copy lacks: an
+// index created before a change (e.g. the title index before milestone 10's facet
+// fields), waiting for npm run setup -- --update <name>. Only for the title and keyword
+// indexes, whose fields are a mapping; the vector index lists its fields differently.
 async function searchIndexStatus(db) {
   return Promise.all(SEARCH_INDEXES.map(async (index) => {
     const [found] = await db.collection(index.collection).listSearchIndexes(index.name).toArray();
-    return { index, exists: Boolean(found), status: found?.status ?? null, queryable: Boolean(found?.queryable) };
+    const stored = found?.latestDefinition?.mappings?.fields ?? {};
+    const missingFields = found && index.definition.mappings
+      ? Object.keys(index.definition.mappings.fields).filter((field) => !(field in stored))
+      : [];
+    return { index, exists: Boolean(found), status: found?.status ?? null, queryable: Boolean(found?.queryable), missingFields };
   }));
 }
 

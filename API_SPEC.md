@@ -135,13 +135,12 @@ The page:
   "Filtered in the browser: title search is unavailable". It closes on Esc or when the
   box loses focus; ticking a suggestion keeps it open, so several can be ticked.
 
-### `GET /api/uploads/facets?q=<text>&type=<types>&size=<sizes>` (milestone 10)
+### `GET /api/uploads/facets?type=<types>&size=<sizes>` (milestone 10)
 
 Counts for the picker's Filter block: complete uploads by file type and by size, with
-the Atlas Search `facet` collector (`$searchMeta`) on the title index.
+the Atlas Search `facet` collector (`$searchMeta`) on the title index. The whole
+library, not the words typed in the title search (see the page, below).
 
-- `q` (optional): the typed words, matched as in title search. Without it, every
-  complete upload counts.
 - `type`, `size` (optional): the ticked chips, comma-separated (`type=pdf,md`,
   `size=medium`). Values: `pdf`, `md`, `txt`; `small`, `medium`, `large`.
 - `200`, with every value listed, 0 where nothing matches:
@@ -151,7 +150,9 @@ the Atlas Search `facet` collector (`$searchMeta`) on the title index.
 - `400` `invalidFilter`: an unknown `type` or `size` value.
 - `503` `facetsUnavailable`: the title index is missing, or doesn't index `fileType`
   and `chunkCount` yet (an older definition; `npm run setup -- --update
-  uploads_title_autocomplete` updates it).
+  uploads_title_autocomplete` updates it). The server warns about both at startup,
+  and `npm run index-status` shows them.
+- `type`, `size` given twice (`type=pdf&type=md`) count like `type=pdf,md`.
 
 How it counts:
 - Type: a string facet on `fileType`, indexed as `token`.
@@ -166,12 +167,14 @@ How it counts:
 
 The page:
 - Shows the Filter block above the title search (below it, the suggestions would
-  cover the counts): a row of chips for Type and one for Size, each chip with its
-  count, and "Clear filter" while a chip is ticked (not "Clear", which the selection
-  row uses for the ticks). A chip with a count of 0 is greyed unless
-  it is ticked. Hovering over a Size chip shows its range in chunks.
-- Asks for counts when the list loads or reloads, when typing in the title search
-  pauses (with the same `q` as the suggestions), when a chip changes, and when an
+  cover the chips while they filter them): a row of chips for Type and one for Size,
+  each chip with its count, and "Clear filter" while a chip is ticked (not "Clear",
+  which the selection row uses for the ticks). A chip with a count of 0 is greyed
+  unless it is ticked. Hovering over a Size chip shows its range in chunks.
+- Keeps the counts as they are while typing in the title search: the list below isn't
+  narrowed by the typed words, so a chip greyed for 0 matches would block a filter
+  that works on the list.
+- Asks for counts when the list loads or reloads, when a chip changes, and when an
   upload turns ready (by then the search index has caught up). A late reply to an
   earlier request is ignored.
 - Filters its own list by the ticked chips (the list has `fileType` and `chunkCount`).
@@ -182,7 +185,9 @@ The page:
   above the question box stay), and the selection row says how many are hidden,
   short enough to fit it: "2 selected, 1 hidden", with "1 of them is hidden by the
   filter" on hover. "All uploads" still means every searchable upload.
-- Sends the ticked chips with title search too, so the suggestions are filtered.
+- Sends the ticked chips with title search too, so the suggestions are filtered: the
+  dropdown's footer then ends in "· filtered", and no matches reads "No titles or file
+  names match "nim" with this filter."
 - On any failure (not only the 503), clears the chips, hides the Filter block and
   shows the whole list. It asks again the next time the list reloads.
 
@@ -657,4 +662,6 @@ wireframe review (2026-10-02) and while building the page (2026-10-06 to 10-08).
   fall in a few weeks, so one bucket), the list itself from `$search` (a new upload
   would vanish for a few seconds), one query for both rows (a ticked chip would turn
   the rest of its row to 0), counting in the browser when facets fail (more code for a
-  case `npm run setup` prevents).
+  case `npm run setup` prevents), counts that follow the typed words (built first,
+  dropped on 2026-11-03: while typing "nim", PDF showed 0 and was greyed, though it
+  would have filtered the list to its 2 PDFs).

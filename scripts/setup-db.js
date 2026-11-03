@@ -5,18 +5,30 @@
 // The first run filled in the uploads saved before searchableAt existed (milestone 7),
 // so their searchableAt says nothing about the embedding delay. Later runs catch an
 // upload whose ingest or page was closed before it was searchable.
+//
+// npm run setup -- --update <index name> also applies a changed definition from
+// src/indexes.js to that existing search index (milestone 10). Atlas builds the new
+// version in the background and answers from the old one until it is ready, so title
+// search keeps working meanwhile. Never the vector index: an autoEmbed field can't be
+// edited, and a rebuild would re-embed every chunk.
 
 const { connect } = require('../src/db');
 const config = require('../src/config');
-const { SEARCH_INDEXES } = require('../src/indexes');
+const { SEARCH_INDEXES, vectorIndex } = require('../src/indexes');
 const { checkReadiness } = require('../src/readiness');
 
 // Creates a search index (definitions in src/indexes.js) unless one with the same name
-// exists. Never updates an existing index: that would rebuild it (and for the vector
-// index, re-embed), so it stays manual.
-async function ensureSearchIndex(db, { collection, name, type, definition }) {
+// exists. Updates an existing one only when it is the index named with --update.
+async function ensureSearchIndex(db, { collection, name, type, definition }, update) {
   const target = db.collection(collection);
   const [existing] = await target.listSearchIndexes(name).toArray();
+  if (existing && name === update) {
+    await target.updateSearchIndex(name, definition);
+    console.log(`Search index ${name} update requested. Atlas builds the new version in the`);
+    console.log('background and answers from the old one meanwhile; run "npm run index-status"');
+    console.log('to check when it is ready.');
+    return;
+  }
   if (existing) {
     console.log(`Search index ${name} already exists (status: ${existing.status}), skipped.`);
     return;
@@ -24,6 +36,21 @@ async function ensureSearchIndex(db, { collection, name, type, definition }) {
   await target.createSearchIndex({ name, type, definition });
   console.log(`Search index ${name} requested. Atlas builds it in the background;`);
   console.log('run "npm run index-status" to check when it is ready.');
+}
+
+// The index named with --update, if any, checked before anything is changed.
+function indexToUpdate(args) {
+  const at = args.indexOf('--update');
+  if (at === -1) return null;
+  const name = args[at + 1];
+  const names = SEARCH_INDEXES.filter((index) => index !== vectorIndex).map((index) => index.name);
+  if (name === vectorIndex.name) {
+    throw new Error(`${name} can't be updated: an autoEmbed field can't be edited. Create a new index under a new name instead.`);
+  }
+  if (!names.includes(name)) {
+    throw new Error(`--update needs the name of a search index: ${names.join(' or ')}.`);
+  }
+  return name;
 }
 
 // Runs the readiness check on each complete upload without searchableAt. An upload that
@@ -48,6 +75,7 @@ async function fillSearchableAt(db, uploads) {
 }
 
 async function main() {
+  const update = indexToUpdate(process.argv.slice(2));
   const { client, db } = await connect();
 
   try {
@@ -82,7 +110,7 @@ async function main() {
     }
 
     // After the collections, because a search index needs its collection to exist.
-    for (const index of SEARCH_INDEXES) await ensureSearchIndex(db, index);
+    for (const index of SEARCH_INDEXES) await ensureSearchIndex(db, index, update);
 
     await fillSearchableAt(db, uploads);
   } finally {

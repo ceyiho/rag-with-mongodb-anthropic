@@ -9,11 +9,14 @@ async function main() {
 
   try {
     console.log(`${db.databaseName} search indexes:`);
-    for (const { index, exists, status, queryable } of await searchIndexStatus(db)) {
+    for (const { index, exists, status, queryable, missingFields } of await searchIndexStatus(db)) {
       const where = `${index.collection}.${index.name} (${index.type})`;
       console.log(exists
         ? `  ${where}: status ${status}, queryable: ${queryable}`
         : `  ${where}: missing. Run "npm run setup".`);
+      if (missingFields.length) {
+        console.log(`    lacks ${missingFields.join(', ')} (an older definition). Run "npm run setup -- --update ${index.name}".`);
+      }
     }
   } finally {
     await client.close();
