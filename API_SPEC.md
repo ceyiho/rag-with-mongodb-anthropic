@@ -3,7 +3,8 @@
 The Express API (milestone 7) and how the web page (milestone 8) uses it: routes,
 request and response formats, error codes, and the `src/` changes milestone 7 made.
 Milestone 9 added reranking, hybrid search and the page's comparison with vector
-search alone, marked "(milestone 9)" where they appear.
+search alone, marked "(milestone 9)" where they appear. Milestone 10 adds the picker's
+facets, from `wireframe/index-facets.html`, marked "(milestone 10)".
 Written before milestone 7 from the wireframe (`wireframe/index.html`, whose state
 menu names the route behind each state), and kept in step with the routes as they
 were built. Decisions and reasons are in PROJECT_PLAN.md; this file is the detail.
@@ -96,7 +97,10 @@ all", which turns into "Expand all" once every group is closed.
 Title search for the picker: Atlas Search autocomplete on `title` and `fileName`, with
 fuzzy matching (a typo like "nimbsu" finds Nimbus), complete uploads only, at most 8.
 
+- `type`, `size` (optional, milestone 10): the Filter block's ticked chips, as in
+  `GET /api/uploads/facets`; only matching uploads are suggested.
 - `200` `[upload, ...]`; an empty `q` gives `[]`.
+- `400` `invalidFilter` (milestone 10): an unknown `type` or `size` value.
 - `503` `titleSearchUnavailable`: the title index is missing (e.g. dropped while being
   changed). The page then filters its own list in the browser. Checked until the
   server first sees the index working, then remembered until it stops, since asking
@@ -130,6 +134,57 @@ The page:
   2 letters are typed: "Atlas Search · autocomplete on title and file name", or
   "Filtered in the browser: title search is unavailable". It closes on Esc or when the
   box loses focus; ticking a suggestion keeps it open, so several can be ticked.
+
+### `GET /api/uploads/facets?q=<text>&type=<types>&size=<sizes>` (milestone 10)
+
+Counts for the picker's Filter block: complete uploads by file type and by size, with
+the Atlas Search `facet` collector (`$searchMeta`) on the title index.
+
+- `q` (optional): the typed words, matched as in title search. Without it, every
+  complete upload counts.
+- `type`, `size` (optional): the ticked chips, comma-separated (`type=pdf,md`,
+  `size=medium`). Values: `pdf`, `md`, `txt`; `small`, `medium`, `large`.
+- `200`, with every value listed, 0 where nothing matches:
+  ```json
+  { "type": { "pdf": 2, "md": 3, "txt": 2 }, "size": { "small": 5, "medium": 1, "large": 1 } }
+  ```
+- `400` `invalidFilter`: an unknown `type` or `size` value.
+- `503` `facetsUnavailable`: the title index is missing, or doesn't index `fileType`
+  and `chunkCount` yet (an older definition; `npm run setup -- --update
+  uploads_title_autocomplete` updates it).
+
+How it counts:
+- Type: a string facet on `fileType`, indexed as `token`.
+- Size: a number facet on `chunkCount`, indexed as `number`, with boundaries 1, 10 and
+  100 and the rest in `large`: under 10 chunks is `small`, 10–99 `medium`, 100 or more
+  `large`. A chunk is about 1,600 characters.
+- Chips in a row combine with "or", the rows with "and". Each row's counts apply the
+  other row's chips but not its own, so another value can still be added to a row:
+  one `$searchMeta` per row, sent together (one query when no chip is ticked).
+- The search index can lag a new upload by a few seconds, so the counts may briefly
+  leave it out.
+
+The page:
+- Shows the Filter block above the title search (below it, the suggestions would
+  cover the counts): a row of chips for Type and one for Size, each chip with its
+  count, and "Clear filter" while a chip is ticked (not "Clear", which the selection
+  row uses for the ticks). A chip with a count of 0 is greyed unless
+  it is ticked. Hovering over a Size chip shows its range in chunks.
+- Asks for counts when the list loads or reloads, when typing in the title search
+  pauses (with the same `q` as the suggestions), when a chip changes, and when an
+  upload turns ready (by then the search index has caught up). A late reply to an
+  earlier request is ignored.
+- Filters its own list by the ticked chips (the list has `fileType` and `chunkCount`).
+  The picker shows only matching uploads, under a "Showing 6 of 15 uploads" line
+  below the selection row (no link: "Clear filter" sits by the chips). Ticking a chip
+  opens every group with a match; clearing leaves the groups as they are.
+- Keeps ticks the filter hides: the question still asks those uploads (their chips
+  above the question box stay), and the selection row says how many are hidden,
+  short enough to fit it: "2 selected, 1 hidden", with "1 of them is hidden by the
+  filter" on hover. "All uploads" still means every searchable upload.
+- Sends the ticked chips with title search too, so the suggestions are filtered.
+- On any failure (not only the 503), clears the chips, hides the Filter block and
+  shows the whole list. It asks again the next time the list reloads.
 
 ### `GET /api/uploads/:id`
 
@@ -594,3 +649,12 @@ wireframe review (2026-10-02) and while building the page (2026-10-06 to 10-08).
   choice of one way per question (no visible difference). Tabs rather than the two
   tables side by side, tried first: side by side, each table was so narrow that
   titles wrapped onto two or three lines and rows differed in height.
+- Facets (milestone 10, 2026-11-03): counted by Atlas Search to showcase facets,
+  although the page could count its own list; with a handful of uploads the counts
+  are small, so they matter for a library of hundreds. Type and size, since the title
+  already drives the A–Z groups and title search. Not chosen: the title's first letter
+  (a stored copy of it, and the same as the groups), upload date (the test uploads
+  fall in a few weeks, so one bucket), the list itself from `$search` (a new upload
+  would vanish for a few seconds), one query for both rows (a ticked chip would turn
+  the rest of its row to 0), counting in the browser when facets fail (more code for a
+  case `npm run setup` prevents).

@@ -1,0 +1,1433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Base (wireframe, facets)</title>
+<!--
+  Proposal: facet filters in the upload picker (Type and Size), counted by Atlas Search.
+  A copy of index-green.html with only the sidebar changed: the "Filter" block above the
+  title search, the list it filters, and the "Facets (proposed)" states in the yellow
+  strip at the top. As on the web page, the picker's groups all open (up to 20 uploads),
+  and the selection row sits under "All uploads", not at the bottom of the sidebar. The workspace is still the milestone 7 mock-up (no reranking tabs).
+  Fake data, no backend, nothing is saved. Not part of the app: keep it out of src/.
+-->
+<style>
+  :root {
+    --bg: #f9fbfa;
+    --surface: #ffffff;
+    --sidebar: #f2f7f5;
+    --border: #e8edeb;
+    --border-strong: #c1c7c6;
+    --text: #001e2b;
+    --muted: #5c6c75;
+    --faint: #889397;
+    --spring: #00ed64;       /* accent only: too bright for text or white-on-green */
+    --green: #00684a;        /* Forest Green: buttons, links, focus */
+    --green-dark: #023430;   /* Evergreen */
+    --green-50: #e3fcf7;     /* Mist */
+    --green-100: #c0fae6;
+    --green-200: #71f6ba;
+    --amber: #944f01;
+    --amber-bg: #fef7db;
+    --red: #970606;
+    --red-bg: #ffeae5;
+    --ok: #00684a;
+    --ok-bg: #e3fcf7;
+    --mono: Consolas, "Cascadia Mono", Menlo, monospace;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  /* Tick boxes are drawn by the browser in its own accent colour (blue) unless told. */
+  :root { accent-color: var(--green); }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--green-50); padding: 0 4px; border-radius: 4px; }
+
+  /* ---------- Wireframe controls (not part of the app) ---------- */
+  .mockbar {
+    background: #fff8dc;
+    border-bottom: 1px dashed #d9b84a;
+    padding: 6px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: #5c4a10;
+  }
+  .mockbar strong { letter-spacing: 0.04em; }
+  .mockbar select { padding: 2px 6px; border: 1px solid #d9b84a; border-radius: 4px; background: #fffdf3; }
+  .mockbar .api { flex: 1 1 360px; font-family: var(--mono); font-size: 12px; color: #4a3b08; }
+
+  /* ---------- App bar ---------- */
+  .appbar {
+    background: var(--surface);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    box-shadow: inset 0 -3px 0 var(--spring);
+    padding: 0 16px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .appbar .logo {
+    width: 24px; height: 24px; border-radius: 6px; background: var(--spring); color: var(--green-dark);
+    display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  }
+  .appbar h1 { font-size: 15px; font-weight: 600; margin: 0; color: var(--green-dark); }
+  .appbar .sub { color: var(--muted); font-size: 12.5px; }
+  .appbar .spacer { flex: 1; }
+  .appbar .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #00a35c; display: inline-block; }
+  .dot.down { background: #db3030; }
+
+  .banner {
+    background: var(--red-bg); color: var(--red); border-bottom: 1px solid #ffcdc7;
+    padding: 8px 16px; font-size: 13px; display: none;
+  }
+  .banner.show { display: block; }
+
+  /* ---------- Layout ---------- */
+  .app { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 300px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  /* scrollbar-gutter keeps room for the scrollbar even when there's nothing to scroll,
+     so the centred column doesn't shift when the content grows (e.g. opening history). */
+  .workspace { flex: 1; overflow-y: auto; min-width: 0; scrollbar-gutter: stable; }
+
+  /* ---------- Sidebar ---------- */
+  .side-head { padding: 12px 12px 8px; display: flex; align-items: center; gap: 8px; }
+  .side-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0; flex: 1; }
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface); border-radius: 6px;
+    padding: 4px 10px; cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { background: var(--green-50); }
+  .btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn.primary:hover { background: var(--green-dark); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .linkbtn { border: 0; background: none; color: var(--green); cursor: pointer; padding: 0; font-size: 12.5px; }
+  .linkbtn:hover { text-decoration: underline; }
+
+  .upload-msgs { padding: 0 12px; display: flex; flex-direction: column; gap: 6px; }
+  .msg {
+    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; position: relative;
+    border: 1px solid var(--border); background: var(--surface);
+  }
+  .msg .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+  .msg.error { background: var(--red-bg); border-color: #ffcdc7; color: var(--red); }
+  .msg.ok { background: var(--ok-bg); border-color: var(--green-100); color: var(--ok); }
+  .msg .name { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .msg .hint { color: var(--muted); margin-top: 2px; }
+  .msg.error .hint { color: #970606; }
+  .bar { height: 4px; border-radius: 2px; background: var(--green-100); overflow: hidden; margin-top: 6px; }
+  .bar span { display: block; height: 100%; width: 35%; background: var(--green); border-radius: 2px; animation: slide 1.3s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+  .search { padding: 8px 12px; position: relative; }
+  .search input[type="search"] {
+    width: 100%; padding: 7px 10px 7px 30px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235c6c75' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E") no-repeat 10px center;
+  }
+  .search input[type="search"]:focus { outline: 2px solid var(--green-200); border-color: var(--green); }
+  .suggest {
+    position: absolute; left: 12px; right: 12px; top: 44px; z-index: 5;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 30, 43, 0.15); display: none; overflow: hidden;
+  }
+  .suggest.show { display: block; }
+  .suggest .row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; cursor: pointer; }
+  .suggest .row:hover, .suggest .row.active { background: var(--green-50); }
+  .suggest .row input { margin-top: 3px; }
+  .suggest .t { font-size: 13px; }
+  .suggest .f { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .suggest mark { background: var(--green-100); color: inherit; border-radius: 2px; }
+  .suggest .foot { border-top: 1px solid var(--border); padding: 5px 10px; font-size: 11.5px; color: var(--faint); background: #f9fbfa; }
+  .suggest .none { padding: 10px; color: var(--muted); font-size: 13px; }
+
+  /* Facets (proposed): one row of chips per facet, each with its count. */
+  .facets { margin: 4px 12px 0; display: flex; flex-direction: column; gap: 5px; }
+  .facets:empty { display: none; }
+  .fhead { display: flex; align-items: baseline; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .fhead .for { text-transform: none; letter-spacing: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .fhead .linkbtn { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
+  .frow { display: flex; align-items: baseline; gap: 6px; }
+  .frow .fname { width: 34px; flex-shrink: 0; font-size: 12px; color: var(--muted); }
+  .fchips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .fchip {
+    border: 1px solid var(--border-strong); background: var(--surface); border-radius: 12px; cursor: pointer;
+    padding: 0 8px; font-size: 12px; line-height: 20px; display: inline-flex; gap: 5px; align-items: baseline;
+  }
+  .fchip .n { color: var(--faint); font-size: 11px; }
+  .fchip:hover { background: var(--green-50); }
+  .fchip.on { background: var(--green); border-color: var(--green); color: #fff; }
+  .fchip.on .n { color: var(--green-100); }
+  .fchip:disabled { opacity: 0.45; cursor: default; background: var(--surface); }
+  /* Coloured like the chips above the question box, so a filtered list stands out. */
+  .filter-note {
+    margin: 0 6px 6px; padding: 4px 8px; font-size: 12px; color: var(--green-dark); display: flex; gap: 6px;
+    background: var(--green-50); border: 1px solid var(--green-200); border-radius: 6px;
+  }
+  .filter-note .linkbtn { margin-left: auto; }
+
+  .all-row {
+    margin: 2px 12px 6px; padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border); cursor: pointer; font-weight: 600; font-size: 13px;
+  }
+  .all-row .count { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 12px; }
+
+  .tree { flex: 1; overflow-y: auto; padding: 0 6px 12px; }
+  .bucket-head {
+    width: 100%; display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 0; background: none;
+    cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-align: left;
+  }
+  .bucket-head:hover { background: var(--green-50); }
+  .bucket-head .chev { width: 12px; display: inline-block; transition: transform 0.12s; color: var(--faint); }
+  .bucket-head.open .chev { transform: rotate(90deg); }
+  .bucket-head .n { margin-left: auto; font-weight: 400; color: var(--faint); }
+  .bucket-head .selcount { background: var(--green-100); color: var(--green-dark); border-radius: 8px; padding: 0 6px; font-weight: 600; font-size: 11px; }
+  .bucket-head.empty { opacity: 0.45; cursor: default; }
+  .bucket-head.empty:hover { background: none; }
+  .items { list-style: none; margin: 0 0 4px; padding: 0; }
+  .item {
+    display: flex; align-items: center; gap: 7px; padding: 3px 6px 3px 22px; border-radius: 4px; cursor: pointer;
+  }
+  .item:hover { background: var(--green-50); }
+  .item.sel { background: var(--green-100); }
+  .item.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0% { background: #71f6ba; } 100% { background: var(--green-100); } }
+  .item .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .item.disabled { cursor: default; color: var(--muted); }
+  .item.disabled:hover { background: none; }
+  .type {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; border-radius: 3px; padding: 0 4px; line-height: 15px;
+    flex-shrink: 0; width: 30px; text-align: center;
+  }
+  .type.pdf { background: #fde3e1; color: #a1281f; }
+  .type.md { background: var(--green-100); color: var(--green-dark); }
+  .type.txt { background: #e8edeb; color: #3d4f58; }
+  .pill { font-size: 11px; border-radius: 9px; padding: 0 7px; flex-shrink: 0; white-space: nowrap; }
+  .pill.processing { background: var(--amber-bg); color: var(--amber); }
+  .pill.ready { background: var(--ok-bg); color: var(--ok); }
+  /* The selection row sits under "All uploads", as on the web page (index-green.html
+     has it at the bottom of the sidebar). */
+  .sel-bar {
+    padding: 0 12px 6px 20px; font-size: 12.5px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sel-bar .spacer { flex: 1; }
+  .drop-hint { font-size: 11.5px; color: var(--faint); padding: 0 12px 6px; }
+  .sidebar.dragover { outline: 2px dashed var(--green); outline-offset: -6px; background: var(--green-50); }
+  .empty-lib { padding: 20px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+  .empty-lib .big { margin-bottom: 6px; }
+  /* Empty-state icons: line drawings in the page's colours (emoji would keep the
+     operating system's own colours). */
+  .big { color: var(--green); }
+  .big.warn { color: var(--amber); }
+  .big svg { width: 34px; height: 34px; }
+  .empty-lib .big svg { width: 28px; height: 28px; }
+
+  /* ---------- Workspace ---------- */
+  .ws-inner { max-width: 860px; margin: 0 auto; padding: 18px 24px 40px; }
+  .scope { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px; background: var(--green-50); border: 1px solid var(--green-200);
+    color: var(--green-dark); border-radius: 12px; padding: 1px 4px 1px 9px; font-size: 12.5px; max-width: 260px;
+  }
+  .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip button { border: 0; background: none; cursor: pointer; color: var(--green-dark); padding: 0 4px; font-size: 13px; line-height: 1; }
+  .chip.all { font-weight: 600; }
+  .none-sel { font-style: italic; color: var(--faint); }
+  .ask.off { background: #eef2f0; border-color: var(--border); box-shadow: none; cursor: pointer; }
+  .ask.off textarea { cursor: pointer; }
+  .ask.off textarea::placeholder { color: var(--muted); }
+  .sidebar.nudge { animation: nudge 1.4s ease-out; }
+  @keyframes nudge {
+    0%, 45% { box-shadow: inset 0 0 0 3px var(--green); background: var(--green-50); }
+    100% { box-shadow: inset 0 0 0 3px transparent; }
+  }
+
+  .ask {
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+    display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 12px;
+    box-shadow: 0 1px 3px rgba(0, 30, 43, 0.06);
+  }
+  .ask:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-100); }
+  .ask textarea {
+    flex: 1; border: 0; outline: 0; resize: none; padding: 6px 0; font-size: 17px; line-height: 1.5; max-height: 220px;
+    background: transparent; overflow-y: hidden;
+  }
+  .ask .btn.primary { padding: 6px 16px; border-radius: 7px; }
+  .ask-hint { font-size: 12px; color: var(--faint); margin: 6px 2px 18px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .ask-hint .count { margin-left: auto; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .q { font-weight: 600; font-size: 17px; margin-bottom: 2px; }
+  .meta { font-size: 12px; color: var(--faint); margin-bottom: 10px; }
+  .answer { font-size: 17px; line-height: 1.5; }
+  .answer p { margin: 0 0 10px; }
+  .cite {
+    border: 0; background: var(--green-100); color: var(--green-dark); font-size: 10.5px; font-weight: 700;
+    border-radius: 4px; padding: 0 4px; margin-left: 2px; cursor: pointer; vertical-align: super; line-height: 1.2;
+  }
+  .cite:hover { background: var(--green); color: #fff; }
+  .sources { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .sources h3, .details h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; }
+  .src { border: 1px solid transparent; border-radius: 6px; }
+  .src.hl { border-color: var(--green-200); background: #f3fdf9; }
+  .src-head { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; cursor: pointer; }
+  .src-head .n { background: var(--green-100); color: var(--green-dark); font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 5px; flex-shrink: 0; }
+  .src-head .t { font-weight: 600; font-size: 13px; }
+  .src-head .w { font-size: 12.5px; color: var(--muted); }
+  .src-head .f { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: auto; white-space: nowrap; }
+  .src-head .chev { color: var(--faint); font-size: 11px; width: 10px; flex-shrink: 0; display: inline-block; transition: transform 0.12s; }
+  .src.open .src-head .chev { transform: rotate(90deg); }
+  .excerpt {
+    display: none; margin: 0 6px 8px 34px; padding: 8px 10px; border-left: 3px solid var(--green-200);
+    background: var(--green-50); font-size: 13px; color: #3d4f58; border-radius: 0 4px 4px 0; white-space: pre-wrap;
+  }
+  .src.open .excerpt { display: block; }
+
+  .details { margin-top: 10px; }
+  .details > summary { cursor: pointer; font-size: 12.5px; color: var(--green); list-style: none; }
+  .details > summary::-webkit-details-marker { display: none; }
+  .details > summary::before { content: "▸ "; }
+  .details[open] > summary::before { content: "▾ "; }
+  .details .box { margin-top: 8px; padding: 10px 12px; background: #f9fbfa; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
+  .details .facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin-bottom: 10px; }
+  .details .facts dt { color: var(--muted); }
+  .details .facts dd { margin: 0; }
+  .hits { width: 100%; border-collapse: collapse; }
+  .hits td { padding: 3px 4px; border-top: 1px solid #e8edeb; vertical-align: middle; }
+  .hits .rank { color: var(--faint); width: 20px; }
+  .hits .score { width: 150px; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; }
+  .scorebar { display: inline-block; width: 80px; height: 6px; background: #e8edeb; border-radius: 3px; margin-left: 6px; position: relative; vertical-align: middle; }
+  .scorebar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 3px; }
+  .scorebar i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--red); }
+  .hits .low span { background: var(--faint); }
+  .hits .citedtag { font-size: 11px; color: var(--green-dark); font-weight: 600; white-space: nowrap; }
+  .modes { margin-top: 8px; color: var(--faint); }
+
+  .notfound .answer { color: var(--muted); }
+  .notfound .nf-title { font-weight: 600; color: var(--text); display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .nf-icon { width: 20px; height: 20px; border-radius: 50%; background: #e8edeb; color: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .card.err { border-color: #ffcdc7; background: #fffaf9; }
+  .card.err .nf-icon { background: var(--red-bg); color: var(--red); }
+  .loading-row { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--green-100); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .skel { height: 10px; background: linear-gradient(90deg, #edf2f0, #f9fbfa, #edf2f0); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 5px; margin-top: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .ws-empty { text-align: center; color: var(--muted); padding: 50px 20px; }
+  /* Earlier in this session: one line, opening to one line per question */
+  .history { margin-top: 4px; }
+  .history.open { margin-bottom: 40vh; }   /* room to scroll the last rows to the middle */
+  .history-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
+    padding: 8px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+  }
+  .history-head:hover { color: var(--green); }
+  .history-head .hc { background: #e8edeb; color: var(--muted); border-radius: 9px; padding: 0 7px; font-size: 11px; letter-spacing: 0; }
+  .history-head .chev, .hist-head .chev { display: inline-block; width: 10px; color: var(--faint); font-size: 11px; transition: transform 0.12s; }
+  .history.open > .history-head .chev, .hist.open > .hist-head .chev { transform: rotate(90deg); }
+  .hist-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .hist + .hist { border-top: 1px solid var(--border); }
+  .hist-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer;
+    padding: 7px 12px; text-align: left;
+  }
+  .hist-head:hover { background: var(--green-50); }
+  .hist.open > .hist-head { background: var(--green-50); font-weight: 600; }
+  .hist-head .hq { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+  .hist-head .hm { font-size: 12px; color: var(--faint); white-space: nowrap; font-weight: 400; }
+  .st { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .st.ok { background: var(--ok-bg); color: var(--ok); }
+  .st.nf { background: #e8edeb; color: var(--muted); }
+  .st.err { background: var(--red-bg); color: var(--red); }
+  .hist-body { padding: 8px 16px 14px 48px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 760px) {
+    .app { flex-direction: column; }
+    .sidebar { width: auto; max-height: 45vh; border-right: 0; border-bottom: 1px solid var(--border); }
+    .ws-inner { padding: 14px 16px 30px; }
+    .src-head { flex-wrap: wrap; }
+    .src-head .f { margin-left: 26px; }
+    .hist-body { padding-left: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <strong>WIREFRAME</strong><span>fake data, no backend</span>
+  <label>State:
+    <select id="scenario">
+      <optgroup label="Answers">
+        <option value="first">Page opened (nothing ticked)</option>
+        <option value="answer">Answer with citations</option>
+        <option value="partial">Partial answer</option>
+        <option value="nf-threshold">Not found (below threshold)</option>
+        <option value="nf-llm">Not found (LLM found no answer)</option>
+        <option value="loading">Waiting for an answer</option>
+        <option value="answer-error">Answer failed (LLM busy)</option>
+      </optgroup>
+      <optgroup label="Uploads">
+        <option value="up-progress">Upload in progress (large PDF)</option>
+        <option value="up-processing">Processing… then ready</option>
+        <option value="up-duplicate">Rejected: duplicate name</option>
+        <option value="up-unsupported">Rejected: unsupported type</option>
+        <option value="up-scanned">Rejected: scanned PDF</option>
+        <option value="up-busy">Rejected: same name uploading now</option>
+        <option value="up-toolarge">Rejected: file too large</option>
+      </optgroup>
+      <optgroup label="Upload picker">
+        <option value="ac">Title search: suggestions</option>
+        <option value="ac-none">Title search: no matches</option>
+      </optgroup>
+      <optgroup label="Facets (proposed)">
+        <option value="fc-type">Filter: PDFs only</option>
+        <option value="fc-two">Filter: PDF or MD, and Medium</option>
+        <option value="fc-search">Counts follow the title search</option>
+        <option value="fc-hidden">A ticked upload hidden by the filter</option>
+        <option value="fc-none">Facets unavailable (index missing)</option>
+      </optgroup>
+      <optgroup label="Whole page">
+        <option value="empty">No uploads yet</option>
+        <option value="down">Server unreachable</option>
+      </optgroup>
+    </select>
+  </label>
+  <span class="api" id="apiNote"></span>
+</div>
+
+<header class="appbar">
+  <div class="logo">KB</div>
+  <h1>Knowledge Base</h1>
+  <span class="sub">Answers from your uploads · MongoDB Atlas Vector Search</span>
+  <span class="spacer"></span>
+  <span class="status" id="connStatus"><span class="dot"></span>Connected</span>
+</header>
+<div class="banner" id="banner">Can't reach the server. Is it running (<code>npm start</code>)? The page retries every few seconds.</div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <h2>Uploads</h2>
+      <button class="btn primary" id="uploadBtn" title="Upload a .txt, .md or text-based PDF">+ Upload</button>
+      <input type="file" id="fileInput" accept=".txt,.md,.pdf" hidden>
+    </div>
+    <div class="drop-hint">.txt, .md or text-based PDF · or drop a file here</div>
+    <div class="upload-msgs" id="uploadMsgs"></div>
+    <!-- Above the title search, not below it: the suggestions dropdown would cover
+         the counts while they follow the typed words. -->
+    <div class="facets" id="facets"></div>
+    <div class="search">
+      <input id="titleSearch" type="search" placeholder="Search titles…" autocomplete="off" aria-label="Search upload titles">
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="all-row" id="allRow">
+      <input type="checkbox" id="allBox" tabindex="-1">
+      <span>All uploads</span><span class="count" id="allCount"></span>
+    </div>
+    <div class="sel-bar" id="selBar"></div>
+    <div class="tree" id="tree"></div>
+  </aside>
+
+  <main class="workspace">
+    <div class="ws-inner">
+      <div class="scope" id="scope"></div>
+      <div class="ask">
+        <textarea id="question" rows="1" maxlength="1000" placeholder="Ask a question about your uploads…"></textarea>
+        <button class="btn primary" id="askBtn">Ask</button>
+      </div>
+      <div class="ask-hint">
+        <span>Enter to ask · Shift+Enter for a new line</span>
+        <span>Each question is answered on its own; follow-ups don't see earlier answers.</span>
+        <span class="count" id="charCount"></span>
+      </div>
+      <div id="answers"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- Fake data (shaped like the proposed GET /api/uploads response) ----------
+const BASE_UPLOADS = [
+  { id: 'u01', title: '2026 Reading List', fileName: 'reading-list-2026.md', fileType: 'md', chunkCount: 3 },
+  { id: 'u02', title: 'Atlas Vector Search Notes', fileName: 'atlas-vector-notes.md', fileType: 'md', chunkCount: 9 },
+  { id: 'u03', title: 'Baking Bread at Home', fileName: 'baking-bread-at-home.pdf', fileType: 'pdf', chunkCount: 48 },
+  { id: 'u04', title: 'Claude Code First Steps', fileName: 'claude-code-first-steps.txt', fileType: 'txt', chunkCount: 6 },
+  { id: 'u05', title: 'Garden Planning Handbook', fileName: 'garden-planning.pdf', fileType: 'pdf', chunkCount: 31 },
+  { id: 'u06', title: 'Home Network Setup', fileName: 'home-network-setup.md', fileType: 'md', chunkCount: 12 },
+  { id: 'u07', title: 'Lisbon Trip Notes', fileName: 'lisbon-trip-notes.txt', fileType: 'txt', chunkCount: 4 },
+  { id: 'u08', title: 'Nimbus Admin Handbook', fileName: 'nimbus-admin-handbook.txt', fileType: 'txt', chunkCount: 7 },
+  { id: 'u09', title: 'Nimbus CLI Guide', fileName: 'nimbus-guide.md', fileType: 'md', chunkCount: 11 },
+  { id: 'u10', title: 'Nimbus Release Notes', fileName: 'nimbus-release-notes.txt', fileType: 'txt', chunkCount: 5 },
+  { id: 'u11', title: 'Practical MongoDB Aggregations', fileName: 'Practical MongoDB Aggregations.pdf', fileType: 'pdf', chunkCount: 313 },
+  { id: 'u12', title: 'Shanti Pouch Instructions', fileName: 'Shanti_Pouch_Instructions.pdf', fileType: 'pdf', chunkCount: 10 },
+  { id: 'u13', title: 'The MongoDB Document Model', fileName: 'mongodb-document-model.md', fileType: 'md', chunkCount: 13 },
+  { id: 'u14', title: 'Weekly Meal Plan', fileName: 'weekly-meal-plan.md', fileType: 'md', chunkCount: 2 },
+  { id: 'u15', title: 'Zero-Downtime Deploys', fileName: 'zero-downtime-deploys.md', fileType: 'md', chunkCount: 8 },
+];
+
+const BUCKETS = [
+  { key: '#', label: '0–9 & other' },
+  { key: 'AD', label: 'A – D', from: 'A', to: 'D' },
+  { key: 'EH', label: 'E – H', from: 'E', to: 'H' },
+  { key: 'IL', label: 'I – L', from: 'I', to: 'L' },
+  { key: 'MP', label: 'M – P', from: 'M', to: 'P' },
+  { key: 'QT', label: 'Q – T', from: 'Q', to: 'T' },
+  { key: 'UZ', label: 'U – Z', from: 'U', to: 'Z' },
+];
+
+// The proposed facets. Type: an Atlas Search string facet on fileType. Size: a number
+// facet on chunkCount, with boundaries 1, 10 and 100 (anything above goes to "large").
+// A chunk is about 1,600 characters.
+const FACETS = [
+  { key: 'type', label: 'Type', of: (u) => u.fileType, values: [
+    { key: 'pdf', label: 'PDF' }, { key: 'md', label: 'MD' }, { key: 'txt', label: 'TXT' },
+  ] },
+  { key: 'size', label: 'Size', of: (u) => (u.chunkCount < 10 ? 'small' : u.chunkCount < 100 ? 'medium' : 'large'), values: [
+    { key: 'small', label: 'Small', tip: 'Under 10 chunks (up to about 15,000 characters)' },
+    { key: 'medium', label: 'Medium', tip: '10 to 99 chunks' },
+    { key: 'large', label: 'Large', tip: '100 chunks or more, such as a book' },
+  ] },
+];
+
+// ---------- Fake answers (shaped like the proposed POST /api/ask response) ----------
+const NIMBUS_SCOPE = ['u08', 'u09'];
+
+const ANSWER_INVITES = {
+  question: 'Who can invite members to a workspace, and how long does an invitation stay valid?',
+  scope: NIMBUS_SCOPE,
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: 'Owners and administrators can invite members; administrators manage members and settings but can\'t delete the workspace or see billing.', cites: [1] }],
+    [{ text: 'An invitation stays valid for 14 days. If it expires, send a new one from Members in the web app; the old link stops working as soon as the new one is sent.', cites: [2] }],
+  ],
+  citations: [
+    { n: 1, uploadId: 'u08', fileType: 'txt', chunkIndex: 0,
+      excerpt: 'Every workspace has at least one owner. Owners can do everything an administrator can, and in addition they can delete the workspace, transfer ownership, and change the billing plan. … Administrators manage members and settings but cannot delete the workspace or see billing details.' },
+    { n: 2, uploadId: 'u08', fileType: 'txt', chunkIndex: 1,
+      excerpt: 'To invite a member, open the web app, go to Members, and choose Invite. … Each person receives an invitation that stays valid for 14 days. If an invitation expires, send a new one from the same page; the old link stops working as soon as a new one is sent.' },
+  ],
+  retrieval: {
+    mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.81, llmCalled: true,
+    hits: [
+      [0.81, 'u08', 'passage 2 of 7', 2], [0.77, 'u08', 'passage 1 of 7', 1], [0.71, 'u08', 'passage 3 of 7'],
+      [0.69, 'u09', 'Configuration'], [0.68, 'u08', 'passage 5 of 7'], [0.66, 'u09', 'Sync behaviour'],
+      [0.65, 'u09', 'Installation › Windows'], [0.64, 'u08', 'passage 4 of 7'], [0.63, 'u09', 'Troubleshooting › Error codes'],
+      [0.61, 'u09', 'Advanced › Proxy settings'],
+    ],
+  },
+};
+
+const ANSWER_GROUP = {
+  question: 'What does the $group stage do, and should I index the fields it groups on?',
+  scope: 'all',
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: '`$group` collects documents that share a key into one output document per key, and computes values such as totals or counts for each group with accumulator operators.', cites: [1] },
+     { text: 'Indexes help a pipeline mainly in its first stages, where `$match` and `$sort` can use them; a `$group` later in the pipeline works on documents already in memory.', cites: [2, 3] }],
+  ],
+  citations: [
+    { n: 1, uploadId: 'u11', fileType: 'pdf', page: 23,
+      excerpt: '(Fake excerpt for the wireframe.) The group stage gathers input documents by a grouping key and outputs one document per distinct key, with accumulators computing fields such as sums and counts…' },
+    { n: 2, uploadId: 'u11', fileType: 'pdf', page: 57,
+      excerpt: '(Fake excerpt for the wireframe.) Only the stages at the start of a pipeline can take advantage of indexes…' },
+    { n: 3, uploadId: 'u13', fileType: 'md', section: 'Indexes',
+      excerpt: '(Fake excerpt for the wireframe.) Without an index, a query has to scan every document in the collection…' },
+  ],
+  retrieval: {
+    mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.84, llmCalled: true,
+    hits: [
+      [0.84, 'u11', 'PDF p. 23', 1], [0.80, 'u11', 'PDF p. 57', 2],
+      [0.78, 'u11', 'PDF p. 24'], [0.76, 'u13', 'Indexes', 3], [0.75, 'u11', 'PDF p. 112'],
+      [0.73, 'u11', 'PDF p. 58'], [0.71, 'u02', 'Filters'], [0.70, 'u11', 'PDF p. 9'],
+      [0.69, 'u13', 'Schema design patterns'], [0.68, 'u11', 'PDF p. 113'],
+    ],
+  },
+};
+
+const ANSWER_PARTIAL = {
+  question: 'How long is an invitation valid, and can an administrator change that limit?',
+  scope: NIMBUS_SCOPE,
+  found: true, reason: 'answered',
+  parts: [
+    [{ text: 'An invitation stays valid for 14 days; after that, send a new one from Members.', cites: [1] }],
+    [{ text: 'The uploads don\'t say whether the 14-day limit can be changed.', cites: [] }],
+  ],
+  citations: [ANSWER_INVITES.citations[1]].map((c) => ({ ...c, n: 1 })),
+  retrieval: { ...ANSWER_INVITES.retrieval, topScore: 0.79,
+    hits: ANSWER_INVITES.retrieval.hits.map((h, i) => [h[0] - 0.02, h[1], h[2], i === 0 ? 1 : undefined]) },
+};
+
+const NF_THRESHOLD = {
+  question: 'What hydration should I use for a sourdough loaf?',
+  scope: NIMBUS_SCOPE,
+  found: false, reason: 'belowThreshold',
+  retrieval: { mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.57, llmCalled: false,
+    hits: [[0.57, 'u09', 'Sync behaviour'], [0.56, 'u08', 'passage 6 of 7'], [0.56, 'u09', 'Advanced › Proxy settings'],
+           [0.55, 'u08', 'passage 3 of 7'], [0.55, 'u09', 'Installation › macOS']] },
+};
+
+const ANSWER_BREAD = {
+  question: 'What hydration should I use for a sourdough loaf?',
+  scope: 'all',
+  found: true, reason: 'answered',
+  parts: [[{ text: 'Start at about 70–75% hydration (700–750 g of water per kg of flour). Wetter doughs give a more open crumb but are harder to shape.', cites: [1] }]],
+  citations: [
+    { n: 1, uploadId: 'u03', fileType: 'pdf', page: 14,
+      excerpt: '(Fake excerpt for the wireframe.) A good starting hydration for a sourdough loaf is 70 to 75 percent…' },
+  ],
+  retrieval: { mode: 'Approximate', chunksSearched: 482, threshold: 0.62, topScore: 0.83, llmCalled: true,
+    hits: [[0.83, 'u03', 'PDF p. 14', 1], [0.78, 'u03', 'PDF p. 15'],
+           [0.71, 'u03', 'PDF p. 31'], [0.66, 'u14', 'Monday'], [0.63, 'u05', 'PDF p. 4']] },
+};
+
+const NF_LLM = {
+  question: 'Does Nimbus support two-factor authentication?',
+  scope: NIMBUS_SCOPE,
+  found: false, reason: 'noCitations',
+  retrieval: { mode: 'Exact', chunksSearched: 18, threshold: 0.62, topScore: 0.74, llmCalled: true,
+    hits: [[0.74, 'u08', 'passage 1 of 7'], [0.72, 'u09', 'Configuration'], [0.70, 'u08', 'passage 2 of 7'],
+           [0.69, 'u09', 'Troubleshooting › Error codes'], [0.67, 'u08', 'passage 7 of 7']] },
+};
+
+// Earlier questions in the session, newest first, shown below the latest answer.
+const EARLIER = [ANSWER_GROUP, ANSWER_BREAD, NF_LLM];
+const withEarlier = (latest) => [latest, ...EARLIER.filter((a) => a !== latest)];
+
+const API_NOTES = {
+  'first': 'No request yet. Ticks last for the visit only (page memory): every page load starts with nothing ticked. POST /api/ask needs uploadIds or scope:"all"; neither → 400.',
+  'answer': 'POST /api/ask {question, uploadIds | scope:"all"} → 200 {found:true, parts, citations[]}. Each citation carries title, section/page, chunkIndex + chunkCount and the excerpt, so showing sources needs no extra request.',
+  'partial': 'Same response as a full answer: citations present ⇒ found. The gap is only in the LLM\'s wording; the page can\'t (and needn\'t) tell partial from full.',
+  'nf-threshold': 'POST /api/ask → 200 {found:false, reason:"belowThreshold", retrieval:{topScore, threshold, llmCalled:false}}. 200, not 404: "not found" is a normal outcome. LLM not called.',
+  'nf-llm': 'POST /api/ask → 200 {found:false, reason:"noCitations"}. Same message for the user; the reason only shows under "How this was found".',
+  'loading': 'One request, no streaming: the page waits (search ≈1 s + LLM a few s). Ask is disabled until the reply, so double-clicks don\'t cost two LLM calls.',
+  'answer-error': 'POST /api/ask → 503 {error:{code:"llmUnavailable", message}}. Errors carry a code so the page picks the wording; the question stays in the box for Retry.',
+  'up-progress': 'POST /api/uploads (multipart/form-data) stays open while the server extracts, chunks and saves; then 201 {upload} with searchable:false. One upload at a time; leaving the page asks first (the server finishes the ingest anyway).',
+  'up-processing': 'GET /api/uploads/:id polled every ~3 s until searchable:true. The server runs the search-and-count check and stores searchableAt once it passes.',
+  'up-duplicate': '409 {error:{code:"duplicate"}}. The page also warns before sending, since it already has the list; the server check stays the real one.',
+  'up-unsupported': '415 {error:{code:"unsupportedType"}}. The file picker filters types, but drag and drop doesn\'t.',
+  'up-scanned': '422 {error:{code:"scannedPdf"}}. Rejected before anything is saved.',
+  'up-busy': '409 {error:{code:"uploadInProgress"}}: an ingest of the same name started under 10 minutes ago.',
+  'up-toolarge': '413 {error:{code:"fileTooLarge"}}: limit set in the upload middleware (multer), before ingest runs.',
+  'ac': 'GET /api/uploads/search?q=nim → Atlas Search autocomplete on uploads.title (+ fileName). A new search index on uploads: takes the M0 spare slot.',
+  'ac-none': 'Same route, empty array.',
+  'fc-type': 'Proposed: GET /api/uploads/facets → $searchMeta on the title index with the facet collector: a string facet on fileType and a number facet on chunkCount (the index gains both fields). The counts come from Atlas; the list itself still comes from GET /api/uploads and is filtered on the page. "All uploads" still means every searchable upload.',
+  'fc-two': 'Chips in a row combine with "or", the rows with "and". Each row\'s counts apply the other row\'s chips but not its own, so another type can still be added: one $searchMeta per row, sent together.',
+  'fc-search': 'Proposed: the facets route also takes the typed words (?q=nim), with the same autocomplete clauses as GET /api/uploads/search, so the counts are for the matches. A chip clicked while typing filters the suggestions too (?type=&size= become filter clauses).',
+  'fc-hidden': 'The filter only changes what the list shows: ticked uploads stay ticked when hidden, the question still asks them (see the chips above the question box), and the selection row under "All uploads" says how many are hidden.',
+  'fc-none': 'Proposed: GET /api/uploads/facets → 503 {error:{code:"facetsUnavailable"}} when the title index is missing or still has the old definition: the Filter block is hidden and the list shows everything. Counts can also lag a new upload by a few seconds while the search index catches up.',
+  'empty': 'GET /api/uploads → []. Ask is disabled until at least one upload is searchable.',
+  'down': 'fetch() rejects (no HTTP status at all). Handled apart from API errors, which always come back as JSON {error:{code,message}}.',
+};
+
+// ---------- State ----------
+let state;
+let processingTimer = null;
+
+// The picker's ticks last for the visit only: every page load starts with nothing
+// ticked, since the next visit may be about different uploads. Switching wireframe
+// states keeps them, like staying on the page.
+let currentTicks = { all: false, uploadIds: [] };
+
+function saveSelection() {
+  currentTicks = { all: state.all, uploadIds: [...state.selected] };
+}
+
+// On the first load, every group starts open when there are at most this many uploads;
+// with more, only the first group does, plus the groups of ticked uploads. As on the
+// web page (public/app.js); index-green.html opens only A – D.
+const OPEN_ALL_UP_TO = 20;
+
+function openAtStart(uploads, ticked) {
+  const used = BUCKETS.map((b) => b.key).filter((key) => uploads.some((u) => bucketOf(u.title) === key));
+  const first = uploads.length <= OPEN_ALL_UP_TO ? used : used.slice(0, 1);
+  return new Set([...first, ...ticked.map((u) => bucketOf(u.title))]);
+}
+
+function freshState() {
+  const saved = currentTicks;
+  const known = new Map(BASE_UPLOADS.map((u) => [u.id, u]));
+  const selected = new Set((saved.uploadIds ?? []).filter((id) => known.has(id)));
+  return {
+    uploads: BASE_UPLOADS.map((u) => ({ ...u, searchable: true })),
+    all: !!saved.all && !selected.size,   // "All uploads" ticked
+    selected,                             // individually ticked upload ids
+    open: openAtStart(BASE_UPLOADS, [...selected].map((id) => known.get(id))),
+    answers: withEarlier(ANSWER_INVITES),
+    historyOpen: false,
+    openEarlier: null,   // index of the open earlier row, if any
+    loading: null,
+    msgs: [],
+    down: false,
+    filters: Object.fromEntries(FACETS.map((f) => [f.key, new Set()])),   // ticked chips per facet
+    facetsDown: false,   // the facets route failed: no Filter block
+  };
+}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+
+// Line icons for the empty states, drawn in the current text colour.
+const icon = (paths) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const ICONS = {
+  folder: icon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  chat: icon('<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>'),
+  tick: icon('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>'),
+  warn: icon('<path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.1"/>'),
+};
+const byId = (id) => state.uploads.find((u) => u.id === id);
+const ready = () => state.uploads.filter((u) => u.searchable);
+const nothingSelected = () => !state.all && !state.selected.size;
+
+function sortKey(title) {
+  return title.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function bucketOf(title) {
+  const c = sortKey(title).charAt(0).toUpperCase();
+  const b = BUCKETS.find((b) => b.from && c >= b.from && c <= b.to);
+  return b ? b.key : '#';
+}
+function sorted(list) {
+  return [...list].sort((a, b) => sortKey(a.title).localeCompare(sortKey(b.title), undefined, { sensitivity: 'base', numeric: true }));
+}
+
+// ---------- Sidebar ----------
+function renderTree() {
+  const tree = $('tree');
+  if (state.down) {
+    tree.innerHTML = '<div class="empty-lib">Couldn\'t load uploads.</div>';
+    return;
+  }
+  if (!state.uploads.length) {
+    tree.innerHTML = '<div class="empty-lib"><div class="big">' + ICONS.folder + '</div>No uploads yet.<br>Upload a .txt, .md or text-based PDF to start asking questions.</div>';
+    return;
+  }
+  const groups = Object.fromEntries(BUCKETS.map((b) => [b.key, []]));
+  for (const u of sorted(shown())) groups[bucketOf(u.title)].push(u);
+  const note = filtering()
+    ? `<div class="filter-note"><span>Showing ${shown().length} of ${state.uploads.length} uploads</span></div>`
+    : '';
+
+  tree.innerHTML = note + BUCKETS.map((b) => {
+    const items = groups[b.key];
+    if (!items.length) {
+      return `<button class="bucket-head empty" disabled><span class="chev">▸</span>${b.label}<span class="n">0</span></button>`;
+    }
+    const isOpen = state.open.has(b.key);
+    const nSel = items.filter((u) => state.selected.has(u.id)).length;
+    const head = `<button class="bucket-head ${isOpen ? 'open' : ''}" data-bucket="${b.key}">
+        <span class="chev">▸</span>${b.label}
+        ${nSel ? `<span class="selcount" title="${nSel} selected">${nSel}</span>` : ''}
+        <span class="n">${items.length}</span></button>`;
+    if (!isOpen) return head;
+    const rows = items.map((u) => {
+      const sel = state.selected.has(u.id);
+      const tip = `${u.title}\n${u.fileName}\n${u.searchable ? u.chunkCount + ' chunks' : 'Being indexed for search'}`;
+      return `<li class="item ${sel ? 'sel' : ''} ${u.searchable ? '' : 'disabled'} ${u.flash ? 'flash' : ''}" data-id="${u.id}" title="${esc(tip)}">
+          <input type="checkbox" ${sel ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
+          <span class="type ${u.fileType}">${u.fileType.toUpperCase()}</span>
+          <span class="title">${esc(u.title)}</span>
+          ${u.searchable ? (u.justReady ? '<span class="pill ready">ready</span>' : '') : '<span class="pill processing">processing…</span>'}
+        </li>`;
+    }).join('');
+    return head + `<ul class="items">${rows}</ul>`;
+  }).join('');
+  state.uploads.forEach((u) => { u.flash = false; });
+}
+
+function renderAllRow() {
+  $('allBox').checked = state.all;
+  $('allBox').disabled = !ready().length;
+  const n = ready().length;
+  const pending = state.uploads.length - n;
+  $('allCount').textContent = state.down ? '' : `${n}${pending ? ` ready, ${pending} processing` : ''}`;
+  $('allRow').style.display = state.uploads.length || state.down ? '' : 'none';
+}
+
+// The selection row. Ticked uploads the filter hides are counted here, short enough to
+// fit the row, with the full sentence on hover.
+function renderSelBar() {
+  const n = state.selected.size;
+  const hidden = [...state.selected].filter((id) => !passes(byId(id))).length;
+  const label = state.all ? 'All uploads selected'
+    : n ? `${n} selected${hidden ? `, <span title="${hidden} of them ${hidden === 1 ? 'is' : 'are'} hidden by the filter">${hidden} hidden</span>` : ''}`
+    : 'Nothing selected';
+  $('selBar').innerHTML = state.uploads.length
+    ? `<span>${label}</span><span class="spacer"></span>
+       ${nothingSelected() ? '' : '<button class="linkbtn" id="clearSel">Clear</button>'}
+       <button class="linkbtn" id="collapseAll">Collapse all</button>`
+    : '';
+}
+
+function renderMsgs() {
+  $('uploadMsgs').innerHTML = state.msgs.map((m, i) => {
+    if (m.kind === 'progress') {
+      return `<div class="msg"><div>Uploading <span class="name">${esc(m.name)}</span></div>
+        <div class="hint">${esc(m.hint)}</div><div class="bar"><span></span></div></div>`;
+    }
+    return `<div class="msg ${m.kind}"><button class="close" data-msg="${i}" aria-label="Dismiss">×</button>
+      <div><span class="name">${esc(m.name)}</span></div><div>${m.text}</div>
+      ${m.hint ? `<div class="hint">${m.hint}</div>` : ''}</div>`;
+  }).join('');
+  $('uploadMsgs').style.marginBottom = state.msgs.length ? '4px' : '0';
+}
+
+// ---------- Title search (simulates Atlas Search autocomplete on uploads.title) ----------
+let activeSuggestion = -1;
+
+function matches(u, q) {
+  const words = (u.title + ' ' + u.fileName.replace(/[-_.]/g, ' ')).toLowerCase().split(/\s+/);
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every((part) => words.some((w) => w.startsWith(part)));
+}
+function highlight(title, q) {
+  let html = esc(title);
+  for (const part of q.split(/\s+/).filter(Boolean)) {
+    const re = new RegExp(`(^|\\s)(${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
+    html = html.replace(re, '$1<mark>$2</mark>');
+  }
+  return html;
+}
+function renderSuggest() {
+  const q = $('titleSearch').value.trim();
+  const box = $('suggest');
+  if (!q) { box.classList.remove('show'); return; }
+  const hits = sorted(state.uploads.filter((u) => matches(u, q) && passes(u))).slice(0, 8);
+  box.innerHTML = (hits.length
+    ? hits.map((u, i) => `<div class="row ${i === activeSuggestion ? 'active' : ''}" data-id="${u.id}">
+        <input type="checkbox" ${state.selected.has(u.id) ? 'checked' : ''} ${u.searchable ? '' : 'disabled'} tabindex="-1">
+        <div><div class="t">${highlight(u.title, q)}${u.searchable ? '' : ' <span class="pill processing">processing…</span>'}</div>
+        <div class="f">${esc(u.fileName)}</div></div></div>`).join('')
+    : `<div class="none">No upload titles match "${esc(q)}"${filtering() ? ' with this filter' : ''}.</div>`)
+    + `<div class="foot">Atlas Search · autocomplete on title${filtering() ? ' · filtered' : ''} · ↑↓ to move, Enter to tick, Esc to close</div>`;
+  box.classList.add('show');
+}
+
+// ---------- Facets (simulates Atlas Search facet counts on uploads) ----------
+// Chips in a row combine with "or", the rows with "and". Each row's counts apply the
+// other rows' chips but not its own, so a second value can still be added to a row.
+// While words are typed in the title search, the counts are for the matching uploads.
+const filtering = () => FACETS.some((f) => state.filters[f.key].size);
+
+// Whether an upload passes the ticked chips; `except` leaves one facet's chips out.
+function passes(u, except) {
+  return FACETS.every((f) => f.key === except || !state.filters[f.key].size || state.filters[f.key].has(f.of(u)));
+}
+const shown = () => state.uploads.filter((u) => passes(u));
+
+function renderFacets() {
+  const el = $('facets');
+  if (state.down || state.facetsDown || !state.uploads.length) { el.innerHTML = ''; return; }
+  const q = $('titleSearch').value.trim();
+  const pool = q ? state.uploads.filter((u) => matches(u, q)) : state.uploads;
+  const rows = FACETS.map((f) => {
+    const base = pool.filter((u) => passes(u, f.key));
+    const chips = f.values.map((v) => {
+      const n = base.filter((u) => f.of(u) === v.key).length;
+      const on = state.filters[f.key].has(v.key);
+      return `<button class="fchip ${on ? 'on' : ''}" data-facet="${f.key}" data-value="${v.key}" aria-pressed="${on}"
+          ${n || on ? '' : 'disabled'} ${v.tip ? `title="${esc(v.tip)}"` : ''}>${v.label}<span class="n">${n}</span></button>`;
+    }).join('');
+    return `<div class="frow"><span class="fname">${f.label}</span><div class="fchips">${chips}</div></div>`;
+  }).join('');
+  el.innerHTML = `<div class="fhead"><span>Filter</span>
+      ${q ? `<span class="for">matches for "${esc(q)}"</span>` : ''}
+      ${filtering() ? '<button class="linkbtn" data-clearfilters>Clear filter</button>' : ''}</div>${rows}`;
+}
+
+// Redraws what the filter changes; the dropdown only if it's open.
+function renderFiltered() {
+  renderFacets(); renderTree(); renderSelBar();
+  if ($('suggest').classList.contains('show')) renderSuggest();
+}
+
+function clearFilters() {
+  FACETS.forEach((f) => state.filters[f.key].clear());
+  renderFiltered();
+}
+
+// ---------- Workspace ----------
+function scopeIds(scope) { return scope === 'all' ? null : scope; }
+
+function renderScope() {
+  const el = $('scope');
+  if (state.down || !state.uploads.length) { el.innerHTML = ''; return; }
+  if (nothingSelected()) {
+    el.innerHTML = 'Asking: <span class="none-sel">nothing selected yet</span>';
+    return;
+  }
+  if (state.all) {
+    el.innerHTML = `Asking: <span class="chip all"><span>All uploads (${ready().length})</span>
+      <button data-unselect="all" aria-label="Remove">×</button></span>`;
+    return;
+  }
+  const chips = sorted([...state.selected].map(byId)).map((u) =>
+    `<span class="chip" title="${esc(u.fileName)}"><span>${esc(u.title)}</span><button data-unselect="${u.id}" aria-label="Remove">×</button></span>`).join('');
+  el.innerHTML = `Asking: ${chips}`;
+}
+
+function whereOf(c) {
+  const u = byId(c.uploadId);
+  if (c.fileType === 'pdf') return `PDF p. ${c.page}`;
+  if (c.fileType === 'md') return c.section;
+  return `passage ${c.chunkIndex + 1} of ${u ? u.chunkCount : '?'}`;
+}
+
+function scopeLabel(scope) {
+  if (scope === 'all') return 'All uploads';
+  const names = scope.map((id) => byId(id)?.title ?? id);
+  return names.length <= 2 ? names.join(', ') : `${names[0]} and ${names.length - 1} more`;
+}
+
+function detailsHtml(r, scope) {
+  const span = 0.95 - 0.45;
+  const pct = (s) => Math.max(0, Math.min(100, ((s - 0.45) / span) * 100));
+  const rows = r.hits.map(([score, uid, where, cited], i) => {
+    const u = byId(uid);
+    return `<tr class="${score < r.threshold ? 'low' : ''}"><td class="rank">${i + 1}</td>
+      <td class="score">${score.toFixed(2)}<span class="scorebar"><span style="width:${pct(score)}%"></span><i style="left:${pct(r.threshold)}%"></i></span></td>
+      <td>${esc(u ? u.title : uid)} <span style="color:var(--muted)">· ${esc(where)}</span></td>
+      <td>${cited ? `<span class="citedtag">cited [${cited}]</span>` : ''}</td></tr>`;
+  }).join('');
+  const nUploads = scope === 'all' ? ready().length : scope.length;
+  const verdict = r.topScore < r.threshold
+    ? `best match ${r.topScore.toFixed(2)} < ${r.threshold}, so the LLM was not called`
+    : `best match ${r.topScore.toFixed(2)} ≥ ${r.threshold}, so the top ${r.hits.length >= 10 ? 10 : r.hits.length} passages went to the LLM`;
+  return `<details class="details"><summary>How this was found</summary><div class="box">
+    <dl class="facts">
+      <dt>Search</dt><dd>${r.mode} vector search over ${nUploads} upload${nUploads === 1 ? '' : 's'} (${r.chunksSearched} chunks)</dd>
+      <dt>Threshold</dt><dd>${verdict}</dd>
+    </dl>
+    <table class="hits">${rows}</table>
+    <div class="modes">Search mode: Vector. Keyword and Hybrid come with milestone 9.</div>
+  </div></details>`;
+}
+
+function ago(a) {
+  const seconds = (Date.now() - (a.askedAt ?? Date.now())) / 1000;
+  return seconds < 60 ? 'just now' : `${Math.round(seconds / 60)} min ago`;
+}
+
+function cardClass(a) {
+  return a.loading ? '' : a.error ? 'err' : !a.found ? 'notfound' : '';
+}
+
+// The latest question and answer, shown in full.
+function answerCard(a, idx) {
+  return `<div class="card ${cardClass(a)}"><div class="q">${esc(a.question)}</div>${answerBody(a, idx)}</div>`;
+}
+
+// One line per earlier question; the open one shows its answer below the line.
+function earlierRow(a, idx) {
+  const open = state.openEarlier === idx;
+  const [cls, icon, label] = a.error ? ['err', '!', 'Failed']
+    : !a.found ? ['nf', '?', 'Not found']
+    : ['ok', '✓', `${a.citations.length} source${a.citations.length === 1 ? '' : 's'}`];
+  return `<div class="hist ${open ? 'open' : ''}" id="hist-${idx}">
+    <button class="hist-head" data-hist="${idx}" aria-expanded="${open}">
+      <span class="chev">▸</span><span class="st ${cls}" title="${label}">${icon}</span>
+      <span class="hq" title="${esc(a.question)}">${esc(a.question)}</span>
+      <span class="hm">${label} · ${ago(a)}</span>
+    </button>
+    ${open ? `<div class="hist-body ${cardClass(a)}">${answerBody(a, idx)}</div>` : ''}
+  </div>`;
+}
+
+// Everything below the question: used by the latest card and by an open earlier row.
+function answerBody(a, idx) {
+  if (a.loading) {
+    return `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))}</div>
+      <div class="loading-row"><div class="spinner"></div>Searching ${a.scope === 'all' ? 'all uploads' : a.scope.length + ' upload' + (a.scope.length === 1 ? '' : 's')} and writing an answer… usually a few seconds</div>
+      <div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div>`;
+  }
+  if (a.error) {
+    return `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))}</div>
+      <div class="nf-title"><span class="nf-icon">!</span>Couldn't get an answer</div>
+      <div style="color:var(--red)">The answer service is busy right now. Your question is still in the box above.</div>
+      <div style="margin-top:8px"><button class="btn" data-retry="${idx}">Try again</button></div>`;
+  }
+  const meta = `<div class="meta">Asked of: ${esc(scopeLabel(a.scope))} · ${ago(a)}</div>`;
+  if (!a.found) {
+    const why = a.reason === 'belowThreshold'
+      ? 'Nothing in the selected uploads is close to this question.'
+      : 'Passages on this topic were found, but none of them answers the question.';
+    const tryAll = a.scope !== 'all'
+      ? `<div style="margin-top:8px"><button class="btn" data-askall="${idx}">Ask all uploads instead</button></div>` : '';
+    return `${meta}
+      <div class="nf-title"><span class="nf-icon">?</span>Not found in your uploads</div>
+      <div class="answer">${why}</div>${tryAll}
+      ${detailsHtml(a.retrieval, a.scope)}`;
+  }
+  const body = a.parts.map((p) => '<p>' + p.map((seg) =>
+    fmt(seg.text) + seg.cites.map((n) => `<button class="cite" data-card="${idx}" data-n="${n}">${n}</button>`).join('')
+  ).join(' ') + '</p>').join('');
+  const sources = a.citations.map((c) => {
+    const u = byId(c.uploadId);
+    return `<div class="src" id="src-${idx}-${c.n}">
+      <div class="src-head" data-toggle="src-${idx}-${c.n}"><span class="chev">▸</span><span class="n">${c.n}</span>
+        <span class="t">${esc(u.title)}</span><span class="w">· ${esc(whereOf(c))}</span><span class="f">${esc(u.fileName)}</span></div>
+      <div class="excerpt">${esc(c.excerpt)}</div></div>`;
+  }).join('');
+  return `${meta}
+    <div class="answer">${body}</div>
+    <div class="sources"><h3>Sources</h3>${sources}</div>
+    ${detailsHtml(a.retrieval, a.scope)}`;
+}
+
+function renderAnswers() {
+  const el = $('answers');
+  if (state.down) {
+    el.innerHTML = '<div class="ws-empty"><div class="big warn">' + ICONS.warn + '</div>The page can\'t reach the server, so questions can\'t be asked right now.</div>';
+    return;
+  }
+  if (!state.uploads.length) {
+    el.innerHTML = '<div class="ws-empty"><div class="big">' + ICONS.chat + '</div>Upload a file on the left, then ask questions about it here.<br>Answers come only from your uploads, with sources.</div>';
+    return;
+  }
+  const list = state.loading ? [state.loading, ...state.answers] : state.answers;
+  if (!list.length) {
+    el.innerHTML = nothingSelected()
+      ? '<div class="ws-empty"><div class="big">' + ICONS.tick + '</div>Choose what to ask about: tick uploads on the left, or All uploads.<br>Answers come only from the uploads you choose, with sources.</div>'
+      : '<div class="ws-empty"><div class="big">' + ICONS.chat + '</div>Ask a question about your uploads.</div>';
+    return;
+  }
+  // Indexes are positions in `list`, so citation and row ids stay unique.
+  const [latest, ...earlier] = list;
+  let html = answerCard(latest, 0);
+  if (earlier.length) {
+    html += `<div class="history ${state.historyOpen ? 'open' : ''}" id="history">
+      <button class="history-head" id="historyHead" aria-expanded="${state.historyOpen}">
+        <span class="chev">▸</span>Earlier in this session<span class="hc">${earlier.length}</span></button>
+      ${state.historyOpen ? `<div class="hist-list">${earlier.map((a, i) => earlierRow(a, i + 1)).join('')}</div>` : ''}
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Scrolls an opened section or row to the middle of the workspace. One taller than the
+// workspace goes to the top instead, so its start stays visible.
+function centerOn(el) {
+  const workspace = document.querySelector('.workspace');
+  const block = el.offsetHeight > workspace.clientHeight * 0.9 ? 'start' : 'center';
+  el.scrollIntoView({ block, behavior: 'smooth' });
+}
+
+// With nothing ticked the box is greyed and read-only, not disabled: a disabled box
+// ignores clicks, and a click should point the user to the picker.
+function renderAsk() {
+  const off = !state.down && ready().length > 0 && nothingSelected();
+  const disabled = state.down || !ready().length || !!state.loading || off;
+  $('askBtn').disabled = disabled || !$('question').value.trim();
+  $('question').disabled = state.down || !ready().length;
+  $('question').readOnly = off;
+  $('question').placeholder = off
+    ? 'Tick uploads on the left, or All uploads, to ask a question.'
+    : 'Ask a question about your uploads…';
+  document.querySelector('.ask').classList.toggle('off', off);
+  const len = $('question').value.length;
+  $('charCount').textContent = len > 800 ? `${len} / 1000` : '';
+}
+
+function render() {
+  $('banner').classList.toggle('show', state.down);
+  $('connStatus').innerHTML = state.down ? '<span class="dot down"></span>Disconnected' : '<span class="dot"></span>Connected';
+  $('uploadBtn').disabled = state.down || uploadInFlight();
+  $('uploadBtn').textContent = uploadInFlight() ? 'Uploading…' : '+ Upload';
+  renderMsgs(); renderFacets(); renderAllRow(); renderSelBar(); renderTree(); renderScope(); renderAnswers(); renderAsk();
+}
+
+// ---------- Interactions ----------
+function toggleUpload(id) {
+  const u = byId(id);
+  if (!u || !u.searchable) return;
+  state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+  state.all = false;   // individual ticks and "All uploads" don't mix
+  state.open.add(bucketOf(u.title));
+  saveSelection();
+  render();
+}
+
+$('tree').addEventListener('click', (e) => {
+  const head = e.target.closest('.bucket-head[data-bucket]');
+  if (head) {
+    const k = head.dataset.bucket;
+    state.open.has(k) ? state.open.delete(k) : state.open.add(k);
+    renderTree();
+    return;
+  }
+  const item = e.target.closest('.item');
+  if (item) toggleUpload(item.dataset.id);
+});
+
+$('allRow').addEventListener('click', () => {
+  if (!ready().length) return;
+  state.all = !state.all;
+  state.selected.clear();
+  saveSelection();
+  render();
+});
+
+function clearSelection() {
+  state.all = false;
+  state.selected.clear();
+  saveSelection();
+  render();
+}
+
+$('selBar').addEventListener('click', (e) => {
+  if (e.target.id === 'clearSel') clearSelection();
+  if (e.target.id === 'collapseAll') { state.open.clear(); renderTree(); }
+});
+
+$('scope').addEventListener('click', (e) => {
+  const id = e.target.dataset.unselect;
+  if (id === 'all') return clearSelection();
+  if (id) { state.selected.delete(id); saveSelection(); render(); }
+});
+
+// A click on the greyed question box briefly highlights the picker.
+document.querySelector('.ask').addEventListener('click', () => {
+  if (!nothingSelected() || state.down || !ready().length) return;
+  sidebar.classList.remove('nudge');
+  void sidebar.offsetWidth;   // restart the animation on repeated clicks
+  sidebar.classList.add('nudge');
+});
+
+const search = $('titleSearch');
+search.addEventListener('input', () => { activeSuggestion = -1; renderSuggest(); renderFacets(); });
+search.addEventListener('focus', renderSuggest);
+search.addEventListener('keydown', (e) => {
+  const rows = [...$('suggest').querySelectorAll('.row')];
+  if (e.key === 'ArrowDown') { activeSuggestion = Math.min(rows.length - 1, activeSuggestion + 1); renderSuggest(); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { activeSuggestion = Math.max(0, activeSuggestion - 1); renderSuggest(); e.preventDefault(); }
+  if (e.key === 'Enter' && rows[activeSuggestion]) { pickSuggestion(rows[activeSuggestion].dataset.id); e.preventDefault(); }
+  if (e.key === 'Escape') { search.value = ''; $('suggest').classList.remove('show'); renderFacets(); }
+});
+
+// Facet chips. On mousedown the dropdown stays open and the focus stays in the search
+// box (the page-wide handler below closes the dropdown on clicks outside the box).
+$('facets').addEventListener('mousedown', (e) => {
+  if (e.target.closest('button')) { e.stopPropagation(); e.preventDefault(); }
+});
+$('facets').addEventListener('click', (e) => {
+  if (e.target.closest('[data-clearfilters]')) return clearFilters();
+  const chip = e.target.closest('.fchip');
+  if (!chip || chip.disabled) return;
+  const set = state.filters[chip.dataset.facet];
+  set.has(chip.dataset.value) ? set.delete(chip.dataset.value) : set.add(chip.dataset.value);
+  // A filtered list is short, so every group with a match opens. Clearing the filter
+  // leaves the groups as they are.
+  if (filtering()) shown().forEach((u) => state.open.add(bucketOf(u.title)));
+  renderFiltered();
+});
+// Clicks inside the dropdown stay there: ticking redraws the rows, so by the time the
+// page-wide "click outside closes it" check below ran, the clicked row would no longer
+// be in the page and the dropdown would close after every tick. preventDefault keeps
+// the focus in the search box, so typing can continue.
+$('suggest').addEventListener('mousedown', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  const row = e.target.closest('.row');
+  if (row) pickSuggestion(row.dataset.id);
+});
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.search')) $('suggest').classList.remove('show');
+});
+function pickSuggestion(id) {
+  const u = byId(id);
+  if (!u || !u.searchable) return;
+  toggleUpload(id);
+  u.flash = true;
+  renderTree();
+  document.querySelector(`.item[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+  renderSuggest();
+}
+
+// Question box grows with its content, up to max-height, then scrolls.
+const q = $('question');
+function grow() {
+  q.style.height = 'auto';
+  q.style.height = Math.min(q.scrollHeight, 220) + 'px';
+  q.style.overflowY = q.scrollHeight > 220 ? 'auto' : 'hidden';
+  renderAsk();
+}
+q.addEventListener('input', grow);
+window.addEventListener('load', grow);
+window.addEventListener('resize', grow);
+q.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }
+});
+$('askBtn').addEventListener('click', () => ask());
+
+function currentScope() { return state.all ? 'all' : [...state.selected]; }
+
+// scopeOverride is for "Ask all uploads instead"; otherwise the picker must have a choice.
+function ask(scopeOverride, questionOverride) {
+  const text = (questionOverride ?? q.value).trim();
+  if (!text || state.loading || state.down) return;
+  if (!scopeOverride && nothingSelected()) return;
+  const scope = scopeOverride ?? currentScope();
+  state.loading = { loading: true, question: text, scope };
+  state.historyOpen = false;   // a new question gets the focus
+  state.openEarlier = null;
+  document.querySelector('.workspace').scrollTo({ top: 0, behavior: 'smooth' });
+  render();
+  const outcome = $('scenario').value;
+  setTimeout(() => {
+    state.loading = null;
+    let reply;
+    if (/bread|sourdough|flour|hydration/i.test(text)) {
+      reply = scope === 'all' || scope.includes('u03') ? ANSWER_BREAD : NF_THRESHOLD;
+    }
+    else if (outcome === 'nf-llm') reply = NF_LLM;
+    else if (outcome === 'nf-threshold') reply = NF_THRESHOLD;
+    else if (outcome === 'answer-error') reply = { error: true };
+    else if (outcome === 'partial') reply = ANSWER_PARTIAL;
+    else reply = ANSWER_INVITES;
+    state.answers = [{ ...reply, question: text, scope, askedAt: Date.now() }, ...state.answers];
+    if (!reply.error) { q.value = ''; grow(); }
+    render();
+  }, 1800);
+}
+
+$('answers').addEventListener('click', (e) => {
+  const cite = e.target.closest('.cite');
+  if (cite) {
+    const src = $(`src-${cite.dataset.card}-${cite.dataset.n}`);
+    document.querySelectorAll('.src.hl').forEach((s) => s.classList.remove('hl'));
+    src.classList.add('open', 'hl');
+    src.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
+  const head = e.target.closest('[data-toggle]');
+  if (head) { $(head.dataset.toggle).classList.toggle('open'); return; }
+  if (e.target.closest('#historyHead')) {
+    state.historyOpen = !state.historyOpen;
+    state.openEarlier = null;
+    renderAnswers();
+    if (state.historyOpen) centerOn($('history'));
+    return;
+  }
+  const row = e.target.closest('[data-hist]');
+  if (row) {
+    const idx = Number(row.dataset.hist);
+    state.openEarlier = state.openEarlier === idx ? null : idx;   // one open at a time
+    renderAnswers();
+    centerOn($(`hist-${idx}`));
+    return;
+  }
+  if (e.target.dataset.askall !== undefined) {
+    const a = state.answers[Number(e.target.dataset.askall) - (state.loading ? 1 : 0)];
+    ask('all', a.question);
+  }
+  if (e.target.dataset.retry !== undefined) {
+    $('scenario').value = 'answer';
+    ask();
+  }
+});
+
+// ---------- Simulated upload ----------
+$('uploadBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) simulateUpload(file.name, file.size);
+  e.target.value = '';
+});
+const sidebar = $('sidebar');
+sidebar.addEventListener('dragover', (e) => { e.preventDefault(); sidebar.classList.add('dragover'); });
+sidebar.addEventListener('dragleave', (e) => { if (!sidebar.contains(e.relatedTarget)) sidebar.classList.remove('dragover'); });
+sidebar.addEventListener('drop', (e) => {
+  e.preventDefault();
+  sidebar.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) simulateUpload(file.name, file.size);
+});
+$('uploadMsgs').addEventListener('click', (e) => {
+  const i = e.target.dataset.msg;
+  if (i !== undefined) { state.msgs.splice(Number(i), 1); renderMsgs(); }
+});
+
+function titleFromFileName(name) {
+  return name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const ERRORS = {
+  duplicate: (n) => ({ text: 'This file name has already been uploaded.', hint: 'Uploads can\'t be replaced in the app. Rename the file to upload it as a new one.' }),
+  unsupportedType: () => ({ text: 'This file type isn\'t supported.', hint: 'Upload a .txt, .md or text-based PDF.' }),
+  scannedPdf: () => ({ text: 'This PDF has almost no text: it looks scanned.', hint: 'Scanned PDFs and images aren\'t supported (no OCR). Nothing was saved.' }),
+  uploadInProgress: () => ({ text: 'A file with this name is being uploaded right now.', hint: 'Try again in a few minutes.' }),
+  fileTooLarge: () => ({ text: 'This file is too large (limit 50 MB).', hint: '' }),
+};
+
+function showError(name, code) {
+  state.msgs = state.msgs.filter((m) => m.kind !== 'error');
+  state.msgs.unshift({ kind: 'error', name, ...ERRORS[code](name) });
+  render();
+}
+
+// One upload at a time: while one runs, the button is greyed and a dropped file is refused.
+function uploadInFlight() {
+  return !!state && state.msgs.some((m) => m.kind === 'progress');
+}
+
+// Leaving or reloading mid-upload: the browser asks first. The server would finish the
+// ingest anyway; only the progress card would be lost.
+window.addEventListener('beforeunload', (e) => {
+  if (uploadInFlight()) {
+    e.preventDefault();
+    e.returnValue = '';   // older browsers need this to show the prompt
+  }
+});
+
+function simulateUpload(name, size = 0) {
+  if (uploadInFlight()) {
+    state.msgs = state.msgs.filter((m) => m.kind === 'progress');
+    state.msgs.push({ kind: 'info', name, text: 'Wait for the current upload to finish.', hint: 'Files upload one at a time.' });
+    return render();
+  }
+  const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  if (!['.txt', '.md', '.pdf'].includes(ext)) return showError(name, 'unsupportedType');
+  if (state.uploads.some((u) => u.fileName === name)) return showError(name, 'duplicate');
+  if (size > 50 * 1024 * 1024) return showError(name, 'fileTooLarge');
+  const big = ext === '.pdf';
+  const progress = { kind: 'progress', name, hint: big ? 'Reading pages and saving chunks. A long PDF can take a minute.' : 'Saving chunks…' };
+  state.msgs = [progress, ...state.msgs.filter((m) => m.kind !== 'error' && m.kind !== 'info')];
+  render();
+  setTimeout(() => {
+    state.msgs = state.msgs.filter((m) => m !== progress);
+    const upload = { id: 'n' + Date.now(), title: titleFromFileName(name), fileName: name, fileType: ext.slice(1),
+      chunkCount: big ? 120 : 6, searchable: false, flash: true };
+    state.uploads.push(upload);
+    state.open.add(bucketOf(upload.title));
+    state.msgs.unshift({ kind: 'ok', name, text: `Saved (${upload.chunkCount} chunks).`, hint: 'It can be searched in a few seconds; until then it shows "processing…".' });
+    render();
+    finishProcessing(upload, 6000);
+  }, big ? 3000 : 1200);
+}
+
+function finishProcessing(upload, ms) {
+  clearTimeout(processingTimer);
+  processingTimer = setTimeout(() => {
+    upload.searchable = true;
+    upload.justReady = true;
+    upload.flash = true;
+    state.msgs = state.msgs.filter((m) => !(m.kind === 'ok' && m.name === upload.fileName));
+    render();
+    setTimeout(() => { upload.justReady = false; renderTree(); }, 5000);
+  }, ms);
+}
+
+// ---------- Scenarios ----------
+function applyScenario(name) {
+  clearTimeout(processingTimer);
+  state = freshState();
+  $('titleSearch').value = '';
+  $('suggest').classList.remove('show');
+  q.value = '';
+
+  switch (name) {
+    case 'first':
+      currentTicks = { all: false, uploadIds: [] };
+      state.all = false;
+      state.selected.clear();
+      state.answers = [];
+      break;
+    case 'partial':
+      state.answers = withEarlier(ANSWER_PARTIAL);
+      break;
+    case 'nf-threshold':
+      state.answers = withEarlier(NF_THRESHOLD);
+      break;
+    case 'nf-llm':
+      state.answers = withEarlier(NF_LLM);
+      break;
+    case 'loading':
+      state.loading = { loading: true, question: 'Which ports does Nimbus need open through a proxy?', scope: NIMBUS_SCOPE };
+      break;
+    case 'answer-error':
+      q.value = 'Which ports does Nimbus need open through a proxy?';
+      state.answers = [{ error: true, question: q.value, scope: NIMBUS_SCOPE }, ...withEarlier(ANSWER_INVITES)];
+      break;
+    case 'up-progress':
+      state.msgs = [{ kind: 'progress', name: 'Kubernetes in Depth.pdf', hint: 'Reading pages and saving chunks. A long PDF can take a minute.' }];
+      break;
+    case 'up-processing': {
+      const u = { id: 'u16', title: 'Kubernetes in Depth', fileName: 'Kubernetes in Depth.pdf', fileType: 'pdf', chunkCount: 412, searchable: false, flash: true };
+      state.uploads.push(u);
+      state.open.add('IL');
+      state.msgs = [{ kind: 'ok', name: u.fileName, text: 'Saved (412 chunks).', hint: 'It can be searched in a few seconds; until then it shows "processing…".' }];
+      finishProcessing(u, 8000);
+      break;
+    }
+    case 'up-duplicate': state.msgs = [{ kind: 'error', name: 'nimbus-guide.md', ...ERRORS.duplicate() }]; break;
+    case 'up-unsupported': state.msgs = [{ kind: 'error', name: 'team-photo.jpg', ...ERRORS.unsupportedType() }]; break;
+    case 'up-scanned': state.msgs = [{ kind: 'error', name: 'signed-lease.pdf', ...ERRORS.scannedPdf() }]; break;
+    case 'up-busy': state.msgs = [{ kind: 'error', name: 'Kubernetes in Depth.pdf', ...ERRORS.uploadInProgress() }]; break;
+    case 'up-toolarge': state.msgs = [{ kind: 'error', name: 'scanned-archive-2019.pdf', ...ERRORS.fileTooLarge() }]; break;
+    case 'fc-type':
+      state.filters.type.add('pdf');
+      break;
+    case 'fc-two':
+      state.filters.type.add('pdf').add('md');
+      state.filters.size.add('medium');
+      break;
+    case 'fc-hidden':
+      state.all = false;
+      state.selected = new Set(['u09', 'u11']);
+      state.filters.type.add('pdf');
+      break;
+    case 'fc-none':
+      state.facetsDown = true;
+      break;
+    case 'empty':
+      state.uploads = [];
+      state.all = false;
+      state.selected.clear();
+      state.answers = [];
+      break;
+    case 'down':
+      state.down = true;
+      state.answers = [];
+      break;
+  }
+
+  // Fake times: the latest answer is recent, earlier ones a few minutes apart.
+  state.answers = state.answers.map((a, i) => ({ ...a, askedAt: Date.now() - (i === 0 ? 20 : 120 + i * 180) * 1000 }));
+  $('apiNote').textContent = 'API: ' + API_NOTES[name];
+  render();
+  grow();
+
+  if (name === 'ac' || name === 'ac-none' || name === 'fc-search') {
+    search.value = name === 'ac-none' ? 'kuber' : 'nim';
+    search.focus();
+    renderSuggest();
+    renderFacets();
+  }
+}
+
+$('scenario').addEventListener('change', (e) => applyScenario(e.target.value));
+// Every page load starts with nothing ticked.
+$('scenario').value = 'first';
+applyScenario('first');
+</script>
+</body>
+</html>

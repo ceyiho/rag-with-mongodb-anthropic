@@ -83,6 +83,8 @@ so no logins or usage limits are needed.
 ## MongoDB features to showcase
 - Atlas Vector Search with Auto-Embedding, pre-filtered by upload (uploadId)
 - Atlas Search autocomplete (fuzzy) on upload titles, for the picker's search
+- Atlas Search facets on the picker: uploads counted by file type and size, following
+  the title search (milestone 10)
 - Hybrid search: vector search combined with Atlas Search (keyword/fuzzy) by
   `$rankFusion` (milestone 9; an option in the API and tools, results in
   `test/HYBRID.md`)
@@ -153,9 +155,18 @@ so no logins or usage limits are needed.
    `test/questions.json`, and re-check the "not found" threshold. Then the web page:
    "How this was found" compares the passages sent to the LLM with the ones vector
    search alone would have sent.
+10. Faceted upload picker: a Filter block above the title search, with Type (PDF, MD,
+    TXT) and Size (Small, Medium, Large) chips whose counts come from Atlas Search
+    facets and follow the typed words. Built from `wireframe/index-facets.html` (the
+    sidebar only; where it and API_SPEC.md differ, the spec wins; not updated after
+    this milestone). Check the facet syntax in the Atlas documentation first. Steps:
+    the title index gains the two fields, applied with a new
+    `npm run setup -- --update <index name>`; then the facets route and the filters
+    on title search, tested with curl; then the page. No test-question or answer
+    runs: retrieval doesn't change.
 
 ### Phase 3
-10. README with an architecture diagram and a Troubleshooting section, starting
+11. README with an architecture diagram and a Troubleshooting section, starting
     with: "SSL alert number 80" (tlsv1 alert internal error) when connecting means
     your IP address has changed; add it in Atlas Network Access. The driver may label
     it `SystemOverloadedError`, but it isn't an Atlas outage.
@@ -167,7 +178,7 @@ so no logins or usage limits are needed.
     dashboard and correct the estimate where it appears.
 
 ### Optional (parked)
-11. Analytics: log each question, top score, and cited chunks in a `questions`
+12. Analytics: log each question, top score, and cited chunks in a `questions`
     collection, then build an analytics view with aggregation pipelines.
 
 ## Open decisions
@@ -193,13 +204,16 @@ so no logins or usage limits are needed.
 - Vector index `chunks_vector_cosine` on `chunks` (created by `npm run setup`):
   autoEmbed on `text`, model `voyage-4`, 1024 dimensions, scalar quantization, cosine
   similarity; filter on `uploadId` (queries must pass ObjectIds, not strings).
-  Search indexes can't be edited, and setup skips an index that already exists and
-  never updates one.
+  It can't be edited (an autoEmbed field). Setup skips a search index that already
+  exists, and updates one only when named with `--update` (milestone 10), never the
+  vector index.
 - Search indexes (milestone 7): three, chosen to fit the M0's 3 slots: the vector
   index, the keyword index (milestone 9), and `uploads_title_autocomplete` on
-  `uploads` for the picker's title search. The vector index stays as it is. The
-  keyword and title indexes hold no embeddings, so a changed definition is applied by
-  dropping and recreating them. M10 has no cap on search indexes, so a 4th index is
+  `uploads` for the picker's title search (and its facets, milestone 10). The vector
+  index stays as it is. The keyword and title indexes hold no embeddings, so a changed
+  definition is applied in place with `npm run setup -- --update <index name>`
+  (milestone 10): Atlas answers from the old version until the new one is built.
+  M10 has no cap on search indexes, so a 4th index is
   possible now, though each one adds load on a small tier. Not chosen: filtering
   titles in the browser, which showcases nothing.
 - Chunk size: 1,600 characters (≈400 tokens), max 2,000, overlap 200; values in
@@ -246,7 +260,14 @@ so no logins or usage limits are needed.
     structured output.) Fallback if citations prove unreliable: a "not found" tool.
   - Partial answers: the LLM answers the part the chunks cover, with citations, and
     says what the uploads don't cover. It counts as an answer.
-- Web page and API (milestones 7–9; details, reasons and rejected options in
+- Facets (milestone 10; details in API_SPEC.md): the title index also holds
+  `fileType` (`token`) and `chunkCount` (`number`), not the outdated `stringFacet` and
+  `numberFacet` types. Size: under 10 chunks is Small, 10–99 Medium, 100 or more
+  Large. Each row's counts apply the other row's chips, not its own, so a second value
+  can still be added. The filter only narrows what the picker shows; ticks and "All
+  uploads" don't change. The list still comes from `GET /api/uploads`. If facets are
+  unavailable, the Filter block is hidden.
+- Web page and API (milestones 7–10; details, reasons and rejected options in
   API_SPEC.md):
   - Picker: several uploads or "All uploads"; nothing ticked when the page opens.
   - Readiness: search and count, saved as `searchableAt` by the page, `npm run ingest`
@@ -464,5 +485,7 @@ milestones run.
   On the page, "How this was found" compares the reranked passages with vector search
   alone's, in two tabs (Decisions: Web page and API), and answers show code blocks
   formatted. The test set has 77 questions.
-- Next: milestone 10 (README with an architecture diagram).
+- A README draft and the MIT license are committed (milestone 11). Milestone 10 comes
+  first, so the README describes the finished page.
+- Next: milestone 10 (faceted upload picker).
 - Files and commands: see ARCHITECTURE.md.
