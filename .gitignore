@@ -11,3 +11,6 @@ samples/private-samples/
 CLAUDE.md
 HANDOFF.md
 MISC.md
+
+# Claude Code's local settings (e.g. launch.json for the browser pane) - kept local
+.claude/
