@@ -1,7 +1,8 @@
 // Creates the collections, regular indexes, and search indexes, then sets searchableAt on
 // complete uploads that lack it (see src/readiness.js). Safe to run more than once:
 // createIndex does nothing if an identical index already exists, search indexes that
-// already exist are skipped, and uploads that have searchableAt aren't checked again.
+// already exist are skipped (unless named with --update, below), and uploads that have
+// searchableAt aren't checked again.
 // The first run filled in the uploads saved before searchableAt existed (milestone 7),
 // so their searchableAt says nothing about the embedding delay. Later runs catch an
 // upload whose ingest or page was closed before it was searchable.

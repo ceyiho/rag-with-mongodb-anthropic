@@ -439,6 +439,12 @@ milestones run.
   would cut about 15% of the LLM's input, about $0.002 per question. Not adopted: a
   small saving, it also drops related same-upload chunks, filler hasn't caused a wrong
   answer, and it would need an answer run.
+- Facets (milestone 10; 2026-11-03): the counts matched a plain count of the 7
+  uploads. Updating the title index in place took under two minutes, BUILDING but
+  queryable throughout, so title search kept answering. On a missing index
+  `$searchMeta` returns no facets, and a facet on a field the index doesn't hold as
+  `token` or `number` fails with "Cannot facet on field…"; the facets route turns both
+  into `facetsUnavailable`.
 
 ## Current status
 - Git installed; Atlas account set up. Milestone 1 is completed.

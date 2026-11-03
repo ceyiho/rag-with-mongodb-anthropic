@@ -161,7 +161,6 @@
   .facets { margin: 4px 12px 0; display: flex; flex-direction: column; gap: 5px; }
   .facets:empty { display: none; }
   .fhead { display: flex; align-items: baseline; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-  .fhead .for { text-transform: none; letter-spacing: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .fhead .linkbtn { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
   .frow { display: flex; align-items: baseline; gap: 6px; }
   .frow .fname { width: 34px; flex-shrink: 0; font-size: 12px; color: var(--muted); }
@@ -402,7 +401,7 @@
       <optgroup label="Facets (proposed)">
         <option value="fc-type">Filter: PDFs only</option>
         <option value="fc-two">Filter: PDF or MD, and Medium</option>
-        <option value="fc-search">Counts follow the title search</option>
+        <option value="fc-search">Title search with a filter</option>
         <option value="fc-hidden">A ticked upload hidden by the filter</option>
         <option value="fc-none">Facets unavailable (index missing)</option>
       </optgroup>
@@ -434,7 +433,7 @@
     <div class="drop-hint">.txt, .md or text-based PDF · or drop a file here</div>
     <div class="upload-msgs" id="uploadMsgs"></div>
     <!-- Above the title search, not below it: the suggestions dropdown would cover
-         the counts while they follow the typed words. -->
+         the chips while they filter them. -->
     <div class="facets" id="facets"></div>
     <div class="search">
       <input id="titleSearch" type="search" placeholder="Search titles…" autocomplete="off" aria-label="Search upload titles">
@@ -632,7 +631,7 @@ const API_NOTES = {
   'ac-none': 'Same route, empty array.',
   'fc-type': 'Proposed: GET /api/uploads/facets → $searchMeta on the title index with the facet collector: a string facet on fileType and a number facet on chunkCount (the index gains both fields). The counts come from Atlas; the list itself still comes from GET /api/uploads and is filtered on the page. "All uploads" still means every searchable upload.',
   'fc-two': 'Chips in a row combine with "or", the rows with "and". Each row\'s counts apply the other row\'s chips but not its own, so another type can still be added: one $searchMeta per row, sent together.',
-  'fc-search': 'Proposed: the facets route also takes the typed words (?q=nim), with the same autocomplete clauses as GET /api/uploads/search, so the counts are for the matches. A chip clicked while typing filters the suggestions too (?type=&size= become filter clauses).',
+  'fc-search': 'GET /api/uploads/search?q=nim&type=txt: the ticked chips become filter clauses in the same $search, so only matching uploads are suggested. The counts stay as they are while typing: they are for the whole library, since the list below isn\'t narrowed by the typed words.',
   'fc-hidden': 'The filter only changes what the list shows: ticked uploads stay ticked when hidden, the question still asks them (see the chips above the question box), and the selection row under "All uploads" says how many are hidden.',
   'fc-none': 'Proposed: GET /api/uploads/facets → 503 {error:{code:"facetsUnavailable"}} when the title index is missing or still has the old definition: the Filter block is hidden and the list shows everything. Counts can also lag a new upload by a few seconds while the search index catches up.',
   'empty': 'GET /api/uploads → []. Ask is disabled until at least one upload is searchable.',
@@ -825,7 +824,9 @@ function renderSuggest() {
 // ---------- Facets (simulates Atlas Search facet counts on uploads) ----------
 // Chips in a row combine with "or", the rows with "and". Each row's counts apply the
 // other rows' chips but not its own, so a second value can still be added to a row.
-// While words are typed in the title search, the counts are for the matching uploads.
+// The counts are for the whole library and don't follow the typed words: the list isn't
+// narrowed by them, so a chip greyed for 0 matches would block a filter that works on
+// the list.
 const filtering = () => FACETS.some((f) => state.filters[f.key].size);
 
 // Whether an upload passes the ticked chips; `except` leaves one facet's chips out.
@@ -837,10 +838,8 @@ const shown = () => state.uploads.filter((u) => passes(u));
 function renderFacets() {
   const el = $('facets');
   if (state.down || state.facetsDown || !state.uploads.length) { el.innerHTML = ''; return; }
-  const q = $('titleSearch').value.trim();
-  const pool = q ? state.uploads.filter((u) => matches(u, q)) : state.uploads;
   const rows = FACETS.map((f) => {
-    const base = pool.filter((u) => passes(u, f.key));
+    const base = state.uploads.filter((u) => passes(u, f.key));
     const chips = f.values.map((v) => {
       const n = base.filter((u) => f.of(u) === v.key).length;
       const on = state.filters[f.key].has(v.key);
@@ -850,7 +849,6 @@ function renderFacets() {
     return `<div class="frow"><span class="fname">${f.label}</span><div class="fchips">${chips}</div></div>`;
   }).join('');
   el.innerHTML = `<div class="fhead"><span>Filter</span>
-      ${q ? `<span class="for">matches for "${esc(q)}"</span>` : ''}
       ${filtering() ? '<button class="linkbtn" data-clearfilters>Clear filter</button>' : ''}</div>${rows}`;
 }
 
@@ -1113,14 +1111,14 @@ document.querySelector('.ask').addEventListener('click', () => {
 });
 
 const search = $('titleSearch');
-search.addEventListener('input', () => { activeSuggestion = -1; renderSuggest(); renderFacets(); });
+search.addEventListener('input', () => { activeSuggestion = -1; renderSuggest(); });
 search.addEventListener('focus', renderSuggest);
 search.addEventListener('keydown', (e) => {
   const rows = [...$('suggest').querySelectorAll('.row')];
   if (e.key === 'ArrowDown') { activeSuggestion = Math.min(rows.length - 1, activeSuggestion + 1); renderSuggest(); e.preventDefault(); }
   if (e.key === 'ArrowUp') { activeSuggestion = Math.max(0, activeSuggestion - 1); renderSuggest(); e.preventDefault(); }
   if (e.key === 'Enter' && rows[activeSuggestion]) { pickSuggestion(rows[activeSuggestion].dataset.id); e.preventDefault(); }
-  if (e.key === 'Escape') { search.value = ''; $('suggest').classList.remove('show'); renderFacets(); }
+  if (e.key === 'Escape') { search.value = ''; $('suggest').classList.remove('show'); }
 });
 
 // Facet chips. On mousedown the dropdown stays open and the focus stays in the search
@@ -1395,6 +1393,9 @@ function applyScenario(name) {
       state.selected = new Set(['u09', 'u11']);
       state.filters.type.add('pdf');
       break;
+    case 'fc-search':
+      state.filters.type.add('txt');
+      break;
     case 'fc-none':
       state.facetsDown = true;
       break;
@@ -1420,7 +1421,6 @@ function applyScenario(name) {
     search.value = name === 'ac-none' ? 'kuber' : 'nim';
     search.focus();
     renderSuggest();
-    renderFacets();
   }
 }
 
