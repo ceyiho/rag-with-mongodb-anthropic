@@ -5,7 +5,7 @@
 // --no-rerank answers from vector search alone (by default the chunks are reranked).
 // --search hybrid answers from hybrid search: vector and keyword search combined, always
 // reranked (up to twice the rerank tokens). --search vector is the default.
-// Each run embeds the question, reranks (about 20,000 tokens), and calls the LLM unless
+// Each run embeds the question, reranks (about 11,000 tokens), and calls the LLM unless
 // the top score is below the "not found" threshold. To see the raw chunks and scores,
 // use npm run search.
 

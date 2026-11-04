@@ -1,4 +1,4 @@
-# RAG knowledge base on MongoDB Atlas
+# RAG Knowledge Base on MongoDB Atlas
 
 Upload text files, Markdown and text-based PDFs, then ask questions in plain
 language. The app answers only from your uploads, and every answer cites the upload
@@ -6,16 +6,18 @@ and section it came from. If the uploads don't hold the answer, it says
 "not found in your uploads" instead of guessing.
 
 A solo portfolio project that shows what MongoDB Atlas can do for retrieval:
-Vector Search with Auto-Embedding, reranking with `$rerank`, and hybrid search with
-`$rankFusion`. Answers are written by Claude (Anthropic API) with built-in citations.
+Vector Search with Auto-Embedding and reranking with `$rerank` for the answers, and
+Atlas Search autocomplete and facets for the upload picker. Answers are written by
+Claude (Anthropic API) with built-in citations.
 
-![The web page: a question about removing array elements, answered from a book PDF with numbered citations, and "How this was found" open, comparing the reranked passages with vector search alone's.](images/answer.png)
+![The web page: the upload picker with its Filter block, and a question about what MongoDB's aggregation framework does, answered from a book PDF with numbered citations, with "How this was found" open, comparing the reranked passages with vector search alone's.](images/answer.png)
 
 ## What it showcases
 
 - **Atlas Vector Search with Auto-Embedding.** The app stores only chunk text. Atlas
-  embeds it with Voyage AI (`voyage-4`) through the vector search index, and embeds
-  each question the same way, so the app never creates or handles a vector.
+  embeds it with Voyage AI (`voyage-4`) through the vector search index
+  `chunks_vector_cosine`, and embeds each question the same way, so the app never
+  creates or handles a vector.
 - **Pre-filtered search.** The user ticks one or more uploads, or "All uploads", and
   the search is filtered on their ids. Ticked uploads use exact search; "All uploads"
   uses approximate search.
@@ -24,11 +26,11 @@ Vector Search with Auto-Embedding, reranking with `$rerank`, and hybrid search w
   answers the question, and the top 10 go to the LLM. On for every answer.
 - **A "not found" threshold on the rerank score.** Below it, the app answers "not
   found" without calling the LLM.
-- **Hybrid search with `$rankFusion`.** Vector search and Atlas Search keyword search
-  merged, then reranked. An option in the API and command line; it made no
-  measurable difference here ([test/HYBRID.md](test/HYBRID.md)).
 - **Atlas Search autocomplete.** Typo-tolerant title search in the page's upload
-  picker.
+  picker, on the Atlas Search index `uploads_title_autocomplete`.
+- **Atlas Search facets.** The picker's Filter block counts uploads by file type and
+  by size with `$searchMeta` (a string facet and a number facet, on the same index
+  `uploads_title_autocomplete`), and its chips filter the list and the title search.
 
 ## How it works
 
@@ -69,15 +71,18 @@ flowchart TB
 [ARCHITECTURE.md](ARCHITECTURE.md) maps every file and command, and
 [API_SPEC.md](API_SPEC.md) describes the API's routes and the web page's behaviour.
 
-## The search pipeline, in code
+## The queries, in code
 
-Simplified from [src/search.js](src/search.js), which also numbers each chunk's rank
-before and after reranking, counts the candidates and joins each chunk's upload.
-Node.js driver syntax.
+Simplified from the app's code, in Node.js driver syntax.
 
-**The vector search index** (from [src/indexes.js](src/indexes.js)). The `autoEmbed`
-field tells Atlas to embed `text` itself; `uploadId` is a filter field, so searches can
-be limited to some uploads.
+### Answers: vector search and reranking
+
+From [src/search.js](src/search.js), which also numbers each chunk's rank before and
+after reranking, counts the candidates and joins each chunk's upload.
+
+**The vector search index `chunks_vector_cosine`** (on the `chunks` collection; from
+[src/indexes.js](src/indexes.js)). The `autoEmbed` field tells Atlas to embed `text`
+itself; `uploadId` is a filter field, so searches can be limited to some uploads.
 
 ```js
 await db.collection('chunks').createSearchIndex({
@@ -102,8 +107,16 @@ await db.collection('chunks').createSearchIndex({
 
 **Vector search, then rerank.** Both stages take the question as text: Atlas embeds
 it for `$vectorSearch`, and the reranker reads it next to each candidate's text.
+`uploadIds` holds the `_id` values of the ticked uploads, as ObjectIds. For "All
+uploads", the app passes the ids of every searchable upload and uses approximate
+search instead of `exact`.
 
 ```js
+const { ObjectId } = require('mongodb');
+
+const question = 'How do I set up a proxy for Nimbus?';
+const uploadIds = [new ObjectId('…')];   // the ticked uploads' _id values
+
 const results = await db.collection('chunks').aggregate([
   {
     $vectorSearch: {
@@ -146,39 +159,120 @@ if (!results.length || results[0].score < 0.58) {
 }
 ```
 
-**Hybrid search.** `$rankFusion` runs vector search and keyword search (Atlas Search
-index `chunks_keyword`) as two input pipelines and merges their results by rank
-(Reciprocal Rank Fusion); `$rerank` then re-sorts the merged list.
+### The upload picker: Atlas Search autocomplete and facets
+
+From [src/title-search.js](src/title-search.js). One Atlas Search index,
+`uploads_title_autocomplete`, serves both the title search and the Filter block's
+counts.
+
+**The Atlas Search index `uploads_title_autocomplete`** (on the `uploads` collection;
+from [src/indexes.js](src/indexes.js)). `autocomplete`
+fields index the start of each word (edge n-grams of 2 to 20 letters), so a few typed
+letters find a title. A custom analyzer splits file names into words at hyphens,
+underscores and dots, which the standard one doesn't. `fileType` and `chunkCount` are
+there for the facets and the chip filters.
 
 ```js
-const results = await db.collection('chunks').aggregate([
+const AUTOCOMPLETE = {
+  type: 'autocomplete',
+  tokenization: 'edgeGram',   // index word starts: "ni", "nim", "nimb", …
+  minGrams: 2,
+  maxGrams: 20,
+  foldDiacritics: true,       // "cafe" finds "Café"
+};
+
+await db.collection('uploads').createSearchIndex({
+  name: 'uploads_title_autocomplete',
+  type: 'search',
+  definition: {
+    analyzers: [
+      {
+        name: 'fileNameWords',
+        tokenizer: { type: 'regexSplit', pattern: '[-_.\\s]+' },   // "nimbus-guide.md" → nimbus, guide, md
+        tokenFilters: [{ type: 'lowercase' }],
+      },
+    ],
+    mappings: {
+      dynamic: false,   // index only the fields below
+      fields: {
+        title: AUTOCOMPLETE,
+        fileName: { ...AUTOCOMPLETE, analyzer: 'fileNameWords' },
+        status: { type: 'token' },        // to search complete uploads only
+        fileType: { type: 'token' },      // facet and filter: pdf, md, txt
+        chunkCount: { type: 'number' },   // facet and filter: the size
+      },
+    },
+  },
+});
+```
+
+**Title search.** Every typed word must start a word of the title or the file name, so
+"nim gui" finds "Nimbus CLI Guide". Words of 4 letters or more may have one typo.
+Filter clauses (complete uploads, the ticked chips) narrow the results without
+changing their score.
+
+```js
+const words = ['nim', 'gui'];   // what was typed, split into words
+
+const results = await db.collection('uploads').aggregate([
   {
-    $rankFusion: {
-      input: {
-        pipelines: {
-          vector: [{ $vectorSearch: { /* as above, limit: 50 */ } }],
-          keyword: [
-            {
-              $search: {
-                index: 'chunks_keyword',
-                compound: {
-                  must: [{ text: { query: question, path: 'text', fuzzy: { maxEdits: 1 } } }],
-                  filter: [{ in: { path: 'uploadId', value: uploadIds } }],
-                },
+    $search: {
+      index: 'uploads_title_autocomplete',
+      compound: {
+        must: words.map((word) => ({
+          compound: {
+            should: ['title', 'fileName'].map((path) => ({
+              autocomplete: {
+                path,
+                query: word,
+                // one typo from 4 letters on; the first letter must be right
+                ...(word.length >= 4 && { fuzzy: { maxEdits: 1, prefixLength: 1 } }),
               },
-            },
-            { $limit: 50 },
-          ],
+            })),
+            minimumShouldMatch: 1,   // the title or the file name
+          },
+        })),
+        filter: [
+          { equals: { path: 'status', value: 'complete' } },
+          { in: { path: 'fileType', value: ['md'] } },   // the ticked Type chips
+        ],
+      },
+    },
+  },
+  { $limit: 8 },
+]).toArray();
+```
+
+**Facets.** `$searchMeta` returns counts instead of uploads. A string facet counts
+uploads per file type; a number facet counts them in chunk-count ranges, each bucket
+starting at a boundary, with `default` for the rest.
+
+```js
+const [{ facet }] = await db.collection('uploads').aggregate([
+  {
+    $searchMeta: {
+      index: 'uploads_title_autocomplete',
+      facet: {
+        operator: { equals: { path: 'status', value: 'complete' } },   // which uploads to count
+        facets: {
+          type: { type: 'string', path: 'fileType', numBuckets: 3 },
+          size: {
+            type: 'number',
+            path: 'chunkCount',
+            boundaries: [1, 10, 100],   // small: 1–9 chunks, medium: 10–99
+            default: 'large',           // 100 or more
+          },
         },
       },
     },
   },
-  { $rerank: { query: { text: question }, path: 'text', numDocsToRerank: 100, model: 'rerank-3' } },
-  { $set: { score: { $meta: 'score' } } },
-  { $sort: { score: -1 } },
-  { $limit: 10 },
 ]).toArray();
+// facet.type.buckets: [{ _id: 'txt', count: 3 }, { _id: 'md', count: 2 }, { _id: 'pdf', count: 2 }]
+// facet.size.buckets: [{ _id: 1, count: 3 }, { _id: 10, count: 3 }, { _id: 'large', count: 1 }]
 ```
+
+With chips ticked, the app runs one `$searchMeta` per row, each filtered by the other
+row's chips, so each count says what ticking that chip would add.
 
 ## Results
 
@@ -193,14 +287,19 @@ wrong one:
   scores, most of those had to be sent to the LLM, which replied "not found" itself:
   in a full test run, questions with no answer in the searched uploads reached the LLM
   55 times with vector search alone and 4 times reranked.
-- **Hybrid search added nothing here:** with reranking last, the same results on
-  every check, at about 1.6 times the rerank tokens.
+
+Each test question's best score in one upload, before and after reranking. The two
+panels use different scores (cosine, then rerank), so compare each dot with its own
+panel's threshold:
+
+![Dot chart: each test question's best score in one upload, vector search alone on the left (cosine) and reranked on the right. With cosine scores, answerable questions (0.65 to 0.90) overlap near-misses, off-topic questions and wrong uploads (0.51 to 0.81) around the 0.62 threshold. Reranked, answerable questions score 0.64 to 0.94, while wrong uploads and off-topic questions fall to 0.24 to 0.51, below the 0.58 threshold; only 2 near-misses stay above it.](test/charts/rerank-score-spread.svg)
+
+How many test questions come out right on each check:
 
 ![Bar chart: share of test questions that come out right per check, vector search alone vs reranked. Ranking: answer first 33 vs 40 of 43 (All uploads), 36 vs 40 (one upload), expected upload first 48 vs 50 of 50. Threshold: answerable questions sent to the LLM 50 of 50 both; stopped before the LLM: wrong upload 38 vs 50 of 50, near-miss 0 vs 10 of 12, off-topic 3 vs 9 of 9, several uploads without the answer 0 vs 4 of 4.](test/charts/rerank-before-after.svg)
 
-The full comparisons: [test/RERANKING.md](test/RERANKING.md) and
-[test/HYBRID.md](test/HYBRID.md). Decisions, measurements and the reasons behind each
-setting: [PROJECT_PLAN.md](PROJECT_PLAN.md).
+The full comparison: [test/RERANKING.md](test/RERANKING.md). Decisions, measurements
+and the reasons behind each setting: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Quick start
 

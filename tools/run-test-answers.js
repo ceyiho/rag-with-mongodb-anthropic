@@ -36,7 +36,7 @@
 //
 // Cost: every mode above the threshold calls the LLM, about 70-80 calls for a full run
 // (a few thousand input tokens each). The token totals are printed at the end.
-// Reranking adds about 20,000 rerank tokens per question and mode.
+// Reranking adds about 11,000 rerank tokens per question and mode.
 
 const fs = require('fs');
 const path = require('path');

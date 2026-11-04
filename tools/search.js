@@ -11,7 +11,7 @@
 // then sets how many chunks each side fetches). Each result shows its rank in each list
 // before reranking.
 // Each run embeds the question: a few tokens and one request against the rate limit.
-// Reranking costs about 20,000 tokens at 50 candidates; hybrid search up to twice that.
+// Reranking costs about 11,000 tokens at 50 candidates; hybrid search up to twice that.
 
 const { connect } = require('../src/db');
 const { search } = require('../src/search');

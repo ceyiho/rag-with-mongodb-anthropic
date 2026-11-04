@@ -17,8 +17,8 @@ saved reports listed under Sources, unless it's marked as an estimate.
   off-topic and several-uploads-without-the-answer search is stopped before the LLM,
   plus 10 of 12 near-misses. With cosine scores at 0.62, nearly all of them went to
   the LLM, which had to reply "not found" itself.
-- **Cheap.** About 20,000 tokens and 300 ms per question (estimates), from a free
-  allowance of 200 million tokens.
+- **Cheap.** About 11,000 tokens (measured) and 300 ms (estimate) per question, from
+  a free allowance of 200 million tokens.
 
 ## How each one scores
 
@@ -150,9 +150,11 @@ A targeted answer run (LLM) covered the 7 questions whose top 10 changed most: 1
 
 ## Cost and speed
 
-- **Tokens** (estimate): the question once per candidate plus every candidate's text,
-  about 20,000 tokens per search at 50 candidates, about 4 million for a full run of
-  the test questions. `rerank-3` costs $0.05 per million tokens after a one-time
+- **Tokens:** the question once per candidate plus every candidate's text. Measured
+  on 2026-11-04 on the Atlas dashboard: 10,765 tokens for one All uploads search at
+  50 candidates, so about 11,000 per search (the estimate used in these runs, 20,000,
+  was about twice too high). A full run of the test questions takes at most about 2
+  million: searches of one small upload rerank fewer than 50 chunks. `rerank-3` costs $0.05 per million tokens after a one-time
   allowance of 200 million free tokens per organization.
 - **Time:** one All-uploads search took 505 ms with vector search alone and 813 ms
   reranked (one measurement). A full run of the test questions (about 200 searches)

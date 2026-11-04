@@ -159,8 +159,10 @@ names that vector search handles badly.
 ## Cost and speed
 
 - **Tokens** (estimate): the merged list held 67 to 96 chunks (average 82) instead of
-  vector search's 50, so about 1.6 times the rerank tokens: about 33,000 per search
-  instead of 20,000, and about 7 million for a full run of the test questions.
+  vector search's 50, so about 1.6 times the rerank tokens: about 18,000 per search
+  instead of 11,000 (measured for vector search on 2026-11-04; see
+  [RERANKING.md](RERANKING.md)), and at most about 3.5 million for a full run of the
+  test questions.
   `rerank-3` costs $0.05 per million tokens after a one-time allowance of 200 million
   free tokens per organization. Keyword search itself uses no tokens.
 - **Time:** the two searches inside `$rankFusion` run one after the other. Without

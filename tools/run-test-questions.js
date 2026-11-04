@@ -5,8 +5,8 @@
 // --save writes a report to test/results/<date>-<label>.md, e.g. --save chunk-800.
 // --threshold tries another threshold for both modes instead of the ones in config.js.
 // Like answers, every search is reranked by default (config.search.rerank), and the
-// scores and thresholds are rerank ones. About 20,000 tokens per search at 50
-// candidates, about 4 million for a full run.
+// scores and thresholds are rerank ones. About 11,000 tokens per search at 50
+// candidates (measured), at most about 2 million for a full run.
 // --rerank reranks the top n vector results instead of config.js's count.
 // --no-rerank tests vector search alone, at the cosine thresholds (the baseline).
 // --search hybrid tests hybrid search: vector and keyword search each fetch the rerank

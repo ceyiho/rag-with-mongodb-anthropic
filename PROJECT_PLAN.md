@@ -413,7 +413,9 @@ milestones run.
   didn't: unanswerable questions scoring at or above the lowest answer dropped from 16
   to 2, and unrelated chunks sit near 0.25 (cosine: about 0.59). 20 and 50 candidates
   gave practically the same results; 50 leaves room for large uploads. Cost: about
-  20,000 rerank tokens and 300 ms per question (estimates).
+  11,000 rerank tokens per search of 50 candidates (measured 2026-11-04: 10,765 on
+  the Atlas dashboard for one All uploads search; the earlier estimate of 20,000 was
+  about twice too high) and about 300 ms (estimate).
 - Rerank threshold (milestone 9; runs of 2026-10-09): 0.58 for both search modes. It
   sends all 50 answerable questions to the LLM (lowest 0.637, a margin of 0.057) and
   stops every wrong-upload, off-topic and several-uploads-without-the-answer search,
