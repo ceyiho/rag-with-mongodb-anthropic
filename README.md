@@ -306,12 +306,12 @@ and the reasons behind each setting: [PROJECT_PLAN.md](PROJECT_PLAN.md).
 **You need:**
 
 - Node.js 22 LTS or later.
-- A MongoDB Atlas cluster with **MongoDB 8.3 or later** for `$rerank`, which means
-  M10 or larger, a paid tier. On the free M0 (MongoDB 8.0), ingesting and searching
-  work, but answers fail unless asked without reranking (`npm run ask -- "…"
-  --no-rerank`), and the web page always reranks. Auto-Embedding and reranking need
-  no Voyage AI account: Atlas runs both, each with a one-time free allowance of 200
-  million tokens.
+- For `$rerank` with the `rerank-3` model ([requirements](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/rerank/)):
+  a **dedicated Atlas cluster (M10 or larger, a paid tier) running MongoDB 9.0 or
+  later**, with **Native Reranking enabled** in the project's settings. On the free
+  M0 (MongoDB 8.0), ingesting and searching work, but answers fail unless asked
+  without reranking (`npm run ask -- "…" --no-rerank`), and the web page always
+  reranks. Auto-Embedding and reranking need no Voyage AI account: Atlas runs both.
 - Your IP address in Atlas **Network Access**.
 - An Anthropic API key.
 
@@ -363,9 +363,10 @@ address has changed: add the new one in Atlas Network Access. The driver may lab
 this `SystemOverloadedError`, but it isn't an Atlas outage.
 
 **Every question fails, on the page and with `npm run ask`, but
-`npm run ask -- "…" --no-rerank` works.** The cluster runs a MongoDB version below
-8.3, which has no `$rerank` stage (the free M0 runs 8.0). Use an M10 or larger with
-8.3+, or ask from the command line with `--no-rerank`.
+`npm run ask -- "…" --no-rerank` works.** The cluster can't run `$rerank`. It needs
+all three: MongoDB 9.0 or later, a dedicated cluster (M10 or larger; the free M0 runs
+8.0), and Native Reranking enabled in the project's settings. Fix whichever is
+missing, or ask from the command line with `--no-rerank`.
 
 **LLM requests go to the wrong address, though `.env` looks right.** A variable
 already set in your shell wins over `.env`. Some tools set `ANTHROPIC_BASE_URL`

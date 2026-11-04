@@ -179,7 +179,9 @@ A targeted answer run (LLM) covered the 7 questions whose top 10 changed most: 1
 
 ## Sources
 
-The charts (`charts/*.svg`) are drawn from the first and fourth reports below.
+The charts (`charts/*.svg`) compare two search runs (no LLM) over all 71 questions:
+`2026-10-09-m10-baseline` (vector search alone) and `2026-10-09-rerank-reference`
+(reranked, final settings).
 
 - Vector search alone: [results/2026-10-09-m10-baseline.md](results/2026-10-09-m10-baseline.md)
 - Reranked, 20 and 50 candidates: [results/2026-10-09-rerank-20.md](results/2026-10-09-rerank-20.md),

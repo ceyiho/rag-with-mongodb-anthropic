@@ -150,7 +150,7 @@ so no logins or usage limits are needed.
    styling; where it and API_SPEC.md differ, the spec wins. It isn't updated after
    milestone 7.
 9. Better retrieval: rerank the top vector results with `$rerank` (Voyage AI; needs
-   MongoDB 8.3+), then add hybrid search (an Atlas Search keyword index combined with
+   MongoDB 9.0+, M10+ and Native Reranking enabled), then add hybrid search (an Atlas Search keyword index combined with
    vector search, reranked last). Measure each against vector search alone with
    `test/questions.json`, and re-check the "not found" threshold. Then the web page:
    "How this was found" compares the passages sent to the LLM with the ones vector
@@ -172,8 +172,8 @@ so no logins or usage limits are needed.
     it `SystemOverloadedError`, but it isn't an Atlas outage.
     For a portfolio reader: what it showcases, the diagram (Mermaid, with a box around
     what runs in Atlas), the vector search and rerank pipeline as example code, a
-    short results summary, a quick start (M10 or larger with MongoDB 8.3+ for
-    `$rerank`), a screenshot of the page, and an MIT license. Links to the other
+    short results summary, a quick start (M10 or larger with MongoDB 9.0+ and
+    Native Reranking enabled, for `$rerank`), a screenshot of the page, and an MIT license. Links to the other
     files rather than repeating them. Re-measure rerank tokens per search on the Atlas
     dashboard and correct the estimate where it appears.
 
