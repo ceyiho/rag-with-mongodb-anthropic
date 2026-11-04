@@ -233,11 +233,18 @@ milestone 10: the Filter block, the filtered list, and the selection row and gro
 as the real page has them. Its own "Facets (proposed)" states are in the state menu.
 Not updated after milestone 10.
 
+### `images/`: pictures for the README
+
+`answer.png`: a screenshot of the web page (a reranked answer with "How this was
+found" open), shown at the top of the README.
+
 ## Root files
 
 | File | Purpose |
 |---|---|
 | `server.js` | Starts the API server (`npm start`): connects to Atlas, checks the search indexes, mounts the routes in `src/api/`, serves the web page from `public/`, and listens on `127.0.0.1:3000` unless `HOST` or `PORT` is set. |
+| `README.md` | The project for a portfolio reader: what it showcases, the architecture diagram (Mermaid), the main queries as example code, results, quick start, Troubleshooting. Links here rather than repeating this map. |
+| `LICENSE` | MIT license. |
 | `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
 | `ARCHITECTURE.md` | This map. |

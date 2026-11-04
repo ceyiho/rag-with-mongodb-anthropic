@@ -500,6 +500,12 @@ milestones run.
   the route `GET /api/uploads/facets` and the chips as filters on title search, tested
   with curl and checked in the browser. The title index gained `fileType` and
   `chunkCount`, applied with the new `npm run setup -- --update <index name>`.
-- A README draft and the MIT license are committed (milestone 11).
-- Next: milestone 11 (README with an architecture diagram).
+- Milestone 11 is completed: the README (what the app showcases, a Mermaid
+  architecture diagram, the vector search + rerank pipeline and the picker's title
+  search and facets queries as example code, run against Atlas as written, the
+  reranking results with both charts, a quick start and Troubleshooting), a
+  screenshot of the page in `images/`, and the MIT license. Rerank tokens re-measured:
+  about 11,000 per search (Findings: Reranking). Hybrid search isn't in the README,
+  since the page doesn't use it.
+- Next: nothing planned; milestone 12 (analytics) is parked.
 - Files and commands: see ARCHITECTURE.md.
