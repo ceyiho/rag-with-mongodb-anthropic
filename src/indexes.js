@@ -3,7 +3,7 @@
 // them, npm run index-status lists them, and the server checks them at startup.
 // Three search indexes, chosen to fit the M0 tier's 3 slots: the vector index, the
 // title index, and the keyword index (milestone 9). The M10 the app runs on now has no
-// cap (see Decisions in PROJECT_PLAN.md).
+// cap (see Decisions in docs/PROJECT_PLAN.md).
 // The title and keyword indexes are updated in place (npm run setup -- --update <name>):
 // Atlas keeps answering from the old version until the new one is built. The vector
 // index can't be edited: a change means a new index under a new name (see below).
@@ -13,7 +13,7 @@ const config = require('./config');
 // Vector search index with Auto-Embedding: Atlas embeds each chunk's text with Voyage AI.
 // Scalar quantization, 1024 dimensions, cosine similarity. Cosine, not dotProduct:
 // scalar vectors aren't unit length, and dotProduct squeezed every score to about 0.50
-// (see Findings in PROJECT_PLAN.md).
+// (see Findings in docs/PROJECT_PLAN.md).
 // An autoEmbed field can't be edited, and changing the model, path, dimensions or
 // quantization re-embeds everything; dropping the index also drops its embeddings. To
 // change it, create a new index under a new name.

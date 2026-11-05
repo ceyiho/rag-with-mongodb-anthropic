@@ -1,6 +1,6 @@
 // Turns API data into safe HTML for the page. Upload titles and excerpts, and the
 // LLM's answers, are untrusted text, so everything is escaped before it's shown
-// (API_SPEC.md: Questions, Formatting).
+// (docs/API_SPEC.md: Questions, Formatting).
 
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -24,7 +24,7 @@ const CODE_CLOSE = String.fromCharCode(0xe003);
 const CODE_SPAN = new RegExp(`${CODE_OPEN}([0-9]+)${CODE_CLOSE}`, 'g');
 const STRAY_MARKS = new RegExp(`[${MARK_OPEN}${MARK_CLOSE}${CODE_OPEN}${CODE_CLOSE}]`, 'g');
 
-// The answer's parts as HTML (API_SPEC.md: Formatting). A Markdown list can be cut
+// The answer's parts as HTML (docs/API_SPEC.md: Formatting). A Markdown list can be cut
 // across several parts, so the parts are joined into one text with a placeholder where
 // each citation marker goes. Then everything is escaped, a small set of Markdown is
 // turned into formatting, and the placeholders become marker buttons. The page never
@@ -137,7 +137,7 @@ function inlineHtml(text) {
     .replace(CODE_SPAN, (_, i) => `<code>${codes[i]}</code>`);
 }
 
-// Where a citation or a search hit points, as shown on the page (API_SPEC.md: where a
+// Where a citation or a search hit points, as shown on the page (docs/API_SPEC.md: where a
 // citation points): "PDF p. 12", "Installation › Windows", "passage 2 of 7", or
 // "Opening text" for Markdown text before the first heading below the title (its
 // section is null). Null only for a PDF passage without a page, which ingest never

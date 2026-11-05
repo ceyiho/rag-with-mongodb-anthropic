@@ -1,4 +1,4 @@
-// Upload routes (see API_SPEC.md: Uploads). Only complete uploads are returned;
+// Upload routes (see docs/API_SPEC.md: Uploads). Only complete uploads are returned;
 // "processing" is the ingest's internal state and never reaches the page.
 //   GET /api/uploads       all complete uploads, sorted by title
 //   GET /api/uploads/search?q=   title search for the picker (Atlas Search autocomplete)

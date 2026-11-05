@@ -1,5 +1,5 @@
 // POST /api/ask: answers a question from the ticked uploads or all uploads (see
-// API_SPEC.md: Questions). Body: { question, uploadIds } or { question, scope: "all" },
+// docs/API_SPEC.md: Questions). Body: { question, uploadIds } or { question, scope: "all" },
 // plus rerank: false for an answer from vector search alone (reranked by default), or
 // search: "hybrid" for hybrid search (always reranked).
 // Checks the request, then calls src/answer.js, and sends only the fields the spec
@@ -115,7 +115,7 @@ function llmBusy(err) {
     || (err instanceof Anthropic.APIError && LLM_BUSY.includes(err.status));
 }
 
-// The answer as API_SPEC.md lists it, with ids as hex strings.
+// The answer as docs/API_SPEC.md lists it, with ids as hex strings.
 function toApiAnswer(result) {
   const withHexIds = (hits) => hits.map((hit) => ({ ...hit, uploadId: hit.uploadId.toHexString() }));
   const { withoutRerank } = result.retrieval;

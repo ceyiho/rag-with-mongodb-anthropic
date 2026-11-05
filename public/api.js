@@ -1,4 +1,4 @@
-// Talks to the API server (routes and formats in API_SPEC.md). Each call returns the
+// Talks to the API server (routes and formats in docs/API_SPEC.md). Each call returns the
 // reply's JSON, or throws one of two errors:
 // - ServerUnreachable: fetch() itself failed, so there was no HTTP reply at all (the
 //   server is stopped, or the network is down).

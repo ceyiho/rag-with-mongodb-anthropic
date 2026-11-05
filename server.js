@@ -1,6 +1,6 @@
 // Starts the API server (milestone 7): connects to Atlas once, mounts the routes in
 // src/api/, and serves the web page from public/ (milestone 8), so page and API share
-// one address. Routes and formats are in API_SPEC.md.
+// one address. Routes and formats are in docs/API_SPEC.md.
 // Usage: npm start, or npm run dev to restart whenever a file changes.
 // Listens on 127.0.0.1 (this computer only) unless HOST is set in .env; PORT
 // defaults to 3000.

@@ -6,9 +6,9 @@
 //   citation in the reply names a block by its position (search_result_index), which
 //   maps back to the chunk, so to its upload and section.
 // - A reply with at least one citation is an answer; one with none is "not found",
-//   whatever its wording (see Decisions in PROJECT_PLAN.md: Answers).
+//   whatever its wording (see Decisions in docs/PROJECT_PLAN.md: Answers).
 //
-// Returns the answer in the API's format (API_SPEC.md: POST /api/ask), plus fields for
+// Returns the answer in the API's format (docs/API_SPEC.md: POST /api/ask), plus fields for
 // the command line and the tests:
 // - found, reason: 'answered', 'belowThreshold' (LLM not called) or 'noCitations' (the
 //   LLM found no answer in the chunks).
@@ -115,7 +115,7 @@ function notFound(reason) {
   return { found: false, reason, parts: [], citations: [], text: config.answer.notFoundReply };
 }
 
-// Where a chunk points, by file type (API_SPEC.md: where a citation points):
+// Where a chunk points, by file type (docs/API_SPEC.md: where a citation points):
 // - PDF: page, from the section ("page 12"); section null.
 // - Markdown: section, the heading path without the title (the first "#" heading,
 //   which starts every path). Null for text under the title alone, or before the first

@@ -1,5 +1,5 @@
 // API errors. Every error reply is an HTTP status plus
-// { "error": { "code": "...", "message": "..." } } (see API_SPEC.md: Conventions).
+// { "error": { "code": "...", "message": "..." } } (see docs/API_SPEC.md: Conventions).
 // A route throws an ApiError for a known case; anything else is a 500 that says only
 // "Something went wrong", with the details in the server log.
 // Express 5 passes errors thrown in async routes on to handleErrors by itself, so

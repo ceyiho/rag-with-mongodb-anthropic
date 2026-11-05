@@ -238,6 +238,17 @@ Not updated after milestone 10.
 `answer.png`: a screenshot of the web page (a reranked answer with "How this was
 found" open), shown at the top of the README.
 
+### `docs/`: the project's documentation
+
+Paths in these files are from the repository root (`src/search.js`, not
+`../src/search.js`).
+
+| File | Purpose |
+|---|---|
+| `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
+| `ARCHITECTURE.md` | This map. |
+| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–10). |
+
 ## Root files
 
 | File | Purpose |
@@ -245,10 +256,7 @@ found" open), shown at the top of the README.
 | `server.js` | Starts the API server (`npm start`): connects to Atlas, checks the search indexes, mounts the routes in `src/api/`, serves the web page from `public/`, and listens on `127.0.0.1:3000` unless `HOST` or `PORT` is set. |
 | `README.md` | The project for a portfolio reader: what it showcases, the architecture diagram (Mermaid), the main queries as example code, results, quick start, Troubleshooting. Links here rather than repeating this map. |
 | `LICENSE` | MIT license. |
-| `PROJECT_PLAN.md` | What we're building, milestones, decisions, findings, current status. |
 | `CLAUDE.md` | Working preferences for Claude Code. Local only (gitignored). |
-| `ARCHITECTURE.md` | This map. |
-| `API_SPEC.md` | The API's routes, request and response formats, and error codes, and how the web page uses them (milestones 7–10). |
 | `HANDOFF.md` | Short-lived notes for the next session, updated at each handoff. Local only (gitignored). |
 | `.env` | Secrets and per-machine values. Never committed. |
 | `.env.example` | The variables `.env` needs, with placeholder values. Committed. |

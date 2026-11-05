@@ -293,7 +293,8 @@ so no logins or usage limits are needed.
   testing, including everything that shows the app's internals (e.g. the command-line
   search); `server.js` at the root starts the API server, whose routes are in
   `src/api/` (milestone 7); `public/` is the web page (milestone 8); `wireframe/` is
-  the static mock-up it's built from. ARCHITECTURE.md maps each folder and file.
+  the static mock-up it's built from; `docs/` holds this plan, the code map and the API
+  spec. ARCHITECTURE.md maps each folder and file.
 
 ## Findings
 Measured results and the values chosen from them, with a short reason. Filled in as

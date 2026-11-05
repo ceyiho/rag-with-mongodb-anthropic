@@ -1,7 +1,7 @@
 // The web page (milestone 8): its state, the functions that draw the page from it, and
 // the events that change it. Built from wireframe/index-green.html, and the Filter
 // block (milestone 10) from wireframe/index-facets.html; the routes it calls, and how
-// it reacts to their errors, are in API_SPEC.md.
+// it reacts to their errors, are in docs/API_SPEC.md.
 // Pattern: every change updates `state`, then calls render(), which redraws each area
 // of the page from state. Simple, and fast enough at this size.
 
@@ -665,7 +665,7 @@ function clearFilter() {
 // One file at a time, from the Upload button or dropped on the sidebar. The page checks
 // what it can before sending (type, duplicate name, size), to save sending a file the
 // server would refuse; the server's checks stay the real ones. The request stays open
-// until the file is saved (API_SPEC.md: POST /api/uploads).
+// until the file is saved (docs/API_SPEC.md: POST /api/uploads).
 
 const UPLOAD_TYPES = ['.txt', '.md', '.pdf'];
 // The same limit as upload.maxMegabytes in src/config.js, which the browser can't read.
@@ -848,7 +848,7 @@ function dropSavedMessage(id) {
 
 // ---------- Questions ----------
 
-// Page wording for the errors POST /api/ask can return (API_SPEC.md: Questions). Any
+// Page wording for the errors POST /api/ask can return (docs/API_SPEC.md: Questions). Any
 // other code shows the server's own message.
 const ASK_ERRORS = {
   llmUnavailable: 'The answer service is busy right now. Try again in a minute.',
@@ -913,7 +913,7 @@ function askErrorText(err) {
 
 // ---------- Earlier questions, saved in the browser ----------
 // Each finished answer is saved in localStorage as the API returned it, with the
-// question, the uploads it was asked of and when (API_SPEC.md: Page state that never
+// question, the uploads it was asked of and when (docs/API_SPEC.md: Page state that never
 // reaches the server). Kept per browser and address, never sent to the server or the
 // LLM. Failed questions aren't saved. If storage is blocked (e.g. a private window),
 // the list just isn't kept.

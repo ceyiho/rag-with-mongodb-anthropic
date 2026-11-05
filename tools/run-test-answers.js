@@ -187,7 +187,7 @@ function judge({ q, mode, expectAnswer, result: r }) {
     else diagnosis = factSent ? 'prompt/LLM' : 'retrieval';
   }
 
-  // Signs worth a look even on a Pass (see Decisions in PROJECT_PLAN.md: Answers).
+  // Signs worth a look even on a Pass (see Decisions in docs/PROJECT_PLAN.md: Answers).
   const notes = [];
   const saysNotFound = r.rawText && normalize(r.rawText).includes(normalize(config.answer.notFoundReply));
   if (r.found && saysNotFound) notes.push('cites while saying "not found"');

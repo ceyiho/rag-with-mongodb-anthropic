@@ -41,7 +41,7 @@ module.exports = {
   // least 20× the results; Atlas caps it at 10,000.
   search: {
     // How many chunks go to the LLM. 10, not 5: broad questions (summaries, overviews)
-    // then cover a small or medium upload fully. See Findings in PROJECT_PLAN.md
+    // then cover a small or medium upload fully. See Findings in docs/PROJECT_PLAN.md
     // (Broad questions).
     limit: 10,
     candidatesPerResult: 20,
@@ -49,7 +49,7 @@ module.exports = {
     // replies "not found in your uploads" without calling the LLM. These are for
     // vector-only searches (cosine scores): answers asked without reranking, and the
     // test tools' --no-rerank. Reranked answers use rerank.notFoundThreshold below.
-    // See Findings in PROJECT_PLAN.md ("Not found" score threshold), re-checked with the
+    // See Findings in docs/PROJECT_PLAN.md ("Not found" score threshold), re-checked with the
     // PDFs and with several selected uploads (Findings: Several ticked uploads).
     notFoundThreshold: {
       selectedUploads: 0.62,
@@ -101,7 +101,7 @@ module.exports = {
   },
 
   // Sizes in characters (≈4 characters per token). Confirmed in milestone 4 against
-  // 1,000 (see Findings in PROJECT_PLAN.md: Chunk size). Changing them means
+  // 1,000 (see Findings in docs/PROJECT_PLAN.md: Chunk size). Changing them means
   // re-ingesting, and so re-embedding, every upload.
   chunking: {
     targetSize: 1600,

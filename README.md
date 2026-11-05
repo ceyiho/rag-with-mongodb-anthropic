@@ -68,8 +68,8 @@ flowchart TB
    answers with citations that map back to an upload and section. A reply with no
    citations also counts as "not found".
 
-[ARCHITECTURE.md](ARCHITECTURE.md) maps every file and command, and
-[API_SPEC.md](API_SPEC.md) describes the API's routes and the web page's behaviour.
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) maps every file and command, and
+[API_SPEC.md](docs/API_SPEC.md) describes the API's routes and the web page's behaviour.
 
 ## The queries, in code
 
@@ -299,7 +299,7 @@ How many test questions come out right on each check:
 ![Bar chart: share of test questions that come out right per check, vector search alone vs reranked. Ranking: answer first 33 vs 40 of 43 (All uploads), 36 vs 40 (one upload), expected upload first 48 vs 50 of 50. Threshold: answerable questions sent to the LLM 50 of 50 both; stopped before the LLM: wrong upload 38 vs 50 of 50, near-miss 0 vs 10 of 12, off-topic 3 vs 9 of 9, several uploads without the answer 0 vs 4 of 4.](test/charts/rerank-before-after.svg)
 
 The full comparison: [test/RERANKING.md](test/RERANKING.md). Decisions, measurements
-and the reasons behind each setting: [PROJECT_PLAN.md](PROJECT_PLAN.md).
+and the reasons behind each setting: [PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Quick start
 
